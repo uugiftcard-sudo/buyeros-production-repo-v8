@@ -302,7 +302,9 @@ class TestWorkflowRunIntegration:
             session_store=session_store,
         )
         # handle_message calls run() and then save_state() — this is what saves session state
-        workflow.handle_message(user_id="u1", message="退款 123")
+        workflow.handle_message(user_id="u1", message="退款 123", session_id="sess-1")
         session_store.save_state.assert_called_once()
         call_args = session_store.save_state.call_args[0]
-        assert "sess-1" in call_args[0]  # session_id contains "sess-1"
+        # save_state(session_id, state_dict) — positional arg 0 = session_id
+        assert call_args[0] == "sess-1"
+        assert call_args[1]["session_id"] == "sess-1"
