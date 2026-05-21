@@ -1,0 +1,13 @@
+fastapi>=0.110.0
+uvicorn>=0.27.0
+requests>=2.31.0
+python-telegram-bot>=20.0  # for Telegram integration
+supabase>=2.0.0  # optional; fallback to in-memory if not installed
+langgraph>=0.2.0
+langchain>=0.2.0
+langchain-openai>=0.1.0
+redis>=5.0.0
+pytest>=7.0.0
+httpx>=0.25.0
+PyJWT>=2.8.0
+google-auth>=2.0.0
