@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import MagicMock, patch
 
-from app.agents.finance_agent import FinanceAgent
-from app.agents.ops_agent import OpsAgent
 from app.context.context_hub import ContextHub
 from app.context.provider_registry import ProviderRegistry
 from app.context.adapters.claude import ClaudeProviderAdapter

@@ -25,9 +25,15 @@ class TaskBoardService:
         "ai_solo_team": "buyeros",
         "report": "cloth",
         "commerce": "cloth",
+        "reporting": "cloth",
+        "order": "cloth",
+        "orders": "cloth",
         "promo": "xau",
-        "xau_promo": "xau",
         "xau-team": "xau",
+        "xau_team": "xau",
+        "xaupromo": "xau",
+        "xau-promo": "xau",
+        "xau_promo": "xau",
         "shop": "cloth",
     }
 

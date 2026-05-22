@@ -21,16 +21,23 @@ class ProjectRegistryService:
         "ai_team": "buyeros",
         "ai-team": "buyeros",
         "ai_solo_team": "buyeros",
+        "ai-solo-team": "buyeros",
         "cloth": "cloth",
         "report": "cloth",
         "commerce": "cloth",
+        "reporting": "cloth",
+        "orders": "cloth",
+        "order": "cloth",
         "shop": "cloth",
         "xau": "xau",
         "promo": "xau",
         "xau_promo": "xau",
         "xau-team": "xau",
+        "xau_team": "xau",
+        "xaupromo": "xau",
+        "xau-promo": "xau",
     }
-    DEFAULT_PROJECTS = [
+    DEFAULT_PROJECTS: List[Dict[str, Any]] = [
         {
             "project_id": "buyeros",
             "name": "BuyerOS Core",

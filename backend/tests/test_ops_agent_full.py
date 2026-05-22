@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from app.agents.ops_agent import OpsAgent
 from app.memory_store import MemoryStore

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -10,6 +11,8 @@ from app.services.promo_service import PromoService
 from app.services.reporting_service import ReportingService
 from app.services.task_board_service import TaskBoardService
 from app.workflows.main import create_app
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_reporting_service_creates_history_and_csv() -> None:
@@ -160,14 +163,14 @@ def test_three_system_api_validates_payload(monkeypatch) -> None:
 
 
 def test_three_systems_smoke_script_exists_and_is_executable() -> None:
-    path = "infra/smoke_four_systems.sh"
+    path = REPO_ROOT / "infra/smoke_four_systems.sh"
 
     assert os.path.exists(path)
     assert os.access(path, os.X_OK)
 
 
 def test_primary_smoke_script_runs_three_systems_by_default() -> None:
-    with open("infra/smoke_api.sh", "r", encoding="utf-8") as fh:
+    with open(REPO_ROOT / "infra/smoke_api.sh", "r", encoding="utf-8") as fh:
         script = fh.read()
 
     assert "smoke_four_systems.sh" in script
@@ -175,7 +178,7 @@ def test_primary_smoke_script_runs_three_systems_by_default() -> None:
 
 
 def test_legacy_three_systems_smoke_script_wraps_three_systems() -> None:
-    path = "infra/smoke_three_systems.sh"
+    path = REPO_ROOT / "infra/smoke_three_systems.sh"
 
     assert os.path.exists(path)
     assert os.access(path, os.X_OK)
@@ -185,7 +188,7 @@ def test_legacy_three_systems_smoke_script_wraps_three_systems() -> None:
 
 
 def test_deploy_and_smoke_script_exists_and_uses_safe_steps() -> None:
-    path = "infra/deploy_and_smoke.sh"
+    path = REPO_ROOT / "infra/deploy_and_smoke.sh"
 
     assert os.path.exists(path)
     assert os.access(path, os.X_OK)
@@ -198,7 +201,7 @@ def test_deploy_and_smoke_script_exists_and_uses_safe_steps() -> None:
 
 
 def test_24h_smoke_script_exists_and_runs_primary_smoke_loop() -> None:
-    path = "infra/smoke_24h.sh"
+    path = REPO_ROOT / "infra/smoke_24h.sh"
 
     assert os.path.exists(path)
     assert os.access(path, os.X_OK)
@@ -211,7 +214,7 @@ def test_24h_smoke_script_exists_and_runs_primary_smoke_loop() -> None:
 
 
 def test_smoke_full_script_exists() -> None:
-    path = "infra/smoke_full.sh"
+    path = REPO_ROOT / "infra/smoke_full.sh"
 
     assert os.path.exists(path)
     assert os.access(path, os.X_OK)

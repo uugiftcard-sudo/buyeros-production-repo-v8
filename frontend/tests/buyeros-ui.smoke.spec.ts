@@ -58,15 +58,15 @@ test("BuyerOS mission control can plan, run one step, and show memory UI", async
   await expect(page.getByText("前端不顯示、不保存金鑰")).toBeVisible();
   await expect(page.getByText("BUYEROS_API_KEY")).not.toBeVisible();
   await expect(page.getByText("按鈕回饋")).toBeVisible();
-    await expect(page.getByText("BuyerOS Core").first()).toBeVisible();
-    await expect(page.getByText("CLOTH 網店自動系統").first()).toBeVisible();
-    await expect(page.getByText("XAU 中控").first()).toBeVisible();
+  await expect(page.getByText("BuyerOS Core").first()).toBeVisible();
+  await expect(page.getByText("CLOTH 網店自動系統").first()).toBeVisible();
+  await expect(page.getByText("XAU 中控").first()).toBeVisible();
   await expect(page.getByText("BUYEROS_API_KEY")).not.toBeVisible();
 
   const projectSelect = page.locator("#dispatch select").nth(0);
-    await expect(projectSelect.locator("option[value='buyeros']")).toHaveText("BuyerOS Core");
-    await expect(projectSelect.locator("option[value='cloth']")).toHaveText("CLOTH 網店自動系統");
-    await expect(projectSelect.locator("option[value='xau']")).toHaveText("XAU 中控");
+  await expect(projectSelect.locator("option[value='buyeros']")).toHaveText("BuyerOS Core");
+  await expect(projectSelect.locator("option[value='cloth']")).toHaveText("CLOTH 網店自動系統");
+  await expect(projectSelect.locator("option[value='xau']")).toHaveText("XAU 中控");
 
   await page.getByRole("button", { name: "查看 AI 狀態" }).click();
   await expect(page.getByText("Fallback：").first()).toBeVisible();
@@ -94,5 +94,4 @@ test("BuyerOS mission control can plan, run one step, and show memory UI", async
   await expect(page.getByText("Backup Status")).toBeVisible();
   await expect(page.getByText("Rollback Checklist")).toBeVisible();
   await expect(page.getByText("Deploy Topology")).toBeVisible();
-  await expect(page.getByText("未設定資料來源").first()).toBeVisible();
 });

@@ -65,8 +65,6 @@ from ..schemas.state import (
 )
 from ..runtime.session_store import RedisSessionStore
 from ..security import require_api_key
-from ..services.orders_service import OrdersService
-from ..services.buyers_service import BuyersService
 from ..services.business_automation import BusinessAutomationService
 from ..services.memory_timeline_service import MemoryTimelineService
 from ..services.promo_service import PromoService
@@ -119,7 +117,6 @@ def create_app() -> FastAPI:
     # Setup agents
     from ..services.orders_service import OrdersService
     from ..services.buyers_service import BuyersService
-
     orders_service = OrdersService()
     buyers_service = BuyersService()
 

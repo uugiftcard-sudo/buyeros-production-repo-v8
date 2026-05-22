@@ -14,13 +14,15 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
+create_supabase_client: Optional[Callable[..., Any]] = None
 try:
-    from supabase import create_client, Client as SupabaseClient  # type: ignore
+    from supabase import create_client as _imported_create_supabase_client  # type: ignore
+
+    create_supabase_client = _imported_create_supabase_client
 except ImportError:
-    create_client = None
-    SupabaseClient = None
+    pass
 
 
 logger = logging.getLogger(__name__)
@@ -39,11 +41,11 @@ class MemoryStore:
     """
 
     def __init__(self, *, supabase_url: Optional[str] = None, supabase_key: Optional[str] = None) -> None:
-        self.supabase: Optional[SupabaseClient] = None
+        self.supabase: Optional[Any] = None
         self.memory: List[Dict[str, Any]] = []
-        if supabase_url and supabase_key and create_client:
+        if supabase_url and supabase_key and create_supabase_client:
             try:
-                self.supabase = create_client(supabase_url, supabase_key)
+                self.supabase = create_supabase_client(supabase_url, supabase_key)
                 # ensure table exists (Supabase will create on insert if absent)
                 logger.info("Using Supabase for memory storage")
             except Exception as exc:
