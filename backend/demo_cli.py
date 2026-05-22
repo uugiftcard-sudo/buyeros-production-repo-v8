@@ -6,8 +6,6 @@ persistent memory works by handling refund requests and subsequent
 queries about the same transaction id.
 """
 
-import os
-
 from app.workflows.main import create_app  # type: ignore
 
 def main() -> None:

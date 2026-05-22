@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from ..registry import ToolRegistry
 from ..memory_store import MemoryStore

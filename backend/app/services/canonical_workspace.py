@@ -18,9 +18,15 @@ WORKSPACE_ALIASES: Dict[str, str] = {
     "commerce": "cloth",
     "report": "cloth",
     "shop": "cloth",
+    "reporting": "cloth",
+    "order": "cloth",
+    "orders": "cloth",
     "xau": "xau",
     "xau-team": "xau",
+    "xau_team": "xau",
     "xau_promo": "xau",
+    "xaupromo": "xau",
+    "xau-promo": "xau",
     "promo": "xau",
 }
 
@@ -39,6 +45,6 @@ def normalize_workspace(value: str | None) -> str:
 
 
 def normalize_many(values: Iterable[str | None]) -> Dict[str, str]:
-    """Normalize multiple values and return original->normalized mapping."""
+    """Normalize multiple values and return string(original)->normalized mapping."""
 
-    return {value: normalize_workspace(value) for value in values}
+    return {value or "": normalize_workspace(value) for value in values}

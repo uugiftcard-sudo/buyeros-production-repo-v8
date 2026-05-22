@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
 
 from app.workflows.main import create_app

@@ -8,13 +8,7 @@ optional graph runtime is not available yet.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Optional
-
-try:  # pragma: no cover - exercised only when langgraph is installed
-    from langgraph.graph import END, StateGraph
-except Exception:  # pragma: no cover - deterministic fallback is tested
-    END = None
-    StateGraph = None
+from typing import Any, Optional
 
 from ..agents.finance_agent import FinanceAgent
 from ..agents.ops_agent import OpsAgent
@@ -23,6 +17,16 @@ from ..context.provider_registry import ProviderRegistry
 from ..memory_store import MemoryStore
 from ..runtime.session_store import RedisSessionStore
 from ..schemas.state import BuyerOSState
+
+GRAPH_END: Any = None
+StateGraphClass: Any = None
+try:  # pragma: no cover - exercised only when langgraph is installed
+    from langgraph.graph import END as _GRAPH_END, StateGraph as _StateGraphClass
+
+    GRAPH_END = _GRAPH_END
+    StateGraphClass = _StateGraphClass
+except Exception:  # pragma: no cover - deterministic fallback is tested
+    pass
 
 
 class BuyerOSGraphWorkflow:
@@ -44,7 +48,7 @@ class BuyerOSGraphWorkflow:
         self.ops_agent = ops_agent
         self.finance_agent = finance_agent
         self.session_store = session_store
-        self._graph = self._build_graph() if StateGraph else None
+        self._graph = self._build_graph() if StateGraphClass is not None else None
 
     def handle_message(
         self,
@@ -84,7 +88,7 @@ class BuyerOSGraphWorkflow:
         return self._provider(state)
 
     def _build_graph(self) -> Any:  # pragma: no cover - depends on optional runtime
-        graph = StateGraph(BuyerOSState)
+        graph = StateGraphClass(BuyerOSState)
         graph.add_node("classify", self._classify)
         graph.add_node("memory_lookup", self._memory_lookup)
         graph.add_node("ops", self._ops)
@@ -101,10 +105,10 @@ class BuyerOSGraphWorkflow:
                 "provider": "provider",
             },
         )
-        graph.add_edge("memory_lookup", END)
-        graph.add_edge("ops", END)
-        graph.add_edge("finance", END)
-        graph.add_edge("provider", END)
+        graph.add_edge("memory_lookup", GRAPH_END)
+        graph.add_edge("ops", GRAPH_END)
+        graph.add_edge("finance", GRAPH_END)
+        graph.add_edge("provider", GRAPH_END)
         return graph.compile()
 
     def _classify(self, state: BuyerOSState) -> BuyerOSState:

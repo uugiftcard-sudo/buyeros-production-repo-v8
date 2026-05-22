@@ -7,10 +7,13 @@ import logging
 import os
 from typing import Any, Dict, Optional
 
+redis: Any = None
 try:
-    import redis
+    import redis as _redis_module
+
+    redis = _redis_module
 except ImportError:  # pragma: no cover - optional dependency fallback
-    redis = None
+    pass
 
 logger = logging.getLogger(__name__)
 

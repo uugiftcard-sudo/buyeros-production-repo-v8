@@ -158,12 +158,20 @@ const projectAliases: Record<string, CanonicalProject> = {
   "ai-team": "buyeros",
   ai_team: "buyeros",
   ai_solo_team: "buyeros",
+  "ai-solo-team": "buyeros",
   cloth: "cloth",
   commerce: "cloth",
+  reporting: "cloth",
+  order: "cloth",
+  orders: "cloth",
   shop: "cloth",
   report: "cloth",
   xau: "xau",
   xau_promo: "xau",
+  "xau-team": "xau",
+  "xau_team": "xau",
+  xaupromo: "xau",
+  "xau-promo": "xau",
   promo: "xau"
 };
 
@@ -236,6 +244,26 @@ const projectProfiles = {
 
 function projectProfile(value?: string) {
   return projectProfiles[normalizeProjectId(value || "")];
+}
+
+function normalizeProjectCard(entry: MemoryEntry<ProjectCard>): MemoryEntry<ProjectCard> {
+  const content = (entry.content || {}) as Record<string, unknown>;
+  const projectId = normalizeProjectId(
+    typeof content.project_id === "string" ? content.project_id : typeof entry.memory_key === "string" ? entry.memory_key : "buyeros"
+  );
+  const profile = projectProfile(projectId);
+  const existingNotes = typeof content.notes === "string" ? content.notes : undefined;
+  return {
+    ...entry,
+    memory_key: projectId,
+    content: {
+      ...content,
+      project_id: projectId,
+      name: profile.title,
+      kind: profile.kind,
+      notes: existingNotes || profile.subtitle,
+    },
+  };
 }
 
 function normalizeProjectId(value?: string): keyof typeof projectProfiles {
@@ -383,20 +411,8 @@ export default function DashboardPage() {
     if (data && typeof data === "object" && "items" in data && Array.isArray((data as { items?: unknown }).items)) {
       const latest = new Map<string, MemoryEntry<ProjectCard>>();
       (data as { items: MemoryEntry<ProjectCard>[] }).items.forEach((entry) => {
-        const content = entry.content;
-        const projectId = normalizeProjectId(content?.project_id || entry.memory_key);
-        const profile = projectProfile(projectId);
-        latest.set(projectId, {
-          ...entry,
-          memory_key: projectId,
-          content: {
-            ...(content || { project_id: projectId, name: profile.title }),
-            project_id: projectId,
-            name: profile.title,
-            kind: profile.kind,
-            notes: profile.subtitle
-          }
-        });
+        const normalized = normalizeProjectCard(entry);
+        latest.set(normalized.memory_key || "buyeros", normalized);
       });
       setProjectCards(taskLanes.map((lane) => latest.get(lane.id)).filter(Boolean) as MemoryEntry<ProjectCard>[]);
       recordAction("專案清單", "已同步三個 workspace");

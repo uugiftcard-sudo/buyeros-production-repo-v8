@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from app.context.adapters.cursor import CursorProviderAdapter
+from app.context.adapters.perplexity import PerplexityProviderAdapter
+from app.context.adapters.openclaw import OpenClawProviderAdapter
+from app.context.adapters.hermes import HermesProviderAdapter
+from app.context.adapters.minimax import MiniMaxProviderAdapter
 from app.context.context_hub import ContextHub
 from app.context.provider_registry import BaseProviderAdapter, ProviderRegistry
 from app.context.adapters.claude import ClaudeProviderAdapter
 from app.context.adapters.openai import OpenAIProviderAdapter
 from app.context.adapters.deepseek import DeepSeekProviderAdapter
 from app.context.adapters.openrouter import OpenRouterProviderAdapter
-from app.context.adapters.minimax import MiniMaxProviderAdapter
 from app.memory_store import MemoryStore
 
 
@@ -348,12 +353,3 @@ class TestProviderAdapterSmoke:
         assert result["ok"] is False
         assert result["provider"] == "openrouter"
         assert "failed" in result["reply"]
-
-
-import pytest  # noqa: E402, F401
-
-from app.context.adapters.cursor import CursorProviderAdapter
-from app.context.adapters.perplexity import PerplexityProviderAdapter
-from app.context.adapters.openclaw import OpenClawProviderAdapter
-from app.context.adapters.hermes import HermesProviderAdapter
-from app.context.adapters.minimax import MiniMaxProviderAdapter
