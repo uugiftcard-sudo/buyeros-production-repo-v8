@@ -5,6 +5,7 @@ ENV_FILE=".env.production.local"
 PUBLIC_BASE_URL_ARG=""
 UI_URL_ARG=""
 MODE="auto"
+FRONTEND_STARTED=0
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   echo "Usage: infra/smoke_one_click.sh [--local|--docker] [env_file] [public_api_url] [public_ui_url]"
@@ -141,15 +142,27 @@ launch_local_services() {
   frontend_pid=""
 
   (cd "$REPO_ROOT/backend" && BUYEROS_API_KEY="$BUYEROS_API_KEY" "$REPO_ROOT/.venv/bin/uvicorn" app.workflows.main:create_app --factory --host 127.0.0.1 --port 8000 >"$REPO_ROOT/infra/backend-smoke-one-click.log" 2>&1 & echo $! >"$REPO_ROOT/infra/.smoke_backend_pid")
-  (cd "$REPO_ROOT/frontend" && BUYEROS_API_KEY="$BUYEROS_API_KEY" BUYEROS_BACKEND_URL="http://127.0.0.1:8000" npm run dev -- --hostname 127.0.0.1 --port 3000 >"$REPO_ROOT/infra/frontend-smoke-one-click.log" 2>&1 & echo $! >"$REPO_ROOT/infra/.smoke_frontend_pid")
+  if command -v npm >/dev/null 2>&1; then
+    FRONTEND_STARTED=1
+    (cd "$REPO_ROOT/frontend" && BUYEROS_API_KEY="$BUYEROS_API_KEY" BUYEROS_BACKEND_URL="http://127.0.0.1:8000" npm run dev -- --hostname 127.0.0.1 --port 3000 >"$REPO_ROOT/infra/frontend-smoke-one-click.log" 2>&1 & echo $! >"$REPO_ROOT/infra/.smoke_frontend_pid")
+  else
+    FRONTEND_STARTED=0
+    echo "npm not found: skipping local frontend boot. Backend smoke + readiness checks will run only."
+  fi
 
   backend_pid=$(cat "$REPO_ROOT/infra/.smoke_backend_pid")
-  frontend_pid=$(cat "$REPO_ROOT/infra/.smoke_frontend_pid")
+  if [[ -f "$REPO_ROOT/infra/.smoke_frontend_pid" ]]; then
+    frontend_pid=$(cat "$REPO_ROOT/infra/.smoke_frontend_pid")
+  fi
 
-  trap 'echo "Stopping local services..."; kill "$backend_pid" "$frontend_pid" >/dev/null 2>&1 || true; rm -f "$REPO_ROOT/infra/.smoke_backend_pid" "$REPO_ROOT/infra/.smoke_frontend_pid"; exit 0' EXIT
+  trap 'echo "Stopping local services..."; [[ -n "${backend_pid:-}" ]] && kill "$backend_pid" >/dev/null 2>&1 || true; [[ -n "${frontend_pid:-}" ]] && kill "$frontend_pid" >/dev/null 2>&1 || true; rm -f "$REPO_ROOT/infra/.smoke_backend_pid" "$REPO_ROOT/infra/.smoke_frontend_pid"; exit 0' EXIT
 
   wait_for_url "${PUBLIC_BASE_URL}/ping"
-  wait_for_url "${UI_URL}"
+  if [[ -n "${frontend_pid:-}" ]]; then
+    wait_for_url "${UI_URL}"
+  else
+    echo "UI not started, skip frontend wait."
+  fi
 }
 
 if [[ "$MODE" == "docker" ]]; then
@@ -157,6 +170,7 @@ if [[ "$MODE" == "docker" ]]; then
     echo "docker not found. Retry with --local."
     exit 1
   fi
+  FRONTEND_STARTED=1
   echo "== run docker compose =="
   cd "$REPO_ROOT" && docker compose up -d --build
   wait_for_url "${PUBLIC_BASE_URL}/ping" 60 2
@@ -173,6 +187,10 @@ else
 fi
 
 echo "== run one-click smoke =="
-bash "$REPO_ROOT/infra/smoke_full.sh" "$PUBLIC_BASE_URL" "$BUYEROS_API_KEY" "$UI_URL"
+if [[ "$FRONTEND_STARTED" == "1" ]] || [[ "$MODE" == "docker" ]]; then
+  bash "$REPO_ROOT/infra/smoke_full.sh" "$PUBLIC_BASE_URL" "$BUYEROS_API_KEY" "$UI_URL"
+else
+  bash "$REPO_ROOT/infra/smoke_api.sh" "$PUBLIC_BASE_URL" "$BUYEROS_API_KEY"
+fi
 
 echo "Smoke done: ${PUBLIC_BASE_URL} / ${UI_URL}"

@@ -527,8 +527,13 @@ def create_app() -> FastAPI:
     async def tasks_get(task_id: str) -> Dict[str, Any]:
         """Return a task and recent runs."""
         task = memory_store.search_memory(namespace_prefix=("buyeros", "tasks"), memory_key=task_id, limit=1)
+        normalized_task = task_board_service.normalize_task_payload(task[0]) if task else None
         runs = memory_store.search_memory(namespace_prefix=("buyeros", "task_runs"), query=task_id, limit=20)
-        return {"ok": True, "task": task[0] if task else None, "runs": runs}
+        for run in runs:
+            content = run.get("content")
+            if isinstance(content, dict):
+                run["content"] = dict(content)
+        return {"ok": True, "task": normalized_task, "runs": runs}
 
     @app.post("/tasks/dispatch", dependencies=[Depends(require_api_key)])
     async def tasks_dispatch(payload: TaskDispatchRequest) -> Dict[str, Any]:

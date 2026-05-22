@@ -127,4 +127,7 @@ class ProjectRegistryService:
                 if item["project_id"] == project_id:
                     return dict(item)
             return None
-        return items[0].get("content") or None
+        content = dict(items[0].get("content") or {})
+        content["project_id"] = project_id
+        content["normalized_project_id"] = project_id
+        return content
