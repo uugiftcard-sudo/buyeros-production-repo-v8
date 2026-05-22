@@ -25,6 +25,7 @@ services:
     environment:
       - BUYEROS_BACKEND_URL=http://backend:8000
       - NEXT_PUBLIC_BUYEROS_API_URL=/api/buyeros
+      - BUYEROS_API_KEY=${BUYEROS_API_KEY}
     ports:
       - "3000:3000"
     depends_on:

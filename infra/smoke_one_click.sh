@@ -6,6 +6,18 @@ PUBLIC_BASE_URL_ARG=""
 UI_URL_ARG=""
 MODE="auto"
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  echo "Usage: infra/smoke_one_click.sh [--local|--docker] [env_file] [public_api_url] [public_ui_url]"
+  echo "Examples:"
+  echo "  infra/smoke_one_click.sh --local"
+  echo "  infra/smoke_one_click.sh --local .env.production.local http://127.0.0.1:8000 http://127.0.0.1:3000"
+  echo "  infra/smoke_one_click.sh --docker"
+  echo
+  echo "When env_file is omitted, defaults to .env.production.local then .env."
+  echo "UI auth is auto-injected server-side from BUYEROS_API_KEY in env / env file; no UI key input needed."
+  exit 0
+fi
+
 for arg in "$@"; do
   case "$arg" in
     --local)

@@ -25,8 +25,8 @@ async function proxy(request: NextRequest, context: RouteContext) {
   // to pass a key via header so local dev doesn't require restarts.
   const uiApiKey = request.headers.get("x-buyeros-api-key") || request.headers.get("x-api-key");
   const queryApiKey = new URL(request.url).searchParams.get("k");
-  const envApiKey = process.env.BUYEROS_API_KEY || process.env.NEXT_PUBLIC_BUYEROS_API_KEY;
-  const apiKey = queryApiKey || envApiKey || uiApiKey;
+  const envApiKey = process.env.BUYEROS_API_KEY;
+  const apiKey = envApiKey || queryApiKey || uiApiKey;
   if (apiKey) headers.set("authorization", `Bearer ${apiKey}`);
 
   const method = request.method.toUpperCase();

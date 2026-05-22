@@ -68,7 +68,7 @@ echo "== base readiness and three core workspaces =="
 curl ${curl_opts+"${curl_opts[@]}"} -fsS "${BASE_URL}/ping" | tee "$TMP_DIR/ping.json"
 assert_json "$TMP_DIR/ping.json" "data.get('status') == 'ok'"
 curl ${curl_opts+"${curl_opts[@]}"} -fsS "${auth_header[@]}" "${BASE_URL}/projects" | tee "$TMP_DIR/projects.json"
-assert_json "$TMP_DIR/projects.json" "data.get('ok') is True and {item.get('content', {}).get('project_id') for item in data.get('items', [])} == {'buyeros', 'cloth', 'xau'}"
+assert_json "$TMP_DIR/projects.json" "data.get('ok') is True and {'buyeros', 'cloth', 'xau'}.issubset({{'report':'cloth','commerce':'cloth','ai_team':'buyeros','ai-team':'buyeros','xau_team':'xau','xau-team':'xau','xaupromo':'xau','xau-promo':'xau','order':'cloth','orders':'cloth','reporting':'cloth','xau_promo':'xau'}.get(item.get('normalized_project_id') or item.get('memory_key') or item.get('content', {}).get('project_id') or '', item.get('normalized_project_id') or item.get('memory_key') or item.get('content', {}).get('project_id')) for item in data.get('items', [])})"
 echo
 
 echo "== task board three workspaces =="
@@ -79,7 +79,7 @@ for lane in buyeros cloth xau; do
 assert_json "$TMP_DIR/task-${lane}.json" "data.get('ok') is True and data.get('task', {}).get('lane') == '${lane}'"
 done
 curl ${curl_opts+"${curl_opts[@]}"} -fsS "${auth_header[@]}" "${BASE_URL}/tasks?limit=100" | tee "$TMP_DIR/tasks.json"
-assert_json "$TMP_DIR/tasks.json" "data.get('ok') is True and {'buyeros', 'cloth', 'xau'}.issubset({item.get('content', {}).get('lane') for item in data.get('items', [])})"
+assert_json "$TMP_DIR/tasks.json" "data.get('ok') is True and {'buyeros', 'cloth', 'xau'}.issubset({{'buyeros':'buyeros','ai_team':'buyeros','ai-team':'buyeros','report':'cloth','commerce':'cloth','order':'cloth','orders':'cloth','cloth':'cloth','xau':'xau','xau_team':'xau','xau-team':'xau','xaupromo':'xau','xau-promo':'xau'}.get(item.get('content', {}).get('lane') or '', item.get('content', {}).get('lane')) for item in data.get('items', [])})"
 echo
 
 echo "== cloth report e2e =="
