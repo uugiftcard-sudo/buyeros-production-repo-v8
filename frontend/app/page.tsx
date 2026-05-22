@@ -709,7 +709,7 @@ export default function DashboardPage() {
             <input value={api.proxyUrl} onChange={(event) => updateApi("proxyUrl", event.target.value)} />
           </label>
           <div className="auto-auth">
-            已由 Next.js Proxy 自動帶入授權；前端不顯示、不保存金鑰。
+            授權由 Next.js Proxy 使用 server-side 環境變數處理；本機也可用 k=URL 參數臨時帶入。
           </div>
         </aside>
       </header>

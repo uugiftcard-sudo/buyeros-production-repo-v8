@@ -281,6 +281,16 @@ def create_app() -> FastAPI:
     async def context_session(session_id: str) -> Dict[str, Any]:
         """Return shared context for a specific session."""
         items = context_hub.get_session(session_id)
+        if not items:
+            # Backward-compatible fallback for historical rows where callers
+            # keyed memory on session_id but failed to persist content.session_id.
+            fallback_items = context_hub.memory_store.search_memory(
+                namespace_prefix=("buyeros", "ai_context"),
+                memory_key=session_id,
+                limit=50,
+            )
+            if fallback_items:
+                items = fallback_items
         audit_logger.log(action="context.session", actor="api", details={"session_id": session_id, "count": len(items)})
         return {"ok": True, "items": items, "last_state": session_store.get_state(session_id)}
 

@@ -47,6 +47,18 @@ infra/go_live_audit.sh .env.production.local "$PUBLIC_BASE_URL" root@206.189.116
 `smoke_api.sh` 會先驗證核心 API / context / dispatcher，然後自動驗證三個
 上線工作線：`buyeros`、`cloth`、`xau`。
 
+一條命令全流程（後端 + UI）：
+
+```bash
+infra/smoke_one_click.sh --local .env.production.local
+```
+
+已安裝 Docker 時可直接用 Docker 模式：
+
+```bash
+infra/smoke_one_click.sh --docker .env.production.local
+```
+
 `smoke_telegram_webhook.sh` 不會設定 Telegram webhook；它用 Telegram
 update payload 直接打 `/telegram/webhook`，再用 `/context/session` 驗證退款
 記憶可召回。正式 Telegram 上線仍要 HTTPS domain。

@@ -98,6 +98,31 @@ class TestContextSessionEndpoint:
         assert isinstance(body["items"], list)
         assert "last_state" in body
 
+    def test_session_returns_fallback_by_memory_key(self, monkeypatch) -> None:
+        monkeypatch.setenv("BUYEROS_API_KEY", "secret")
+        client = TestClient(create_app())
+        # simulate legacy rows: no content.session_id, only memory_key=session.
+        client.post(
+            "/context/write",
+            json={
+                "source_provider": "openai",
+                "task_id": "legacy-session",
+                "content": {"text": "Legacy session entry"},
+                "summary": "legacy",
+            },
+            headers={"Authorization": "Bearer secret"},
+        )
+
+        response = client.get(
+            "/context/session/legacy-session",
+            headers={"Authorization": "Bearer secret"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["ok"] is True
+        assert isinstance(body["items"], list)
+        assert len(body["items"]) >= 1
+
     def test_session_empty_when_no_data(self) -> None:
         client = TestClient(create_app())
         response = client.get("/context/session/nonexistent-session")
