@@ -63,13 +63,13 @@ class ContextHub:
         limit: int = 5,
     ) -> List[Dict[str, Any]]:
         namespace = tuple(self.namespace_for(source_provider)) if source_provider else AI_CONTEXT_ROOT
-        entries = self.memory_store.search_memory(namespace_prefix=namespace, query=query, limit=limit * 2)
-        if session_id:
-            entries = [
-                entry
-                for entry in entries
-                if (entry.get("content") or {}).get("session_id") == session_id
-            ]
+        entries = self.memory_store.search_memory(
+            namespace_prefix=namespace,
+            query=query,
+            session_id=session_id,
+            source_provider=source_provider,
+            limit=limit,
+        )
         return entries[:limit]
 
     def summarize_context(
@@ -106,4 +106,3 @@ class ContextHub:
             text = json.dumps(content, ensure_ascii=False, sort_keys=True)
         text = str(text).strip()
         return text[:240] + ("..." if len(text) > 240 else "")
-

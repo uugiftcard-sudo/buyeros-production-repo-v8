@@ -79,7 +79,17 @@ class MemoryStore:
                 return
         self.memory.append(entry)
 
-    def search_memory(self, *, namespace_prefix: Tuple[str, ...], query: Optional[str] = None, memory_key: Optional[str] = None, limit: int = 5) -> List[Dict[str, Any]]:
+    def search_memory(
+        self,
+        *,
+        namespace_prefix: Tuple[str, ...],
+        query: Optional[str] = None,
+        memory_key: Optional[str] = None,
+        session_id: Optional[str] = None,
+        task_id: Optional[str] = None,
+        source_provider: Optional[str] = None,
+        limit: int = 5,
+    ) -> List[Dict[str, Any]]:
         """Retrieve recent memory entries matching the given namespace prefix.
 
         If running on Supabase, this issues a SQL query filtering by
@@ -89,25 +99,65 @@ class MemoryStore:
         :param namespace_prefix: tuple of namespace parts to match at the start of the namespace list
         :param query: optional substring to search in JSON content
         :param memory_key: optional exact key to match
+        :param session_id: optional session id stored inside the content payload
+        :param task_id: optional task id stored inside the content payload
+        :param source_provider: optional provider stored inside the content payload
         :param limit: maximum number of entries to return
         :return: list of memory entries, most recent first
         """
         if self.supabase:
             try:
                 query_builder = self.supabase.table("agent_memory").select("*").order("created_at", desc=True)
-                # Supabase/PostgREST supports the array contains operator via cs.
-                query_builder = query_builder.filter("namespace", "cs", json.dumps(list(namespace_prefix)))
+                # PostgREST expects Postgres array literal syntax for text[] filters.
+                query_builder = query_builder.filter("namespace", "cs", self._pg_array_literal(namespace_prefix))
                 if memory_key:
                     query_builder = query_builder.filter("memory_key", "eq", memory_key)
-                # Supabase doesn't support JSON contains search easily; we skip query search here
-                response = query_builder.limit(limit).execute()
+                # Keep JSON/text filtering deterministic across Supabase and the
+                # in-memory store. Fetch a bounded candidate window first, then
+                # apply query/session/provider filters before final limiting.
+                fetch_limit = min(max(limit * 20, 100), 1000)
+                response = query_builder.limit(fetch_limit).execute()
                 if response and response.data:
-                    return response.data  # type: ignore
+                    return self._filter_entries(
+                        list(response.data),
+                        namespace_prefix=namespace_prefix,
+                        query=query,
+                        memory_key=memory_key,
+                        session_id=session_id,
+                        task_id=task_id,
+                        source_provider=source_provider,
+                        limit=limit,
+                    )
             except Exception as exc:
                 logger.error("Supabase search failed: %s", exc)
         # Fallback filter
+        return self._filter_entries(
+            list(reversed(self.memory)),
+            namespace_prefix=namespace_prefix,
+            query=query,
+            memory_key=memory_key,
+            session_id=session_id,
+            task_id=task_id,
+            source_provider=source_provider,
+            limit=limit,
+        )
+
+    def _filter_entries(
+        self,
+        entries: List[Dict[str, Any]],
+        *,
+        namespace_prefix: Tuple[str, ...],
+        query: Optional[str],
+        memory_key: Optional[str],
+        session_id: Optional[str],
+        task_id: Optional[str],
+        source_provider: Optional[str],
+        limit: int,
+    ) -> List[Dict[str, Any]]:
         result: List[Dict[str, Any]] = []
-        for entry in reversed(self.memory):  # iterate from latest
+        normalized_query = query.lower() if query else None
+        normalized_provider = source_provider.lower().strip() if source_provider else None
+        for entry in entries:
             ns = entry.get("namespace", [])
             if len(ns) < len(namespace_prefix):
                 continue
@@ -115,12 +165,20 @@ class MemoryStore:
                 continue
             if memory_key and entry.get("memory_key") != memory_key:
                 continue
-            if query:
+            content = entry.get("content") or {}
+            if session_id and content.get("session_id") != session_id:
+                continue
+            if task_id and content.get("task_id") != task_id:
+                continue
+            if normalized_provider and str(content.get("source_provider", "")).lower().strip() != normalized_provider:
+                continue
+            if normalized_query:
                 try:
-                    if query.lower() not in json.dumps(entry.get("content")).lower():
+                    searchable = json.dumps(content, ensure_ascii=False, sort_keys=True).lower()
+                    if normalized_query not in searchable and normalized_query not in str(entry.get("memory_key", "")).lower():
                         continue
                 except Exception:
-                    pass
+                    continue
             result.append(entry)
             if len(result) >= limit:
                 break
@@ -135,3 +193,7 @@ class MemoryStore:
         except Exception as exc:
             logger.error("Supabase status check failed: %s", exc)
             return {"backend": "supabase", "ok": False, "error": str(exc)}
+
+    def _pg_array_literal(self, values: Iterable[str]) -> str:
+        escaped = [str(value).replace("\\", "\\\\").replace('"', '\\"') for value in values]
+        return "{" + ",".join(f'"{value}"' for value in escaped) + "}"

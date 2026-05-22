@@ -33,6 +33,16 @@ class TestBaseProviderAdapter:
         result = adapter._run_via_openrouter("test prompt")
         assert result is None
 
+    def test_run_without_provider_key_returns_not_configured(self, monkeypatch) -> None:
+        monkeypatch.setenv("OPENROUTER_API_KEY", "")
+        memory = MemoryStore()
+        hub = ContextHub(memory)
+        adapter = BaseProviderAdapter(context_hub=hub, enabled=True)
+        result = adapter.run("test prompt")
+        assert result["ok"] is False
+        assert result["status"] == "not_configured"
+        assert result["error"] == "provider_not_configured"
+
     def test_run_via_openrouter_success(self, monkeypatch) -> None:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
         monkeypatch.setenv("OPENROUTER_MODEL_BASE", "openai/gpt-4o-mini")
@@ -321,6 +331,23 @@ class TestProviderAdapterSmoke:
         with patch("app.context.adapters.openrouter.requests.post", return_value=mock_response):
             result = adapter.run("hello")
         assert "reply" in result
+
+    def test_openrouter_adapter_gracefully_handles_http_error(self, monkeypatch) -> None:
+        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
+        memory = MemoryStore()
+        hub = ContextHub(memory)
+        adapter = OpenRouterProviderAdapter(context_hub=hub)
+
+        import requests
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status.side_effect = requests.HTTPError("429")
+        with patch("app.context.adapters.openrouter.requests.post", return_value=mock_response):
+            result = adapter.run("hello")
+
+        assert result["ok"] is False
+        assert result["provider"] == "openrouter"
+        assert "failed" in result["reply"]
 
 
 import pytest  # noqa: E402, F401

@@ -22,7 +22,12 @@ BuyerOS 是一個多代理（multi‑agent）管理系統，目的是簡化線�
 * **Audit Trail：** context/agent API 操作會寫入 `["buyeros", "audit"]`
   namespace，方便部署後追蹤。
 * **Readiness/Provider Status：** `/health/ready` 用於部署檢查，
-  `/providers` 可查看 provider/model 設定狀態。
+  `/providers` 可查看 provider/model 設定狀態，provider 失敗時會按
+  fallback chain 降級並寫入 context。
+* **業務自動化：** 提供日報、OCR 入帳、對帳、異常告警、人工覆核與
+  retry 狀態 API。
+* **繁中管理 UI：** `frontend/` 提供 Next.js 管理台，可查 provider、
+  session 記憶、重跑任務與執行業務自動化。
 * **單元測試：** 使用 PyTest 驗證記憶儲存、代理行為與 Supervisor
   路由。
 
@@ -37,9 +42,9 @@ buyeros-production-repo/
 │   ├── requirements.txt # Python 依賴
 │   ├── Dockerfile       # 後端容器構建
 │   ├── demo_cli.py      # 命令行示範
-├── frontend/            # Telegram Mini App 前端（佔位）
-├── infra/               # 基礎建設配置（預留）
-├── docs/                # 進一步文檔（預留）
+├── frontend/            # Next.js 繁中管理台
+├── infra/               # 部署、smoke、backup、rollback 腳本
+├── docs/                # 架構與部署資料
 ├── .github/workflows/   # CI 流程
 ├── docker-compose.yml   # 容器編排
 ├── .env.example         # 環境變數範本
@@ -85,6 +90,21 @@ buyeros-production-repo/
    pytest -q
    ```
 
+7. **啟動管理 UI：**
+
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+   若你只有 `node` 沒有 `npm`，可改為：
+
+   ```bash
+   cd frontend
+   node ./node_modules/next/dist/bin/next dev
+   ```
+
 ## 容器化部署
 
 本專案包含 `docker-compose.yml` 用於快速部署。請確保您安裝了
@@ -95,9 +115,30 @@ cp .env.example .env
 docker compose up --build
 ```
 
+要只重啟前端而唔洗全部服務，可直接用：
+
+```bash
+bash infra/restart_frontend.sh
+```
+
+注意：唔好再喺指令後面亂加 `#` 註解。`#` 入到 shell 會變成獨立指令，出現 `command not found`。
+
+API Key 快速測試（本機除錯）：
+
+```bash
+# 用同一條 key 打 API 時，可以加查詢參數直接測試
+curl "http://127.0.0.1:3000/api/buyeros/health/ready?k=$BUYEROS_API_KEY"
+```
+
+前端頁面只要一次開咗含 `?k=<API_KEY>` 的網址，瀏覽器後續所有 `/api/buyeros/...` 請求都會帶同一組 key：
+
+```text
+http://127.0.0.1:3000/?k=$BUYEROS_API_KEY
+```
+
 此操作會建立 `backend` 與 `redis` 服務並啟動應用程式。如果您有
 Supabase 資料庫憑證，容器會自動連線儲存長期記憶；Redis 用於短期
-runtime/session 狀態。
+runtime/session 狀態。Compose 也會啟動 `frontend` 管理台。
 
 ## Context API Example
 
@@ -126,6 +167,58 @@ key is missing, providers fail gracefully and still write task context.
 - `GET /health/ready`: memory, Redis and provider readiness.
 - `GET /providers`: provider/model status, protected by `BUYEROS_API_KEY`.
 - `GET /audit/search`: recent audit events, protected by `BUYEROS_API_KEY`.
+- `GET /projects`: three canonical workspaces (`buyeros`, `cloth`, `xau`).
+- `POST /tasks/dispatch_plan`: create a deterministic subtask plan.
+- `POST /tasks/{task_id}/run_all`: run subtasks until completed/blocked/max steps.
+- `POST /memory/timeline`: inspect context, routing, run_all, audit and task history.
+- `POST /automation/daily-report`: create report snapshot.
+- `POST /automation/ocr-posting`: create OCR accounting entry.
+- `POST /automation/reconcile`: compare totals and create mismatch alerts.
+
+正式上線驗收：
+
+```bash
+python backend/scripts/validate_env.py --env .env.production.local
+bash infra/smoke_api.sh "$PUBLIC_BASE_URL" "$BUYEROS_API_KEY"
+bash infra/smoke_telegram_webhook.sh "$PUBLIC_BASE_URL" "$BUYEROS_API_KEY" "$TELEGRAM_WEBHOOK_SECRET"
+bash infra/smoke_24h.sh "$PUBLIC_BASE_URL" "$BUYEROS_API_KEY" 24 3600
+```
+
+One-command gate audit:
+
+```bash
+bash infra/go_live_audit.sh .env.production.local "$PUBLIC_BASE_URL" root@206.189.116.155 root@167.172.60.38
+```
+
+`smoke_api.sh` validates the core API and then runs the three-workspace smoke:
+CLOTH daily report, CLOTH refund recall, XAU promo metrics and BuyerOS
+dispatch/run_all/timeline. To run only the core API checks:
+
+```bash
+BUYEROS_SKIP_THREE_SYSTEMS_SMOKE=1 bash infra/smoke_api.sh "$PUBLIC_BASE_URL" "$BUYEROS_API_KEY"
+```
+
+`smoke_telegram_webhook.sh` posts Telegram-shaped webhook updates directly to
+BuyerOS and verifies the shared context/session state. Real Telegram webhook
+activation still requires an HTTPS domain and `infra/set_telegram_webhook.sh`.
+For the primary VPS, `BUYEROS_DOMAIN=buyeros.206.189.116.155.sslip.io` can be
+used as a temporary HTTPS domain until a purchased domain is ready.
+
+For staging only, if `sslip.io` certificate issuance is rate limited, smoke can
+use:
+
+```bash
+BUYEROS_CURL_INSECURE=1 bash infra/smoke_api.sh "https://buyeros.167.172.60.38.sslip.io" "$BUYEROS_API_KEY"
+bash infra/smoke_api.sh "http://167.172.60.38:8000" "$BUYEROS_API_KEY"
+```
+
+Do not use `BUYEROS_CURL_INSECURE=1` for production acceptance.
+
+三個 Workspace 上線順序請見：
+
+```text
+docs/THREE_WORKSPACE_GO_LIVE_PLAN.md
+```
 
 ## Production Inputs
 
@@ -140,7 +233,7 @@ domain, Supabase, Telegram and OpenRouter values before deployment.
 
 * **連結真實支付接口** 處理退款
 * **整合 OCR 服務** 提取收據文字
-* **新增報表或警報代理** 提供即時分析
-* **開發 Telegram Mini App 前端** 改善使用者體驗
+* **接入真實排程器** 定時推送日報和異常告警
+* **把管理 UI 接到正式登入/權限系統**
 
 歡迎貢獻或提出改進建議！

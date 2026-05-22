@@ -1,6 +1,11 @@
 __pycache__/
 .pytest_cache/
 .env
+.env.local
+.env.production
+.env.production.local
+.env.staging.local
+.staging_root_password.local
 *.pyc
 *.pyo
 *.pyd
@@ -11,4 +16,8 @@ build/
 dist/
 *.egg-info/
 node_modules/
+.next/
+*.tsbuildinfo
+frontend/test-results/
+frontend/playwright-report/
 /.vscode/

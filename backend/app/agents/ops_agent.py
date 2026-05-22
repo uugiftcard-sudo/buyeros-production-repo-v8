@@ -96,7 +96,7 @@ class OpsAgent:
         self.memory.save_memory(
             ["buyeros", "refunds"],
             txn_id,
-            {"result": result, "provider": "ops_agent"},
+            {"result": result, "provider": "ops_agent", "project_id": "cloth", "project": "cloth"},
             created_by="ops_agent",
         )
         return result

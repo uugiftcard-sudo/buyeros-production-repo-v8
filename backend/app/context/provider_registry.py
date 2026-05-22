@@ -37,8 +37,10 @@ class BaseProviderAdapter:
         context_count = len(context or [])
         return {
             "provider": self.name,
-            "ok": True,
-            "reply": f"[{self.name}] no provider key configured; stored task with {context_count} context item(s): {prompt}",
+            "ok": False,
+            "status": "not_configured",
+            "reply": f"[{self.name}] provider key is not configured; stored task with {context_count} context item(s): {prompt}",
+            "error": "provider_not_configured",
         }
 
     def _run_via_openrouter(self, prompt: str, context: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
@@ -157,23 +159,37 @@ class ProviderRegistry:
         return items
 
     def choose_provider(self, prompt: str, *, preferred: Optional[str] = None) -> str:
+        chain = self.fallback_chain(prompt, preferred=preferred)
+        if chain:
+            return chain[0]
+        return self.names()[0]
+
+    def fallback_chain(self, prompt: str, *, preferred: Optional[str] = None) -> List[str]:
+        names = self.names()
+        if not names:
+            return []
+        chain: List[str] = []
         if preferred and self.has_provider(preferred):
-            return preferred.lower().strip()
+            chain.append(preferred.lower().strip())
         lower = prompt.lower()
         if any(word in lower for word in ["code", "coding", "repo", "bug", "claude", "cursor"]):
-            return "claude" if self.has_provider("claude") else "cursor"
-        if any(word in lower for word in ["search", "research", "news", "perplexity", "grok"]):
-            if self.has_provider("perplexity"):
-                return "perplexity"
-            if self.has_provider("grok"):
-                return "grok"
-        if any(word in lower for word in ["batch", "cheap", "大量", "批量"]):
-            return "deepseek" if self.has_provider("deepseek") else "minimax"
-        if any(word in lower for word in ["openclaw", "hermes", "orchestrate", "tool"]):
-            return "openclaw" if self.has_provider("openclaw") else "hermes"
-        if self.has_provider("openai"):
-            return "openai"
-        return self.names()[0]
+            chain.extend(["claude", "cursor", "openai"])
+        elif any(word in lower for word in ["search", "research", "news", "perplexity", "grok"]):
+            chain.extend(["perplexity", "grok", "openai"])
+        elif any(word in lower for word in ["batch", "cheap", "大量", "批量"]):
+            chain.extend(["deepseek", "minimax", "openai"])
+        elif any(word in lower for word in ["openclaw", "hermes", "orchestrate", "tool"]):
+            chain.extend(["openclaw", "hermes", "openai"])
+        else:
+            chain.append("openai")
+        chain.extend(names)
+
+        deduped: List[str] = []
+        for name in chain:
+            key = name.lower().strip()
+            if key in self._providers and key not in deduped:
+                deduped.append(key)
+        return deduped
 
     def run(
         self,
@@ -184,11 +200,93 @@ class ProviderRegistry:
         session_id: Optional[str] = None,
         task_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        provider_name = self.choose_provider(prompt, preferred=preferred)
-        provider = self.get(provider_name)
-        result = provider.run(prompt, context=context)
-        provider.write_context(result, session_id=session_id, task_id=task_id)
-        return result
+        chain = self.fallback_chain(prompt, preferred=preferred)
+        attempts: List[Dict[str, Any]] = []
+        last_result: Optional[Dict[str, Any]] = None
+        last_provider: Optional[BaseProviderAdapter] = None
+        for provider_name in chain:
+            provider = self.get(provider_name)
+            last_provider = provider
+            try:
+                raw_result = provider.run(prompt, context=context)
+            except Exception as exc:
+                logger.exception("Provider %s crashed during run", provider_name)
+                raw_result = {
+                    "provider": provider_name,
+                    "ok": False,
+                    "reply": f"[{provider_name}] provider crashed; continuing fallback.",
+                    "error": str(exc),
+                }
+            result = self._normalize_result(
+                raw_result,
+                provider_name=provider_name,
+                chain=chain,
+                attempts=attempts,
+                fallback_exhausted=False,
+            )
+            self._safe_write_context(provider, result, session_id=session_id, task_id=task_id)
+            if result.get("ok"):
+                return result
+            attempts.append(
+                {
+                    "provider": provider_name,
+                    "ok": False,
+                    "error": result.get("error"),
+                    "reply": result.get("reply"),
+                }
+            )
+            last_result = result
+        if last_result is not None:
+            last_result["fallback_exhausted"] = True
+            last_result["fallback_attempts"] = attempts
+            if last_provider is not None:
+                self._safe_write_context(last_provider, last_result, session_id=session_id, task_id=task_id)
+            return last_result
+        return {
+            "provider": None,
+            "ok": False,
+            "reply": "No providers are registered.",
+            "fallback_chain": [],
+            "fallback_attempts": [],
+            "fallback_exhausted": True,
+        }
+
+    def _normalize_result(
+        self,
+        result: Dict[str, Any],
+        *,
+        provider_name: str,
+        chain: List[str],
+        attempts: List[Dict[str, Any]],
+        fallback_exhausted: bool,
+    ) -> Dict[str, Any]:
+        normalized = dict(result or {})
+        normalized["provider"] = normalized.get("provider") or provider_name
+        normalized["ok"] = bool(normalized.get("ok"))
+        normalized["reply"] = normalized.get("reply") or ""
+        normalized["fallback_chain"] = chain
+        normalized["fallback_attempts"] = attempts + [
+            {
+                "provider": provider_name,
+                "ok": bool(normalized.get("ok")),
+                "error": normalized.get("error"),
+            }
+        ]
+        normalized["fallback_exhausted"] = fallback_exhausted
+        return normalized
+
+    def _safe_write_context(
+        self,
+        provider: BaseProviderAdapter,
+        result: Dict[str, Any],
+        *,
+        session_id: Optional[str],
+        task_id: Optional[str],
+    ) -> None:
+        try:
+            provider.write_context(result, session_id=session_id, task_id=task_id)
+        except Exception as exc:
+            logger.exception("Provider %s failed to write context: %s", provider.name, exc)
 
 
 def register_default_providers(registry: ProviderRegistry, providers: Iterable[BaseProviderAdapter]) -> None:

@@ -1,0 +1,13 @@
+{
+    auto_https disable_redirects
+}
+
+{$BUYEROS_DOMAIN:buyeros.206.189.116.155.sslip.io} {
+    encode gzip zstd
+
+    handle /ui* {
+        reverse_proxy frontend:3000
+    }
+
+    reverse_proxy backend:8000
+}

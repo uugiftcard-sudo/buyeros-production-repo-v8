@@ -56,3 +56,133 @@ class AgentRunRequest(BaseModel):
     session_id: Optional[str] = None
     task_id: Optional[str] = None
 
+
+class DailyReportRequest(BaseModel):
+    date: Optional[str] = None
+
+
+class OcrPostingRequest(BaseModel):
+    text: str = Field(min_length=1)
+    source: str = "api"
+    entry_id: Optional[str] = None
+
+
+class ReconcileRequest(BaseModel):
+    expected_total: float
+    actual_total: float
+    reference: str = "api"
+
+
+class AlertItem(BaseModel):
+    id: Optional[str] = None
+    amount: float = 0
+
+    model_config = {"extra": "allow"}
+
+
+class AlertsRequest(BaseModel):
+    items: List[AlertItem] = Field(default_factory=list)
+    threshold: float = 0
+
+
+class ApprovalRequest(BaseModel):
+    task_id: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    payload: Dict[str, Any] = Field(default_factory=dict)
+
+
+class RetryRequest(BaseModel):
+    task_id: str = Field(min_length=1)
+    error: str = Field(min_length=1)
+    attempt: int = Field(default=1, ge=1)
+
+
+class ReportCreateRequest(BaseModel):
+    period: str = "daily"
+    date: Optional[str] = None
+
+
+class ReportExportRequest(BaseModel):
+    report_id: Optional[str] = None
+    limit: int = Field(default=20, ge=1, le=100)
+
+
+class PromoCampaignRequest(BaseModel):
+    name: str = Field(min_length=1)
+    offer: str = Field(min_length=1)
+    channel: str = "manual"
+    budget_hkd: float = Field(default=0, ge=0)
+    utm_source: str = "buyeros"
+    utm_campaign: Optional[str] = None
+
+
+class PromoEventRequest(BaseModel):
+    campaign_id: str = Field(min_length=1)
+    event_type: str = Field(min_length=1)
+    value_hkd: float = 0
+    source: str = "ui"
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class TaskCreateRequest(BaseModel):
+    title: str = Field(min_length=1)
+    lane: str = "buyeros"
+    owner_provider: str = "openai"
+    priority: str = "P1"
+    payload: Dict[str, Any] = Field(default_factory=dict)
+
+
+class TaskStatusRequest(BaseModel):
+    status: str = Field(min_length=1)
+    note: Optional[str] = None
+
+
+class TaskRunRequest(BaseModel):
+    result: str = Field(min_length=1)
+    provider: str = "openai"
+
+
+class ProjectUpsertRequest(BaseModel):
+    project_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    kind: str = "external"
+    source: Dict[str, Any] = Field(default_factory=dict)
+    notes: Optional[str] = None
+
+
+class MemoryTimelineRequest(BaseModel):
+    project_id: Optional[str] = None
+    session_id: Optional[str] = None
+    query: Optional[str] = None
+    limit: int = Field(default=50, ge=1, le=200)
+
+
+class TaskDispatchRequest(BaseModel):
+    project: str = Field(min_length=1)
+    task_type: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    prompt: str = Field(min_length=1)
+    preferred_provider: Optional[str] = None
+    session_id: Optional[str] = None
+
+
+class DispatchPlanRequest(BaseModel):
+    project: str = Field(min_length=1)
+    task_type: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    prompt: str = Field(min_length=1)
+    preferred_provider: Optional[str] = None
+    session_id: Optional[str] = None
+    max_steps: int = Field(default=5, ge=1, le=12)
+
+
+class SubtaskRunRequest(BaseModel):
+    subtask_id: str = Field(min_length=1)
+    preferred_provider: Optional[str] = None
+    session_id: Optional[str] = None
+
+
+class TaskRunAllRequest(BaseModel):
+    preferred_provider: Optional[str] = None
+    session_id: Optional[str] = None
+    max_steps: int = Field(default=50, ge=1, le=200)

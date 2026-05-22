@@ -13,6 +13,7 @@ from typing import Any, Dict
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from ..memory_store import MemoryStore
@@ -39,14 +40,40 @@ from ..context.adapters.openrouter import OpenRouterProviderAdapter
 from ..context.adapters.perplexity import PerplexityProviderAdapter
 from ..schemas.state import (
     AgentRunRequest,
+    AlertsRequest,
+    ApprovalRequest,
     ContextSearchRequest,
     ContextSummarizeRequest,
     ContextWriteRequest,
+    DailyReportRequest,
+    DispatchPlanRequest,
+    MemoryTimelineRequest,
+    OcrPostingRequest,
+    PromoCampaignRequest,
+    PromoEventRequest,
+    ProjectUpsertRequest,
+    ReportCreateRequest,
+    ReportExportRequest,
+    ReconcileRequest,
+    RetryRequest,
+    SubtaskRunRequest,
+    TaskDispatchRequest,
+    TaskCreateRequest,
+    TaskRunAllRequest,
+    TaskRunRequest,
+    TaskStatusRequest,
 )
 from ..runtime.session_store import RedisSessionStore
 from ..security import require_api_key
 from ..services.orders_service import OrdersService
 from ..services.buyers_service import BuyersService
+from ..services.business_automation import BusinessAutomationService
+from ..services.memory_timeline_service import MemoryTimelineService
+from ..services.promo_service import PromoService
+from ..services.project_registry_service import ProjectRegistryService
+from ..services.reporting_service import ReportingService
+from ..services.task_board_service import TaskBoardService
+from ..services.task_dispatcher_service import TaskDispatcherService
 from ..workflows.buyeros_graph import BuyerOSGraphWorkflow
 
 logger = logging.getLogger(__name__)
@@ -55,6 +82,18 @@ logger = logging.getLogger(__name__)
 def create_app() -> FastAPI:
     """Create and configure a FastAPI application."""
     app = FastAPI(title="BuyerOS API")
+    cors_origins = [
+        origin.strip()
+        for origin in os.getenv("BUYEROS_CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+        if origin.strip()
+    ]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     # Setup memory store (Supabase if env vars present, otherwise memory)
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_key = os.getenv("SUPABASE_KEY")
@@ -65,6 +104,12 @@ def create_app() -> FastAPI:
     context_hub = ContextHub(memory_store)
     session_store = RedisSessionStore(os.getenv("REDIS_URL"))
     audit_logger = AuditLogger(memory_store)
+    business_automation = BusinessAutomationService(memory_store)
+    reporting_service = ReportingService(memory_store)
+    promo_service = PromoService(memory_store)
+    task_board_service = TaskBoardService(memory_store)
+    project_registry = ProjectRegistryService(memory_store)
+    timeline_service = MemoryTimelineService(memory_store)
 
     # Setup tool registry and register tools
     tool_registry = ToolRegistry()
@@ -102,6 +147,16 @@ def create_app() -> FastAPI:
         OpenClawProviderAdapter(context_hub=context_hub),
     ]:
         provider_registry.register(provider)
+
+    dispatcher_service = TaskDispatcherService(
+        memory_store=memory_store,
+        task_board=task_board_service,
+        projects=project_registry,
+        providers=provider_registry,
+        context_hub=context_hub,
+        ops_agent=ops_agent,
+        finance_agent=finance_agent,
+    )
     workflow = BuyerOSGraphWorkflow(
         memory_store=memory_store,
         context_hub=context_hub,
@@ -125,6 +180,13 @@ def create_app() -> FastAPI:
     app.state.audit_logger = audit_logger
     app.state.tool_registry = tool_registry
     app.state.agent_registry = agent_registry
+    app.state.business_automation = business_automation
+    app.state.reporting_service = reporting_service
+    app.state.promo_service = promo_service
+    app.state.task_board_service = task_board_service
+    app.state.project_registry = project_registry
+    app.state.timeline_service = timeline_service
+    app.state.dispatcher_service = dispatcher_service
 
     @app.post("/telegram/webhook")
     async def telegram_webhook(request: Request) -> JSONResponse:
@@ -248,6 +310,18 @@ def create_app() -> FastAPI:
         """Health check endpoint."""
         return {"status": "ok"}
 
+    @app.get("/")
+    async def root() -> Dict[str, Any]:
+        """Operator-friendly root endpoint."""
+        return {
+            "ok": True,
+            "service": "BuyerOS API",
+            "ui": "http://127.0.0.1:3000",
+            "health": "/health/ready",
+            "ping": "/ping",
+            "docs": "/docs",
+        }
+
     @app.get("/health/ready")
     async def ready() -> Dict[str, Any]:
         """Readiness check for deployment probes and VPS smoke tests."""
@@ -268,11 +342,282 @@ def create_app() -> FastAPI:
         """List configured provider adapters and model routing defaults."""
         return {"ok": True, "providers": provider_registry.status()}
 
+    @app.get("/ai-team/status", dependencies=[Depends(require_api_key)])
+    async def ai_team_status() -> Dict[str, Any]:
+        """Return AI provider readiness for the operator UI."""
+        return {"ok": True, "providers": provider_registry.status()}
+
+    @app.get("/projects", dependencies=[Depends(require_api_key)])
+    async def projects_list(limit: int = 50) -> Dict[str, Any]:
+        """List registered projects (core + external)."""
+        return project_registry.list_projects(limit=min(max(limit, 1), 200))
+
+    @app.post("/projects", dependencies=[Depends(require_api_key)])
+    async def projects_upsert(payload: ProjectUpsertRequest) -> Dict[str, Any]:
+        """Create or update a project entry."""
+        return project_registry.upsert_project(project_id=payload.project_id, content=payload.model_dump(), created_by="api")
+
+    @app.post("/memory/timeline", dependencies=[Depends(require_api_key)])
+    async def memory_timeline(payload: MemoryTimelineRequest) -> Dict[str, Any]:
+        """Query a merged timeline across key namespaces."""
+        return timeline_service.timeline(
+            project_id=payload.project_id,
+            session_id=payload.session_id,
+            query=payload.query,
+            limit=payload.limit,
+        )
+
     @app.get("/audit/search", dependencies=[Depends(require_api_key)])
     async def audit_search(limit: int = 20) -> Dict[str, Any]:
         """Return recent audit events."""
         items = memory_store.search_memory(namespace_prefix=("buyeros", "audit"), limit=min(max(limit, 1), 100))
         return {"ok": True, "items": items}
+
+    @app.post("/automation/daily-report", dependencies=[Depends(require_api_key)])
+    async def automation_daily_report(payload: DailyReportRequest) -> Dict[str, Any]:
+        """Create a daily operations report from current BuyerOS memory."""
+        result = business_automation.create_daily_report(date=payload.date)
+        audit_logger.log(action="automation.daily_report", actor="api", details=result)
+        return result
+
+    @app.post("/automation/ocr-posting", dependencies=[Depends(require_api_key)])
+    async def automation_ocr_posting(payload: OcrPostingRequest) -> Dict[str, Any]:
+        """Create an accounting entry from OCR text."""
+        result = business_automation.post_ocr_entry(
+            text=payload.text,
+            source=payload.source,
+            entry_id=payload.entry_id,
+        )
+        audit_logger.log(action="automation.ocr_posting", actor="api", details=result)
+        return result
+
+    @app.post("/automation/reconcile", dependencies=[Depends(require_api_key)])
+    async def automation_reconcile(payload: ReconcileRequest) -> Dict[str, Any]:
+        """Compare expected and actual totals and create an alert on mismatch."""
+        result = business_automation.reconcile_entries(
+            expected_total=payload.expected_total,
+            actual_total=payload.actual_total,
+            reference=payload.reference,
+        )
+        audit_logger.log(action="automation.reconcile", actor="api", details=result)
+        return result
+
+    @app.post("/automation/alerts", dependencies=[Depends(require_api_key)])
+    async def automation_alerts(payload: AlertsRequest) -> Dict[str, Any]:
+        """Generate anomaly alerts for items above a threshold."""
+        result = business_automation.generate_alerts(
+            items=[item.model_dump() for item in payload.items],
+            threshold=payload.threshold,
+        )
+        audit_logger.log(action="automation.alerts", actor="api", details=result)
+        return result
+
+    @app.post("/automation/approval", dependencies=[Depends(require_api_key)])
+    async def automation_approval(payload: ApprovalRequest) -> Dict[str, Any]:
+        """Create a manual approval task."""
+        result = business_automation.request_approval(
+            task_id=payload.task_id,
+            reason=payload.reason,
+            payload=payload.payload,
+        )
+        audit_logger.log(action="automation.approval", actor="api", details=result)
+        return result
+
+    @app.post("/automation/retry", dependencies=[Depends(require_api_key)])
+    async def automation_retry(payload: RetryRequest) -> Dict[str, Any]:
+        """Record retry state for an automation task."""
+        result = business_automation.record_retry(
+            task_id=payload.task_id,
+            error=payload.error,
+            attempt=payload.attempt,
+        )
+        audit_logger.log(action="automation.retry", actor="api", details=result)
+        return result
+
+    @app.post("/reports/create", dependencies=[Depends(require_api_key)])
+    async def reports_create(payload: ReportCreateRequest) -> Dict[str, Any]:
+        """Create a buyer report snapshot."""
+        result = reporting_service.create_report(period=payload.period, date=payload.date)
+        audit_logger.log(action="reports.create", actor="api", details={"period": payload.period, "date": payload.date})
+        return result
+
+    @app.get("/reports/history", dependencies=[Depends(require_api_key)])
+    async def reports_history(limit: int = 20) -> Dict[str, Any]:
+        """Return report history."""
+        return reporting_service.history(limit=min(max(limit, 1), 100))
+
+    @app.post("/reports/export", dependencies=[Depends(require_api_key)])
+    async def reports_export(payload: ReportExportRequest) -> Dict[str, Any]:
+        """Export report history as CSV text."""
+        return reporting_service.export_csv(report_id=payload.report_id, limit=payload.limit)
+
+    @app.post("/promo/campaigns", dependencies=[Depends(require_api_key)])
+    async def promo_campaigns_create(payload: PromoCampaignRequest) -> Dict[str, Any]:
+        """Create an XAU promo campaign."""
+        result = promo_service.create_campaign(
+            name=payload.name,
+            offer=payload.offer,
+            channel=payload.channel,
+            budget_hkd=payload.budget_hkd,
+            utm_source=payload.utm_source,
+            utm_campaign=payload.utm_campaign,
+        )
+        audit_logger.log(action="promo.campaigns.create", actor="api", details=result.get("campaign", {}))
+        return result
+
+    @app.get("/promo/campaigns", dependencies=[Depends(require_api_key)])
+    async def promo_campaigns_list(limit: int = 20) -> Dict[str, Any]:
+        """List XAU promo campaigns."""
+        return promo_service.list_campaigns(limit=min(max(limit, 1), 100))
+
+    @app.post("/promo/events", dependencies=[Depends(require_api_key)])
+    async def promo_events(payload: PromoEventRequest) -> Dict[str, Any]:
+        """Record XAU promo event or conversion."""
+        result = promo_service.record_event(
+            campaign_id=payload.campaign_id,
+            event_type=payload.event_type,
+            value_hkd=payload.value_hkd,
+            source=payload.source,
+            metadata=payload.metadata,
+        )
+        audit_logger.log(action="promo.events.create", actor="api", details=result.get("event", {}))
+        return result
+
+    @app.get("/promo/metrics", dependencies=[Depends(require_api_key)])
+    async def promo_metrics(campaign_id: str | None = None) -> Dict[str, Any]:
+        """Return XAU promo metrics."""
+        return promo_service.metrics(campaign_id=campaign_id)
+
+    @app.post("/tasks", dependencies=[Depends(require_api_key)])
+    async def tasks_create(payload: TaskCreateRequest) -> Dict[str, Any]:
+        """Create a cross-AI task board item."""
+        result = task_board_service.create_task(
+            title=payload.title,
+            lane=payload.lane,
+            owner_provider=payload.owner_provider,
+            priority=payload.priority,
+            payload=payload.payload,
+        )
+        audit_logger.log(action="tasks.create", actor="api", details=result.get("task", {}))
+        return result
+
+    @app.get("/tasks", dependencies=[Depends(require_api_key)])
+    async def tasks_list(lane: str | None = None, limit: int = 50) -> Dict[str, Any]:
+        """List AI company OS task board items."""
+        return task_board_service.list_tasks(lane=lane, limit=min(max(limit, 1), 100))
+
+    @app.post("/tasks/{task_id}/status", dependencies=[Depends(require_api_key)])
+    async def tasks_status(task_id: str, payload: TaskStatusRequest) -> Dict[str, Any]:
+        """Update task status."""
+        return task_board_service.update_status(task_id=task_id, status=payload.status, note=payload.note)
+
+    @app.post("/tasks/{task_id}/run", dependencies=[Depends(require_api_key)])
+    async def tasks_run(task_id: str, payload: TaskRunRequest) -> Dict[str, Any]:
+        """Record a task run result."""
+        return task_board_service.run_task(task_id=task_id, result=payload.result, provider=payload.provider)
+
+    @app.get("/tasks/{task_id}", dependencies=[Depends(require_api_key)])
+    async def tasks_get(task_id: str) -> Dict[str, Any]:
+        """Return a task and recent runs."""
+        task = memory_store.search_memory(namespace_prefix=("buyeros", "tasks"), memory_key=task_id, limit=1)
+        runs = memory_store.search_memory(namespace_prefix=("buyeros", "task_runs"), query=task_id, limit=20)
+        return {"ok": True, "task": task[0] if task else None, "runs": runs}
+
+    @app.post("/tasks/dispatch", dependencies=[Depends(require_api_key)])
+    async def tasks_dispatch(payload: TaskDispatchRequest) -> Dict[str, Any]:
+        """Create a task and dispatch it to the provider layer (single-hop)."""
+        project = task_board_service.normalize_lane(payload.project)
+        created = task_board_service.create_task(
+            title=payload.title,
+            lane=project,
+            owner_provider=payload.preferred_provider or "openai",
+            priority="P0",
+            payload={"project": project, "task_type": payload.task_type, "prompt": payload.prompt},
+        )
+        task_id = created["task"]["task_id"]
+        task_board_service.update_status(task_id=task_id, status="running", note="dispatched")
+
+        project_meta = project_registry.get_project(project_id=project) or {"project_id": project}
+        context = context_hub.search_context(query=payload.prompt, session_id=payload.session_id, limit=8)
+        context.insert(
+            0,
+            {
+                "namespace": ["buyeros", "projects"],
+                "memory_key": project,
+                "content": {
+                    "summary": f"Project {project}: {project_meta.get('name','')}",
+                    "content": project_meta,
+                },
+            },
+        )
+        dispatch_prompt = f"[project={project} task_type={payload.task_type}]\n{payload.prompt}"
+        result = provider_registry.run(
+            prompt=dispatch_prompt,
+            context=context,
+            preferred=payload.preferred_provider,
+            session_id=payload.session_id or f"dispatch-{task_id}",
+            task_id=task_id,
+        )
+        reply = result.get("reply") or ""
+        if result.get("ok"):
+            task_board_service.run_task(task_id=task_id, result=reply, provider=str(result.get("provider") or "unknown"))
+        else:
+            task_board_service.update_status(task_id=task_id, status="blocked", note=str(result.get("error") or "provider_failed"))
+        audit_logger.log(
+            action="tasks.dispatch",
+            actor="api",
+            details={"task_id": task_id, "project": project, "task_type": payload.task_type, "provider": result.get("provider"), "ok": bool(result.get("ok"))},
+        )
+        return {"ok": True, "task_id": task_id, "result": result}
+
+    @app.post("/tasks/dispatch_plan", dependencies=[Depends(require_api_key)])
+    async def tasks_dispatch_plan(payload: DispatchPlanRequest) -> Dict[str, Any]:
+        """Create a task + deterministic subtask plan (no execution)."""
+        result = dispatcher_service.create_plan(
+            project=payload.project,
+            task_type=payload.task_type,
+            title=payload.title,
+            prompt=payload.prompt,
+            preferred_provider=payload.preferred_provider,
+            session_id=payload.session_id,
+            max_steps=payload.max_steps,
+        )
+        audit_logger.log(action="tasks.dispatch_plan", actor="api", details={"task_id": result.get("task_id"), "project": payload.project, "task_type": payload.task_type})
+        return result
+
+    @app.get("/tasks/{task_id}/subtasks", dependencies=[Depends(require_api_key)])
+    async def tasks_subtasks(task_id: str, limit: int = 50) -> Dict[str, Any]:
+        """List subtasks for a task."""
+        return dispatcher_service.list_subtasks(task_id=task_id, limit=min(max(limit, 1), 200))
+
+    @app.post("/tasks/{task_id}/subtasks/run", dependencies=[Depends(require_api_key)])
+    async def tasks_subtasks_run(task_id: str, payload: SubtaskRunRequest) -> Dict[str, Any]:
+        """Run a specific subtask."""
+        return dispatcher_service.run_subtask(
+            task_id=task_id,
+            subtask_id=payload.subtask_id,
+            preferred_provider=payload.preferred_provider,
+            session_id=payload.session_id or f"task-{task_id}",
+        )
+
+    @app.post("/tasks/{task_id}/subtasks/next", dependencies=[Depends(require_api_key)])
+    async def tasks_subtasks_next(task_id: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        """Run next queued subtask."""
+        preferred = (payload or {}).get("preferred_provider") if isinstance(payload, dict) else None
+        session_id = (payload or {}).get("session_id") if isinstance(payload, dict) else None
+        return dispatcher_service.run_next(task_id=task_id, preferred_provider=preferred, session_id=session_id)
+
+    @app.post("/tasks/{task_id}/run_all", dependencies=[Depends(require_api_key)])
+    async def tasks_run_all(task_id: str, payload: TaskRunAllRequest) -> Dict[str, Any]:
+        """Run queued subtasks sequentially until completed/blocked (no loops)."""
+        result = dispatcher_service.run_all(
+            task_id=task_id,
+            preferred_provider=payload.preferred_provider,
+            session_id=payload.session_id,
+            max_steps=payload.max_steps,
+        )
+        audit_logger.log(action="tasks.run_all", actor="api", details={"task_id": task_id, "ok": bool(result.get("ok")), "status": result.get("status")})
+        return result
 
     @app.get("/system/capabilities", dependencies=[Depends(require_api_key)])
     async def system_capabilities() -> Dict[str, Any]:
@@ -295,6 +640,19 @@ def create_app() -> FastAPI:
             "agents": agent_registry.names(),
             "tools": tool_registry.names(),
             "providers": providers,
+            "automation": [
+                "daily_report",
+                "report_history",
+                "report_csv_export",
+                "ocr_posting",
+                "reconciliation",
+                "alerts",
+                "approval",
+                "retry",
+                "xau_promo_campaigns",
+                "xau_promo_events",
+                "ai_task_board",
+            ],
             "feature_flags": {
                 "telegram_configured": bool(os.getenv("TELEGRAM_BOT_TOKEN")),
                 "api_key_required": bool(os.getenv("BUYEROS_API_KEY")),
