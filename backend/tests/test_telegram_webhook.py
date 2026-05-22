@@ -3,6 +3,25 @@ from fastapi.testclient import TestClient
 from app.workflows.main import create_app
 
 
+class _FakeTelegramResponse:
+    def raise_for_status(self) -> None:
+        return None
+
+
+class _FakeTelegramClient:
+    sent_messages = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def post(self, url, json):
+        self.sent_messages.append({"url": url, "json": json})
+        return _FakeTelegramResponse()
+
+
 def test_telegram_webhook_secret_when_configured(monkeypatch) -> None:
     monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "telegram-secret")
     client = TestClient(create_app())
@@ -77,3 +96,30 @@ def test_telegram_webhook_edited_message_handled(monkeypatch) -> None:
     )
     assert response.status_code == 200
 
+
+def test_telegram_refund_then_recall_sends_persisted_reply(monkeypatch) -> None:
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "telegram-secret")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
+    monkeypatch.setattr("app.workflows.main.httpx.AsyncClient", _FakeTelegramClient)
+    _FakeTelegramClient.sent_messages = []
+    client = TestClient(create_app())
+
+    headers = {"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"}
+    first = client.post(
+        "/telegram/webhook",
+        json={"update_id": 1, "message": {"chat": {"id": 991001}, "text": "退款 991"}},
+        headers=headers,
+    )
+    second = client.post(
+        "/telegram/webhook",
+        json={"update_id": 2, "message": {"chat": {"id": 991001}, "text": "991 點？"}},
+        headers=headers,
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert len(_FakeTelegramClient.sent_messages) == 2
+    assert _FakeTelegramClient.sent_messages[0]["json"]["chat_id"] == 991001
+    assert "991" in _FakeTelegramClient.sent_messages[0]["json"]["text"]
+    assert "991" in _FakeTelegramClient.sent_messages[1]["json"]["text"]
+    assert "沒有找到" not in _FakeTelegramClient.sent_messages[1]["json"]["text"]

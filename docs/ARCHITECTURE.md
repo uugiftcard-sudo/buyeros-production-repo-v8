@@ -88,6 +88,12 @@ All inherit from `BaseProviderAdapter`. Providers exchange context via `ContextH
 | `GET` | `/providers` | `BUYEROS_API_KEY` | Provider status |
 | `GET` | `/audit/search` | `BUYEROS_API_KEY` | Recent audit events |
 | `GET` | `/system/capabilities` | `BUYEROS_API_KEY` | Full capability matrix |
+| `POST` | `/automation/daily-report` | `BUYEROS_API_KEY` | Daily report snapshot |
+| `POST` | `/automation/ocr-posting` | `BUYEROS_API_KEY` | OCR accounting entry |
+| `POST` | `/automation/reconcile` | `BUYEROS_API_KEY` | Reconciliation + mismatch alert |
+| `POST` | `/automation/alerts` | `BUYEROS_API_KEY` | Anomaly alert generation |
+| `POST` | `/automation/approval` | `BUYEROS_API_KEY` | Manual approval task |
+| `POST` | `/automation/retry` | `BUYEROS_API_KEY` | Retry state tracking |
 
 ## Storage Layers
 

@@ -14,6 +14,15 @@ class TestPingEndpoint:
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
 
+    def test_root_returns_operator_links(self) -> None:
+        client = TestClient(create_app())
+        response = client.get("/")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["ok"] is True
+        assert body["service"] == "BuyerOS API"
+        assert body["ping"] == "/ping"
+
 
 class TestContextSummarizeEndpoint:
     def test_summarize_requires_key(self, monkeypatch) -> None:

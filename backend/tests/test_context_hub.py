@@ -35,9 +35,35 @@ def test_provider_registry_routes_coding_and_writes_context() -> None:
 
     result = registry.run(prompt="fix this code bug", session_id="dev")
 
-    assert result["provider"] == "claude"
+    assert result["ok"] is False
+    assert result["fallback_exhausted"] is True
     stored = hub.search_context(source_provider="claude", session_id="dev")
     assert stored
+
+
+def test_context_session_search_filters_before_limit() -> None:
+    memory = MemoryStore()
+    hub = ContextHub(memory)
+    hub.write_context(
+        source_provider="claude",
+        session_id="session-target",
+        task_id="task-target",
+        content={"text": "退款 991 已完成"},
+        summary="退款 991 已完成",
+    )
+    for index in range(20):
+        hub.write_context(
+            source_provider="claude",
+            session_id="other-session",
+            task_id=f"noise-{index}",
+            content={"text": f"noise {index}"},
+            summary=f"noise {index}",
+        )
+
+    result = hub.search_context(query="991", session_id="session-target", limit=1)
+
+    assert len(result) == 1
+    assert result[0]["content"]["session_id"] == "session-target"
 
 
 def test_openclaw_adapter_writes_shared_context() -> None:
@@ -51,4 +77,3 @@ def test_openclaw_adapter_writes_shared_context() -> None:
     stored = hub.search_context(source_provider="openclaw", session_id="ops")
     assert stored
     assert stored[0]["content"]["source_provider"] == "openclaw"
-

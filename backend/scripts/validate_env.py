@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import sys
+import argparse
 from pathlib import Path
 
 
@@ -17,7 +17,7 @@ REQUIRED_KEYS = [
     "OPENROUTER_API_KEY",
 ]
 
-PLACEHOLDER_BITS = ["CHANGE_ME", "YOUR_DOMAIN", "YOUR_", "root@YOUR", "TODO_"]
+PLACEHOLDER_BITS = ["CHANGE_ME", "YOUR_DOMAIN", "YOUR_", "ROOT@YOUR", "TODO", "REPLACE", "PLACEHOLDER"]
 
 
 def parse_env(path: Path) -> dict[str, str]:
@@ -32,10 +32,16 @@ def parse_env(path: Path) -> dict[str, str]:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
+    parser = argparse.ArgumentParser(description="Validate BuyerOS production env files.")
+    parser.add_argument("env_file", nargs="?", help="Path to env file")
+    parser.add_argument("--env", dest="env_option", help="Path to env file")
+    args = parser.parse_args()
+    env_path = args.env_option or args.env_file
+    if not env_path:
         print("Usage: python backend/scripts/validate_env.py <env_file>")
+        print("   or: python backend/scripts/validate_env.py --env <env_file>")
         return 2
-    path = Path(sys.argv[1])
+    path = Path(env_path)
     if not path.exists():
         print(f"Missing env file: {path}")
         return 2
@@ -44,7 +50,7 @@ def main() -> int:
     placeholders = [
         key
         for key, value in values.items()
-        if any(bit in value for bit in PLACEHOLDER_BITS)
+        if any(bit in value.upper() for bit in PLACEHOLDER_BITS)
     ]
     if missing:
         print("Missing required keys:")

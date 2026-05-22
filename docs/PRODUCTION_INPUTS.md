@@ -103,7 +103,7 @@ Authorization: Bearer YOUR_KEY
 ```bash
 cp .env.production.template .env.production
 # fill .env.production
-python backend/scripts/validate_env.py .env.production
+python backend/scripts/validate_env.py --env .env.production
 infra/deploy_vps.sh root@206.189.116.155 /opt/buyeros .env.production
 ```
 
@@ -114,6 +114,16 @@ curl https://YOUR_DOMAIN/ping
 curl https://YOUR_DOMAIN/health/ready
 curl -H "Authorization: Bearer $BUYEROS_API_KEY" https://YOUR_DOMAIN/providers
 curl -H "Authorization: Bearer $BUYEROS_API_KEY" https://YOUR_DOMAIN/system/capabilities
+bash infra/smoke_api.sh https://YOUR_DOMAIN "$BUYEROS_API_KEY"
+```
+
+## Ops Automation
+
+```bash
+infra/preflight_deploy.sh .env.production
+infra/backup_vps.sh root@206.189.116.155 /opt/buyeros /opt/buyeros-backups
+infra/rollback_vps.sh root@206.189.116.155 /opt/buyeros-backups/<archive>.tgz /opt/buyeros
+infra/failover_smoke.sh https://PRIMARY_DOMAIN https://SECONDARY_DOMAIN "$BUYEROS_API_KEY" 300
 ```
 
 ## Deployment Choice
