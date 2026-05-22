@@ -127,7 +127,20 @@ class TaskDispatcherService:
                 latest_by_subtask[subtask_id] = item
         deduped = list(latest_by_subtask.values())
         deduped.sort(key=lambda x: int(((x.get("content") or {}).get("order") or 0)))
-        return {"ok": True, "items": deduped}
+        normalized = []
+        for item in deduped:
+            content = dict(item.get("content") or {})
+            payload_obj = content.get("payload")
+            payload_project = payload_obj.get("project") if isinstance(payload_obj, dict) else ""
+            project = self.task_board.normalize_lane(str(content.get("project") or payload_project or ""))
+            if isinstance(payload_obj, dict):
+                payload = dict(payload_obj)
+                payload["project"] = project
+                content["payload"] = payload
+            content["project"] = project
+            item["content"] = content
+            normalized.append(item)
+        return {"ok": True, "items": normalized}
 
     def run_subtask(
         self,

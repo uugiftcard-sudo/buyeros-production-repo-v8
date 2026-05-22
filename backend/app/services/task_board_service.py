@@ -129,3 +129,12 @@ class TaskBoardService:
         self.memory.save_memory(["buyeros", "task_runs"], run_id, run, created_by="task_board_service")
         self.update_status(task_id=task_id, status="completed", note=f"Completed by {provider}")
         return {"ok": True, "run": run}
+
+    def normalize_task_payload(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize a persisted task payload so API responses only expose canonical lanes."""
+        payload = dict(item)
+        content = payload.get("content")
+        if not isinstance(content, dict):
+            return payload
+        payload["content"] = self.normalize_task_content(content)
+        return payload
