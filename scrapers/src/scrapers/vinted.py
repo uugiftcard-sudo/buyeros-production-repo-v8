@@ -1,13 +1,13 @@
 """
-Vinted (vinted.co.uk) scraper -- fashion resale marketplace.
+Vinted (vinted.com) scraper -- European fashion resale marketplace.
 
 Supports:
   - Keyword / filtered search via the Vinted web API
-  - Individual item detail scraping via HTML
+  - Individual item detail scraping via API or HTML fallback
   - Seller profile scraping via HTML
 
-Uses the Vinted internal web API (www.vinted.co.uk/api/v2)
-as the primary source, falling back to HTML parsing when needed.
+Primary API: https://www.vinted.com/api/v2/
+Fallback API: https://vinteds.com/api/v2/  (used when primary is blocked)
 """
 
 from __future__ import annotations
@@ -30,14 +30,19 @@ from src.utils.html import make_soup, text
 
 _LOG = logging.getLogger(__name__)
 
-_WEB_BASE = "https://www.vinted.co.uk"
+# ── API Base URLs ────────────────────────────────────────────────
+_WEB_BASE = "https://www.vinted.com"
 _API_BASE = f"{_WEB_BASE}/api/v2"
+_VINTEDS_API_BASE = "https://vinteds.com/api/v2"
 
 _API_HEADERS = {
     "Accept": "application/json",
     "Accept-Language": "en-GB,en;q=0.9",
     "Referer": _WEB_BASE,
-    "X-Requested-With": "XMLHttpRequest",
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    ),
 }
 
 _PAGE_SIZE = 50
@@ -58,7 +63,7 @@ class VintedScraper(BaseScraper[VintedProduct]):
     Example:
         scraper = VintedScraper(delay=2.0)
         items = scraper.scrape_search("gucci bag", pages=2)
-        product = scraper.scrape_product("https://www.vinted.co.uk/items/1234567")
+        product = scraper.scrape_product("https://www.vinted.com/items/1234567")
         seller = scraper.scrape_user("johndoe")
     """
 
@@ -82,11 +87,7 @@ class VintedScraper(BaseScraper[VintedProduct]):
         self.session = requests.Session()
         self.session.headers.update(
             {
-                "User-Agent": (
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/122.0.0.0 Safari/537.36"
-                ),
+                "User-Agent": _API_HEADERS["User-Agent"],
                 "Accept-Language": "en-GB,en;q=0.9",
                 "Accept": "application/json, text/html, */*;q=0.8",
             }
@@ -188,34 +189,57 @@ class VintedScraper(BaseScraper[VintedProduct]):
         page: int,
         filters: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        """Fetch one page of search results from the Vinted API."""
+        """
+        Fetch one page of search results.
+        Tries primary Vinted API first, falls back to vinteds.com API.
+        """
         params: dict[str, Any] = {
-            "search_text": keyword,
+            "keywords": keyword,
             "page": page,
             "per_page": _PAGE_SIZE,
             "order": "newest_first",
         }
         params.update(self._build_filter_params(filters))
 
+        # Try primary API
         try:
-            resp = self.session.get(
-                f"{_API_BASE}/catalog/items",
-                params=params,
-                headers=_API_HEADERS,
-                timeout=20,
-            )
-            if resp.status_code != 200:
-                _LOG.warning(f"[Vinted API] Search returned {resp.status_code}")
-                return []
-
-            data = resp.json()
-            items = data.get("items", [])
-            if isinstance(items, list):
+            items = self._do_search_request(_API_BASE, params)
+            if items:
                 return items
-
         except requests.RequestException as e:
-            _LOG.error(f"[Vinted API] Search request failed: {e}")
+            _LOG.warning(f"[Vinted] Primary API failed: {e}")
 
+        # Fallback to vinteds.com API
+        _LOG.info("[Vinted] Falling back to vinteds.com API")
+        try:
+            items = self._do_search_request(_VINTEDS_API_BASE, params)
+            if items:
+                return items
+        except requests.RequestException as e:
+            _LOG.error(f"[Vinted] Fallback API failed: {e}")
+
+        return []
+
+    def _do_search_request(
+        self,
+        api_base: str,
+        params: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Execute a search request against the given API base."""
+        resp = self.session.get(
+            f"{api_base}/catalog/items",
+            params=params,
+            headers=_API_HEADERS,
+            timeout=20,
+        )
+        if resp.status_code != 200:
+            _LOG.warning(f"[Vinted] API returned {resp.status_code}")
+            return []
+
+        data = resp.json()
+        items = data.get("items", [])
+        if isinstance(items, list):
+            return items
         return []
 
     def _build_filter_params(self, filters: dict[str, Any]) -> dict[str, Any]:
@@ -260,26 +284,31 @@ class VintedScraper(BaseScraper[VintedProduct]):
     # ── Internal: item detail ──────────────────────────────────────
 
     def _fetch_item_via_api(self, item_id: str) -> VintedProduct | None:
-        """Fetch item detail from the Vinted item API endpoint."""
-        try:
-            resp = self.session.get(
-                f"{_API_BASE}/items/{item_id}",
-                headers=_API_HEADERS,
-                timeout=20,
-            )
-            if resp.status_code != 200:
-                return None
+        """
+        Fetch item detail from the Vinted item API endpoint.
+        Tries primary first, then fallback.
+        """
+        for api_base in (_API_BASE, _VINTEDS_API_BASE):
+            try:
+                resp = self.session.get(
+                    f"{api_base}/items/{item_id}",
+                    headers=_API_HEADERS,
+                    timeout=20,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    item = (
+                        data.get("item")
+                        or (
+                            data.get("items", [{}])[0]
+                            if isinstance(data.get("items"), list) else {}
+                        )
+                    )
+                    return self._parse_search_item(item) if item else None
+            except requests.RequestException:
+                continue
 
-            data = resp.json()
-            item = (
-                data.get("item")
-                or (data.get("items", [{}])[0] if isinstance(data.get("items"), list) else {})
-            )
-            return self._parse_search_item(item) if item else None
-
-        except requests.RequestException as e:
-            _LOG.warning(f"[Vinted API] Item fetch failed: {e}")
-            return None
+        return None
 
     def _fetch_item_via_html(self, url: str) -> VintedProduct | None:
         """Parse item detail from the public HTML page."""
@@ -318,7 +347,7 @@ class VintedScraper(BaseScraper[VintedProduct]):
         # Condition
         p.condition = self._parse_condition(raw.get("status", ""))
 
-        # Pricing — Vinted stores prices in cents
+        # Pricing -- Vinted stores prices in cents
         price_data = raw.get("price") or {}
         if isinstance(price_data, dict):
             p.price = float(price_data.get("amount", 0) or 0) / 100
@@ -545,7 +574,7 @@ class VintedScraper(BaseScraper[VintedProduct]):
 
     def _extract_item_id(self, url: str) -> str:
         """Extract the numeric item ID from a Vinted item URL."""
-        # https://www.vinted.co.uk/items/1234567
+        # https://www.vinted.com/items/1234567
         m = re.search(r"/items/(\d+)", url)
         return m.group(1) if m else ""
 
