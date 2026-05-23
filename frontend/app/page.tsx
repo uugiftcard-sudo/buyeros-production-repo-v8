@@ -87,6 +87,29 @@ type ProviderStatus = {
   status?: "ready" | "not_configured" | "degraded";
 };
 
+type OpsSummary = {
+  ok?: boolean;
+  action?: string;
+  target?: string;
+  started_at?: string;
+  ended_at?: string;
+  duration_seconds?: number;
+  notes?: string;
+  archive_path?: string;
+  rollback_source?: string;
+  rto_seconds?: number;
+  rpo_seconds?: number;
+  checks_passed?: number;
+  checks_failed?: number;
+  status?: string;
+};
+
+type OpsStatus = {
+  ok?: boolean;
+  summary_dir?: string;
+  summaries?: Record<string, OpsSummary>;
+};
+
 type TimelineContent = {
   type?: string;
   route?: string;
@@ -157,7 +180,7 @@ const referencePatterns = [
 
 const taskLanes = [
   { id: "buyeros", label: "BuyerOS Core" },
-  { id: "cloth", label: "CLOTH 網店自動系統" },
+  { id: "cloth", label: "CLOTH 網店" },
   { id: "xau", label: "XAU 中控" }
 ];
 
@@ -237,11 +260,11 @@ const projectProfiles = {
     kind: "AI 主線"
   },
   cloth: {
-    title: "CLOTH 網店自動系統",
-    subtitle: "日報、週報、CSV 匯出、毛利、退款與異常摘要",
-    memory: "buyeros / reports / finance / refunds / alerts",
-    sop: "每日報表、週報、CSV export、Telegram 推送",
-    kind: "報表主線"
+    title: "CLOTH 網店",
+    subtitle: "網店 SOP、買手報告、訂單、OCR、對帳、退款",
+    memory: "buyeros / reports / finance / refunds / alerts / ocr_entries",
+    sop: "OCR 入帳、對帳、差異告警、人工覆核、日報",
+    kind: "網店專案"
   },
   xau: {
     title: "XAU 中控",
@@ -314,6 +337,7 @@ export default function DashboardPage() {
   const [projectCards, setProjectCards] = useState<MemoryEntry<ProjectCard>[]>([]);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [teamStatus, setTeamStatus] = useState<ProviderStatus[]>([]);
+  const [opsStatus, setOpsStatus] = useState<OpsStatus | null>(null);
   const [capabilities, setCapabilities] = useState<Record<string, unknown> | null>(null);
   const [uiTheme, setUiTheme] = useState<UiTheme>("ops");
   const [mounted, setMounted] = useState(false);
@@ -462,12 +486,21 @@ export default function DashboardPage() {
     }
   }
 
+  async function loadOpsStatus() {
+    const data = await callApi("/ops/status", {}, "維運狀態");
+    if (data && typeof data === "object") {
+      setOpsStatus(data as OpsStatus);
+      recordAction("維運狀態", "已載入最近一次維運摘要");
+    }
+  }
+
   useEffect(() => {
     loadTasks();
     loadProjects();
     loadTeamStatus();
     searchTimeline();
     loadCapabilities();
+    loadOpsStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [normalizedProxyUrl]);
 
@@ -576,25 +609,60 @@ export default function DashboardPage() {
     }
   }
 
-  async function runWorkspaceAction(action: "daily_report" | "ocr" | "reconcile" | "alerts" | "promo_metrics" | "provider_check") {
+  async function runWorkspaceAction(action: "daily_report" | "ocr" | "reconcile" | "alerts" | "approval" | "retry" | "close_cycle" | "promo_metrics" | "provider_check" | "ops_status") {
     if (action === "daily_report") {
       await callApi("/automation/daily-report", { method: "POST", body: JSON.stringify({}) }, "CLOTH 日報");
       await searchTimeline();
       return;
     }
+    if (action === "close_cycle") {
+      await callApi(
+        "/automation/close-cycle",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            ocr_text: "UI 收單測試 HKD 88",
+            expected_total: 100,
+            actual_total: 88,
+            reference: "ui-close-cycle",
+            source: "ui",
+            high_risk: true,
+            retry_error: "ui smoke retry sample",
+            retry_attempt: 1,
+          }),
+        },
+        "CLOTH 收單流程"
+      );
+      await searchTimeline();
+      return;
+    }
     if (action === "ocr") {
-      await callApi("/automation/ocr-posting", { method: "POST", body: JSON.stringify({ text: "UI 測試 OCR 入帳", source: "ui" }) }, "OCR 入帳測試");
+      await callApi("/automation/ocr-posting", { method: "POST", body: JSON.stringify({ text: "UI 測試 OCR 入帳 HKD 88", source: "ui" }) }, "OCR 入帳測試");
       await searchTimeline();
       return;
     }
     if (action === "reconcile") {
-      await callApi("/automation/reconcile", { method: "POST", body: JSON.stringify({}) }, "對帳檢查");
+      await callApi("/automation/reconcile", { method: "POST", body: JSON.stringify({ expected_total: 100, actual_total: 88, reference: "ui-reconcile" }) }, "對帳檢查");
       await searchTimeline();
       return;
     }
     if (action === "alerts") {
-      await callApi("/automation/alerts", { method: "POST", body: JSON.stringify({}) }, "異常告警檢查");
+      await callApi("/automation/alerts", { method: "POST", body: JSON.stringify({ items: [{ id: "ui-alert", amount: 88 }], threshold: 1 }) }, "異常告警檢查");
       await searchTimeline();
+      return;
+    }
+    if (action === "approval") {
+      await callApi("/automation/approval", { method: "POST", body: JSON.stringify({ task_id: "ui-approval", reason: "UI 人工覆核測試", payload: { project_id: "cloth" } }) }, "人工覆核");
+      await searchTimeline();
+      return;
+    }
+    if (action === "retry") {
+      await callApi("/automation/retry", { method: "POST", body: JSON.stringify({ task_id: "ui-retry", error: "UI 重試記錄測試", attempt: 1 }) }, "重試記錄");
+      await searchTimeline();
+      return;
+    }
+    if (action === "ops_status") {
+      await loadOpsStatus();
       return;
     }
     if (action === "promo_metrics") {
@@ -877,7 +945,7 @@ export default function DashboardPage() {
 	                專案
 	                <select value={project} onChange={(event) => setProject(normalizeProjectId(event.target.value))}>
                   <option value="buyeros">BuyerOS Core</option>
-                  <option value="cloth">CLOTH 網店自動系統</option>
+                  <option value="cloth">CLOTH 網店</option>
                   <option value="xau">XAU 中控</option>
                 </select>
 	              </label>
@@ -1181,7 +1249,7 @@ export default function DashboardPage() {
 	              {project === "buyeros"
 	                ? "BuyerOS Core 負責 Context Hub、Provider fallback、任務派工、部署與營運。"
 	                : project === "cloth"
-	                  ? "買手 Report 專注日報、週報、CSV 匯出、毛利、退款與異常摘要；對接 CLOTH 資料流後可直接支援 OCR 與訂單看板。"
+	                  ? "CLOTH 網店負責網店 SOP、買手報告、訂單、OCR 入帳、對帳、退款與差異告警。"
 	                  : "XAU 中控接 campaign / conversion / metrics；外部行情或內容來源未設定時顯示待接線。"}
 	            </p>
 	            <div className="quick-actions" aria-label="工作區快捷操作">
@@ -1200,6 +1268,9 @@ export default function DashboardPage() {
 	                  <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("daily_report")}>
                     {loading ? "產生中..." : "產生日報"}
                   </button>
+                  <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("close_cycle")}>
+                    {loading ? "執行中..." : "收單全流程"}
+                  </button>
                   <button type="button" className="secondary slim" disabled={loading} onClick={() => callApi("/reports/history", {}, "報表歷史")}>
                     {loading ? "載入中..." : "報表歷史"}
                   </button>
@@ -1215,6 +1286,12 @@ export default function DashboardPage() {
                   </button>
                   <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("alerts")}>
                     {loading ? "檢查中..." : "告警檢查"}
+                  </button>
+                  <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("approval")}>
+                    {loading ? "建立中..." : "人工覆核"}
+                  </button>
+                  <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("retry")}>
+                    {loading ? "記錄中..." : "重試記錄"}
                   </button>
 	                </>
 	              ) : null}
@@ -1285,19 +1362,32 @@ export default function DashboardPage() {
             <button type="button" onClick={loadCapabilities}>Capabilities / Gaps</button>
             <button type="button" onClick={() => callApi("/reports/history", {}, "報表歷史")}>Report History</button>
             <button type="button" onClick={() => callApi("/audit/search", {}, "Audit Log")}>Audit Log</button>
+            <button type="button" onClick={() => runWorkspaceAction("ops_status")}>維運狀態</button>
           </div>
           <div className="ops-checklist">
             <div>
               <strong>Backup Status</strong>
-              <span>查看 Supabase / VPS 備份 SOP</span>
+              <span>{opsStatus?.summaries?.backup?.notes || "尚無執行紀錄"}</span>
             </div>
             <div>
               <strong>Rollback Checklist</strong>
-              <span>映像回退、DB 還原、配置回退</span>
+              <span>{opsStatus?.summaries?.rollback?.notes || "尚無執行紀錄"}</span>
             </div>
             <div>
               <strong>Deploy Topology</strong>
-              <span>主機 API+Redis+worker，副機 staging/backup</span>
+              <span>
+                {opsStatus?.summaries?.failover?.rto_seconds != null
+                  ? `RTO ${opsStatus.summaries.failover.rto_seconds}s / RPO ${opsStatus.summaries.failover.rpo_seconds ?? 0}s`
+                  : "尚未產生 failover drill 摘要"}
+              </span>
+            </div>
+            <div>
+              <strong>VPS Smoke</strong>
+              <span>
+                {opsStatus?.summaries?.smoke
+                  ? `通過 ${opsStatus.summaries.smoke.checks_passed ?? 0} / 失敗 ${opsStatus.summaries.smoke.checks_failed ?? 0}`
+                  : "尚無 smoke 摘要"}
+              </span>
             </div>
           </div>
           {capabilities ? (

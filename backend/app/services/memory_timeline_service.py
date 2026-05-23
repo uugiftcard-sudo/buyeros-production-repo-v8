@@ -48,6 +48,8 @@ class MemoryTimelineService:
             ("buyeros", "ocr_entries"),
             ("buyeros", "retries"),
             ("buyeros", "approvals"),
+            ("buyeros", "reconciliation"),
+            ("buyeros", "close_cycles"),
         ]
         candidates: List[Dict[str, Any]] = []
         # Fetch more than limit because we will filter and merge.
