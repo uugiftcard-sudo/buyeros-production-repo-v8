@@ -13,6 +13,7 @@ rate_limits:
   loyalty: 10
   supermarket: 40
   aliexpress: 30
+  vinted: 30
 
 # ── Delay Between Requests (seconds) ───────────────────────────
 delays:
@@ -24,6 +25,7 @@ delays:
   ebay: 2.0
   loyalty: 5.0
   aliexpress: 2.0
+  vinted: 2.0
 
 # ── User-Agent Rotation Pool ──────────────────────────────────
 user_agents:
@@ -103,3 +105,11 @@ scrapers:
     tesco_url: "https://www.tesco.com/groceries"
     marksandspencer_url: "https://www.marksandspencer.com/search"
     default_limit: 30
+
+  vinted:
+    api_base_url: "https://www.vinted.com/api/v2"
+    fallback_api_base_url: "https://vinteds.com/api/v2"
+    web_base_url: "https://www.vinted.com"
+    default_country: "gb"
+    default_currency: "GBP"
+    default_page_size: 50

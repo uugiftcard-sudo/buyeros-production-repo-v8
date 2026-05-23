@@ -730,51 +730,51 @@ def cmd_supermarket(
 # ════════════════════════════════════════════════════════════════════
 
 
-@cli.command("vinted")
-@click.argument("url_or_search", nargs=-1, required=False)
-@click.option("--search", "-s", help="Search keyword (overrides positional arg)")
+@cli.group("vinted")
+def vinted():
+    """Vinted European fashion resale marketplace (vinted.com)"""
+    pass
+
+
+@vinted.command("search")
+@click.option("--keyword", "-k", "keyword", required=True, help="Search keyword")
+@click.option("--pages", "-p", type=int, default=1, help="Number of result pages")
+@click.option("--size", help="Filter by size (e.g. M, 38, 12)")
 @click.option("--brand", help="Filter by brand name")
-@click.option("--size", help="Filter by size label (e.g. M, 38, 12)")
 @click.option(
     "--condition",
     type=click.Choice(["new_with_tags", "new_without_tags", "very_good", "good", "satisfactory"]),
     help="Filter by item condition",
 )
-@click.option("--min-price", type=float, default=None, help="Minimum price (GBP)")
-@click.option("--max-price", type=float, default=None, help="Maximum price (GBP)")
-@click.option("--category", help="Filter by category name")
+@click.option("--min-price", type=float, default=None, help="Minimum price")
+@click.option("--max-price", type=float, default=None, help="Maximum price")
 @click.option("--gender", type=click.Choice(["male", "female", "unisex"]), help="Gender filter")
-@click.option("--pages", type=int, default=1, help="Number of search result pages")
 @click.option("-d", "--delay", type=float, default=2.0)
 @pass_opts
-def cmd_vinted(
+def vinted_search(
     opts: GlobalOptions,
-    url_or_search: tuple[str, ...],
-    search: str | None,
-    brand: str | None,
+    keyword: str,
+    pages: int,
     size: str | None,
+    brand: str | None,
     condition: str | None,
     min_price: float | None,
     max_price: float | None,
-    category: str | None,
     gender: str | None,
-    pages: int,
     delay: float,
 ) -> None:
-    """Scrape Vinted (vinted.co.uk) fashion listings."""
+    """Search Vinted listings by keyword."""
     from src.scrapers.vinted import VintedScraper
     from src.storage.writer import save_any
 
     if opts.dry_run:
-        console.print("[cyan]Dry-run: would scrape Vinted[/cyan]")
-        console.print(f"  search={search} brand={brand} size={size} condition={condition}")
-        console.print(f"  pages={pages} min_price={min_price} max_price={max_price}")
+        console.print("[cyan]Dry-run: would search Vinted[/cyan]")
+        console.print(
+            f"  keyword={keyword} pages={pages} brand={brand} size={size} "
+            f"condition={condition} min_price={min_price} max_price={max_price}"
+        )
         return
 
-    scraper = VintedScraper(delay=delay)
-    results: list = []
-
-    # Build filters dict
     filters: dict = {}
     if brand:
         filters["brand"] = brand
@@ -786,51 +786,53 @@ def cmd_vinted(
         filters["min_price"] = min_price
     if max_price is not None:
         filters["max_price"] = max_price
-    if category:
-        filters["category"] = category
     if gender:
         filters["gender"] = gender
 
-    # Priority 1: direct item URL
-    if url_or_search:
-        for raw_url in url_or_search:
-            if "vinted.co.uk/items/" in raw_url or "/items/" in raw_url:
-                console.print(f"[cyan]Fetching item: {raw_url}[/cyan]")
-                product = scraper.scrape_product(raw_url)
-                if product:
-                    results.append(product)
-                continue
-
-            # Treat as search keyword
-            keyword = raw_url.strip()
-            if not search:
-                search = keyword
-
-    # Priority 2: explicit --search
-    if search and not results:
-        console.print(f"[cyan]Searching Vinted: '{search}' ({pages} page(s))[/cyan]")
-        results = scraper.scrape_search(search, pages=pages, filters=filters or None)
-        output = opts.output or f"vinted_{search[:20].replace(' ', '_')}.csv"
-
-    elif results:
-        # Direct URL results
-        output = opts.output or "vinted_items.csv"
-
-    else:
-        console.print(
-            "[yellow]Provide a search term with --search or as a positional argument,[/yellow]\n"
-            "       or pass a Vinted item URL directly."
-        )
-        return
+    scraper = VintedScraper(delay=delay)
+    console.print(f"[cyan]Searching Vinted: '{keyword}' ({pages} page(s))[/cyan]")
+    results = scraper.scrape_search(keyword, pages=pages, filters=filters or None)
 
     if not results:
         console.print("[yellow]No results found[/yellow]")
         return
 
+    output = opts.output or f"vinted_{keyword[:20].replace(' ', '_')}.csv"
     path = save_any(results, output, opts.format)
-    console.print(f"[green]✓ Saved {len(results)} results → {path}[/green]")
-
+    console.print(f"[green]Saved {len(results)} results -> {path}[/green]")
     _print_table(results[:5], "Vinted Listings")
+
+
+@vinted.command("product")
+@click.argument("url")
+@click.option("-d", "--delay", type=float, default=2.0)
+@pass_opts
+def vinted_product(
+    opts: GlobalOptions,
+    url: str,
+    delay: float,
+) -> None:
+    """Get full details for a specific Vinted product URL."""
+    from src.scrapers.vinted import VintedScraper
+    from src.storage.writer import save_any
+
+    if opts.dry_run:
+        console.print("[cyan]Dry-run: would fetch Vinted product[/cyan]")
+        console.print(f"  url={url}")
+        return
+
+    scraper = VintedScraper(delay=delay)
+    console.print(f"[cyan]Fetching: {url}[/cyan]")
+    product = scraper.scrape_product(url)
+
+    if not product:
+        console.print("[yellow]Could not retrieve product (blocked or not found)[/yellow]")
+        return
+
+    output = opts.output or "vinted_product.json"
+    path = save_any([product], output, "json")
+    console.print(f"[green]Saved 1 product -> {path}[/green]")
+    _print_table([product], "Vinted Product")
 
 
 # ─── Entry point ──────────────────────────────────────────────────
