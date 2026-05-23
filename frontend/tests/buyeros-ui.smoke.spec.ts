@@ -88,6 +88,17 @@ test("BuyerOS mission control can plan, run one step, and show memory UI", async
     if (path === "/system/capabilities" || path === "/health/ready") {
       return json({ ok: true });
     }
+    if (path === "/ops/status") {
+      return json({
+        ok: true,
+        summaries: {
+          backup: { ok: true, action: "backup", notes: "Backup created", archive_path: "host:/backup.tgz" },
+          rollback: { ok: false, action: "rollback", status: "尚無執行紀錄", notes: "尚未產生維運演練摘要。" },
+          failover: { ok: true, action: "failover", rto_seconds: 12, rpo_seconds: 60, notes: "Failover smoke OK" },
+          smoke: { ok: true, action: "smoke", checks_passed: 3, checks_failed: 0, notes: "runs=3 failures=0" },
+        },
+      });
+    }
     return json({ ok: true });
   });
 
@@ -127,6 +138,12 @@ test("BuyerOS mission control can plan, run one step, and show memory UI", async
 
   await expect(page.getByRole("button", { name: "Health Check" })).toBeVisible();
   await expect(page.getByText("Backup Status")).toBeVisible();
-  await expect(page.getByText("Rollback Checklist")).toBeVisible();
-  await expect(page.getByText("Deploy Topology")).toBeVisible();
+  await page.getByRole("button", { name: "維運狀態" }).click();
+  await expect(page.locator("#ops").getByText("Backup created", { exact: true })).toBeVisible();
+  await expect(page.getByText(/RTO 12s/)).toBeVisible();
+
+  await page.locator("#projects").scrollIntoViewIfNeeded();
+  await page.locator("#projects .project-switch").filter({ hasText: "CLOTH 網店" }).click();
+  await page.getByRole("button", { name: "收單全流程" }).click();
+  await expect(page.getByText("CLOTH 收單流程").first()).toBeVisible();
 });

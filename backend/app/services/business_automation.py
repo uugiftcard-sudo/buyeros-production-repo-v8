@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from uuid import uuid4
 from typing import Any, Dict, Iterable, List, Optional
 
 from ..memory_store import MemoryStore
@@ -39,11 +40,17 @@ class BusinessAutomationService:
         finance = self.memory.search_memory(namespace_prefix=("buyeros", "finance"), limit=20)
         orders = self.memory.search_memory(namespace_prefix=("buyeros", "orders"), limit=100)
         alerts = self.memory.search_memory(namespace_prefix=("buyeros", "alerts"), limit=20)
+        ocr_entries = self.memory.search_memory(namespace_prefix=("buyeros", "ocr_entries"), limit=100)
+        reconciliation = self.memory.search_memory(namespace_prefix=("buyeros", "reconciliation"), limit=100)
+        approvals = self.memory.search_memory(namespace_prefix=("buyeros", "approvals"), limit=100)
+        retries = self.memory.search_memory(namespace_prefix=("buyeros", "retries"), limit=100)
         summary = (
             f"{report_date} 日報：訂單 {len(orders)}，退款 {len(refunds)}，"
-            f"財務記錄 {len(finance)}，告警 {len(alerts)}。"
+            f"財務記錄 {len(finance)}，OCR {len(ocr_entries)}，告警 {len(alerts)}，"
+            f"覆核 {len(approvals)}，重試 {len(retries)}。"
         )
         payload = {
+            "project_id": "cloth",
             "date": report_date,
             "summary": summary,
             "counts": {
@@ -51,6 +58,10 @@ class BusinessAutomationService:
                 "refunds": len(refunds),
                 "finance": len(finance),
                 "alerts": len(alerts),
+                "ocr_entries": len(ocr_entries),
+                "reconciliation": len(reconciliation),
+                "approvals": len(approvals),
+                "retries": len(retries),
             },
         }
         self.memory.save_memory(["buyeros", "reports"], report_date, payload, created_by="business_automation")
@@ -61,6 +72,7 @@ class BusinessAutomationService:
         amount = self._extract_amount(text)
         status = "needs_review" if amount is None else "posted"
         payload = {
+            "project_id": "cloth",
             "entry_id": key,
             "source": source,
             "text": text,
@@ -75,6 +87,7 @@ class BusinessAutomationService:
         difference = round(actual_total - expected_total, 2)
         status = "matched" if difference == 0 else "mismatch"
         payload = {
+            "project_id": "cloth",
             "reference": reference,
             "expected_total": expected_total,
             "actual_total": actual_total,
@@ -92,7 +105,7 @@ class BusinessAutomationService:
         for index, item in enumerate(items, start=1):
             amount = float(item.get("amount", 0) or 0)
             if amount > threshold:
-                alert = {"index": index, **item, "threshold": threshold, "status": "open"}
+                alert = {"project_id": "cloth", "index": index, **item, "threshold": threshold, "status": "open"}
                 alerts.append(alert)
                 self.memory.save_memory(
                     ["buyeros", "alerts"],
@@ -109,15 +122,88 @@ class BusinessAutomationService:
         ).to_dict()
 
     def request_approval(self, *, task_id: str, reason: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        content = {"task_id": task_id, "reason": reason, "payload": payload or {}, "status": "pending"}
+        content = {"project_id": "cloth", "task_id": task_id, "reason": reason, "payload": payload or {}, "status": "pending"}
         self.memory.save_memory(["buyeros", "approvals"], task_id, content, created_by="business_automation")
         return AutomationResult(True, "approval", "pending", "已建立人工覆核任務。", content).to_dict()
 
     def record_retry(self, *, task_id: str, error: str, attempt: int) -> Dict[str, Any]:
         status = "retry_scheduled" if attempt < 3 else "failed"
-        content = {"task_id": task_id, "error": error, "attempt": attempt, "status": status}
+        content = {"project_id": "cloth", "task_id": task_id, "error": error, "attempt": attempt, "status": status}
         self.memory.save_memory(["buyeros", "retries"], task_id, content, created_by="business_automation")
         return AutomationResult(True, "retry", status, f"任務 {task_id} {status}。", content).to_dict()
+
+    def close_cycle(
+        self,
+        *,
+        ocr_text: str,
+        expected_total: float,
+        actual_total: float,
+        reference: str = "close-cycle",
+        source: str = "api",
+        retry_error: Optional[str] = None,
+        retry_attempt: int = 1,
+        high_risk: bool = False,
+        date: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        cycle_id = f"cycle-{uuid4().hex[:8]}"
+        steps: List[Dict[str, Any]] = []
+
+        ocr = self.post_ocr_entry(text=ocr_text, source=source, entry_id=f"{cycle_id}-ocr")
+        steps.append(ocr)
+
+        approval: Optional[Dict[str, Any]] = None
+        if ocr["status"] == "needs_review" or high_risk:
+            approval = self.request_approval(
+                task_id=f"{cycle_id}-approval",
+                reason="OCR 無法抽出金額或命中高風險條件",
+                payload={"cycle_id": cycle_id, "ocr": ocr["data"], "high_risk": high_risk},
+            )
+            steps.append(approval)
+
+        reconciliation = self.reconcile_entries(
+            expected_total=expected_total,
+            actual_total=actual_total,
+            reference=reference,
+        )
+        steps.append(reconciliation)
+
+        alert_items = []
+        if reconciliation["status"] == "mismatch":
+            alert_items.append(
+                {
+                    "id": f"{cycle_id}-difference",
+                    "amount": abs(float(reconciliation["data"].get("difference", 0) or 0)),
+                    "reference": reference,
+                    "reason": "reconciliation_mismatch",
+                }
+            )
+        alerts = self.generate_alerts(items=alert_items, threshold=0)
+        steps.append(alerts)
+
+        retry: Optional[Dict[str, Any]] = None
+        if retry_error:
+            retry = self.record_retry(task_id=f"{cycle_id}-retry", error=retry_error, attempt=retry_attempt)
+            steps.append(retry)
+
+        report = self.create_daily_report(date=date)
+        steps.append(report)
+
+        status = "needs_review" if approval or reconciliation["status"] == "mismatch" else "completed"
+        payload = {
+            "project_id": "cloth",
+            "cycle_id": cycle_id,
+            "status": status,
+            "reference": reference,
+            "steps": steps,
+            "ocr": ocr,
+            "reconciliation": reconciliation,
+            "alerts": alerts,
+            "approval": approval,
+            "retry": retry,
+            "daily_report": report,
+        }
+        self.memory.save_memory(["buyeros", "close_cycles"], cycle_id, payload, created_by="business_automation")
+        return AutomationResult(True, "close_cycle", status, "CLOTH 收單流程已完成並寫入共同記憶。", payload).to_dict()
 
     def _extract_amount(self, text: str) -> Optional[float]:
         import re

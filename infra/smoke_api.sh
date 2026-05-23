@@ -131,6 +131,18 @@ curl ${curl_opts+"${curl_opts[@]}"} -fsS -X POST "${BASE_URL}/memory/timeline" \
 assert_json "$TMP_DIR/timeline.json" "data.get('ok') is True and len(data.get('items', [])) >= 1"
 echo
 
+echo "== automation close cycle =="
+curl ${curl_opts+"${curl_opts[@]}"} -fsS -X POST "${BASE_URL}/automation/close-cycle" \
+  "${json_header[@]}" "${auth_header[@]}" \
+  -d "{\"ocr_text\":\"Smoke close cycle HKD 88\",\"expected_total\":100,\"actual_total\":88,\"reference\":\"${SESSION_ID}-cycle\",\"source\":\"smoke\",\"high_risk\":true,\"retry_error\":\"smoke retry\",\"retry_attempt\":1}" | tee "$TMP_DIR/close-cycle.json"
+assert_json "$TMP_DIR/close-cycle.json" "data.get('ok') is True and data.get('workflow') == 'close_cycle'"
+echo
+
+echo "== ops status =="
+curl ${curl_opts+"${curl_opts[@]}"} -fsS "${auth_header[@]}" "${BASE_URL}/ops/status" | tee "$TMP_DIR/ops-status.json"
+assert_json "$TMP_DIR/ops-status.json" "data.get('ok') is True and 'summaries' in data"
+echo
+
 SKIP_FOUR_SYSTEMS_SMOKE="${BUYEROS_SKIP_FOUR_SYSTEMS_SMOKE:-${BUYEROS_SKIP_THREE_SYSTEMS_SMOKE:-0}}"
 if [[ "$SKIP_FOUR_SYSTEMS_SMOKE" != "1" ]]; then
   echo "== three workspaces e2e =="

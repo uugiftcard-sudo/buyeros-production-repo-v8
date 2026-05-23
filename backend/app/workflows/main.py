@@ -42,6 +42,7 @@ from ..schemas.state import (
     AgentRunRequest,
     AlertsRequest,
     ApprovalRequest,
+    CloseCycleRequest,
     ContextSearchRequest,
     ContextSummarizeRequest,
     ContextWriteRequest,
@@ -67,6 +68,7 @@ from ..runtime.session_store import RedisSessionStore
 from ..security import require_api_key
 from ..services.business_automation import BusinessAutomationService
 from ..services.memory_timeline_service import MemoryTimelineService
+from ..services.ops_status_service import OpsStatusService
 from ..services.promo_service import PromoService
 from ..services.project_registry_service import ProjectRegistryService
 from ..services.reporting_service import ReportingService
@@ -108,6 +110,7 @@ def create_app() -> FastAPI:
     task_board_service = TaskBoardService(memory_store)
     project_registry = ProjectRegistryService(memory_store)
     timeline_service = MemoryTimelineService(memory_store)
+    ops_status_service = OpsStatusService()
 
     # Setup tool registry and register tools
     tool_registry = ToolRegistry()
@@ -184,6 +187,7 @@ def create_app() -> FastAPI:
     app.state.project_registry = project_registry
     app.state.timeline_service = timeline_service
     app.state.dispatcher_service = dispatcher_service
+    app.state.ops_status_service = ops_status_service
 
     @app.post("/telegram/webhook")
     async def telegram_webhook(request: Request) -> JSONResponse:
@@ -380,6 +384,11 @@ def create_app() -> FastAPI:
         items = memory_store.search_memory(namespace_prefix=("buyeros", "audit"), limit=min(max(limit, 1), 100))
         return {"ok": True, "items": items}
 
+    @app.get("/ops/status", dependencies=[Depends(require_api_key)])
+    async def ops_status() -> Dict[str, Any]:
+        """Return latest backup, rollback, failover, and smoke summaries."""
+        return ops_status_service.status()
+
     @app.post("/automation/daily-report", dependencies=[Depends(require_api_key)])
     async def automation_daily_report(payload: DailyReportRequest) -> Dict[str, Any]:
         """Create a daily operations report from current BuyerOS memory."""
@@ -439,6 +448,23 @@ def create_app() -> FastAPI:
             attempt=payload.attempt,
         )
         audit_logger.log(action="automation.retry", actor="api", details=result)
+        return result
+
+    @app.post("/automation/close-cycle", dependencies=[Depends(require_api_key)])
+    async def automation_close_cycle(payload: CloseCycleRequest) -> Dict[str, Any]:
+        """Run the CLOTH OCR -> reconcile -> alert -> approval/retry -> report flow."""
+        result = business_automation.close_cycle(
+            ocr_text=payload.ocr_text,
+            expected_total=payload.expected_total,
+            actual_total=payload.actual_total,
+            reference=payload.reference,
+            source=payload.source,
+            retry_error=payload.retry_error,
+            retry_attempt=payload.retry_attempt,
+            high_risk=payload.high_risk,
+            date=payload.date,
+        )
+        audit_logger.log(action="automation.close_cycle", actor="api", details=result)
         return result
 
     @app.post("/reports/create", dependencies=[Depends(require_api_key)])
