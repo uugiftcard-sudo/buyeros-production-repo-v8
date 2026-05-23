@@ -134,6 +134,26 @@ except ImportError:  # Python < 3.7 fallback (dict, not thread-safe)
         _fallback_ctx.clear()
 
 
+def get_trace_ctx() -> Dict[str, Any]:
+    """Return current trace context for logging and observability.
+
+    All agents and tool calls should call this to get the current
+    request_id / trace_id so logs can be correlated end-to-end.
+    """
+    ctx = get_request_ctx()
+    return {
+        "request_id": ctx.get("request_id"),
+        "trace_id": ctx.get("trace_id"),
+        "client_ip": ctx.get("client_ip"),
+    }
+
+    def set_request_ctx(**kwargs: Any) -> None:
+        _fallback_ctx.update(kwargs)
+
+    def clear_request_ctx() -> None:
+        _fallback_ctx.clear()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Debug mode flag
 # ─────────────────────────────────────────────────────────────────────────────
@@ -272,25 +292,6 @@ def _clean_window(ip: str, window_seconds: float, now: float) -> None:
     cutoff = now - window_seconds
     _request_windows[ip] = [t for t in _request_windows[ip] if t > cutoff]
 
-def _check_rate_limit(ip: str, rpm: int, rps: int) -> tuple[bool, str]:
-    """Return (allowed, retry_after_str). thread-safe sliding window."""
-    now = _time.time()
-    with _window_lock:
-        _clean_window(ip, 60.0, now)
-        _clean_window(ip, 1.0, now)
-        total = len(_request_windows[ip])
-        if total >= rpm:
-            oldest = _request_windows[ip][0]
-            retry = int(oldest + 60.0 - now) + 1
-            return False, str(max(1, retry))
-        if len([t for t in _request_windows[ip] if t > now - 1.0]) >= rps:
-            oldest = [t for t in _request_windows[ip] if t > now - 1.0][0]
-            retry = int(oldest + 1.0 - now) + 1
-            return False, str(max(1, retry))
-        _request_windows[ip].append(now)
-        return True, "0"
-
-
 def _ip_from_request(request: Request) -> str:
     """Best-effort client IP extraction (X-Forwarded-For aware)."""
     forwarded = request.headers.get("x-forwarded-for", "")
@@ -373,11 +374,17 @@ def create_app() -> FastAPI:
     async def metrics_middleware(request: Request, call_next):
         request_id = request.headers.get("x-request-id", str(uuid.uuid4()))
         trace_id = request.headers.get("x-trace-id", str(uuid.uuid4()))
+        span_id = str(uuid.uuid4())[:8]
         client_ip = _ip_from_request(request)
         start = time.perf_counter()
 
-        # Populate request context for downstream logging
+        # Populate both old request-ctx and new trace context
         set_request_ctx(request_id=request_id, trace_id=trace_id, client_ip=client_ip)
+        try:
+            from ..trace import set_trace, clear_trace
+            set_trace(request_id=request_id, trace_id=trace_id, span_id=span_id, client_ip=client_ip)
+        except ImportError:
+            pass
         body_bytes: bytes | None = None
         if _is_debug() and request.method in ("POST", "PUT", "PATCH"):
             body_bytes = await request.body()
@@ -408,6 +415,7 @@ def create_app() -> FastAPI:
         # Response headers
         response.headers["x-request-id"] = request_id
         response.headers["x-trace-id"] = trace_id
+        response.headers["x-span-id"] = span_id
 
         # Structured log
         log_data: Dict[str, Any] = {
@@ -417,6 +425,7 @@ def create_app() -> FastAPI:
             "duration_ms": round(duration * 1000, 2),
             "request_id": request_id,
             "trace_id": trace_id,
+            "span_id": span_id,
             "client_ip": client_ip,
             "user_agent": request.headers.get("user-agent", ""),
             "content_length": request.headers.get("content-length", ""),
@@ -427,6 +436,13 @@ def create_app() -> FastAPI:
             log_data["auth_header_present"] = bool(request.headers.get("authorization"))
             log_data["referer"] = request.headers.get("referer", "")
         _log.info("http_request", **log_data)
+
+        # Clean up trace context
+        try:
+            from ..trace import clear_trace
+            clear_trace()
+        except ImportError:
+            pass
         return response
     # Setup memory store (Supabase if env vars present, otherwise memory)
     supabase_url = os.getenv("SUPABASE_URL")
@@ -632,7 +648,7 @@ def create_app() -> FastAPI:
 
         return JSONResponse(content={"received": True})
 
-    @app.post("/context/write", dependencies=[Depends(require_api_key)])
+    @app.post("/context/write", dependencies=[Depends(require_api_key)], tags=["Context"])
     async def context_write(payload: ContextWriteRequest) -> Dict[str, Any]:
         """Write shared context from any provider/client."""
         item = context_hub.write_context(
@@ -667,7 +683,7 @@ def create_app() -> FastAPI:
         )
         return {"ok": True, "items": items}
 
-    @app.post("/context/summarize", dependencies=[Depends(require_api_key)])
+    @app.post("/context/summarize", dependencies=[Depends(require_api_key)], tags=["Context"])
     async def context_summarize(payload: ContextSummarizeRequest) -> Dict[str, Any]:
         """Summarize shared context matching a filter."""
         summary = context_hub.summarize_context(
@@ -700,7 +716,7 @@ def create_app() -> FastAPI:
         audit_logger.log(action="context.session", actor="api", details={"session_id": session_id, "count": len(items)})
         return {"ok": True, "items": items, "last_state": session_store.get_state(session_id)}
 
-    @app.post("/agents/run", dependencies=[Depends(require_api_key)])
+    @app.post("/agents/run", dependencies=[Depends(require_api_key)], tags=["Agents"])
     async def agents_run(payload: AgentRunRequest) -> Dict[str, Any]:
         """Run a task through the BuyerOS graph/provider layer."""
         try:
@@ -795,7 +811,7 @@ def create_app() -> FastAPI:
             "providers": provider_registry.status(),
         })
 
-    @app.get("/")
+    @app.get("/", tags=["Meta"])
     async def root() -> Dict[str, Any]:
         """Operator-friendly root endpoint."""
         return {
@@ -807,17 +823,19 @@ def create_app() -> FastAPI:
             "docs": "/docs",
         }
 
-    @app.get("/health/ready")
+    @app.get("/health/ready", tags=["Meta"])
     async def ready() -> Dict[str, Any]:
         """Readiness check for deployment probes and VPS smoke tests."""
         memory_status = memory_store.status()
         redis_status = session_store.status()
         providers = provider_registry.status()
+        router_status = ai_router.status() if "ai_router" in dir() else {}
         return {
             "ok": bool(memory_status.get("ok")),
             "memory": memory_status,
             "redis": redis_status,
             "providers": providers,
+            "ai_router": router_status,
             "telegram_configured": bool(os.getenv("TELEGRAM_BOT_TOKEN")),
             "api_key_required": bool(os.getenv("BUYEROS_API_KEY")),
         }
@@ -887,27 +905,27 @@ def create_app() -> FastAPI:
     except Exception as exc:
         _log.warning("scheduler_init_skipped", reason=str(exc))
 
-    @app.get("/providers", dependencies=[Depends(require_api_key)])
+    @app.get("/providers", dependencies=[Depends(require_api_key)], tags=["Providers"])
     async def providers() -> Dict[str, Any]:
         """List configured provider adapters and model routing defaults."""
         return {"ok": True, "providers": provider_registry.status()}
 
-    @app.get("/ai-team/status", dependencies=[Depends(require_api_key)])
+    @app.get("/ai-team/status", dependencies=[Depends(require_api_key)], tags=["Providers"])
     async def ai_team_status() -> Dict[str, Any]:
         """Return AI provider readiness for the operator UI."""
         return {"ok": True, "providers": provider_registry.status()}
 
-    @app.get("/projects", dependencies=[Depends(require_api_key)])
+    @app.get("/projects", dependencies=[Depends(require_api_key)], tags=["Projects"])
     async def projects_list(limit: int = 50) -> Dict[str, Any]:
         """List registered projects (core + external)."""
         return project_registry.list_projects(limit=min(max(limit, 1), 200))
 
-    @app.post("/projects", dependencies=[Depends(require_api_key)])
+    @app.post("/projects", dependencies=[Depends(require_api_key)], tags=["Projects"])
     async def projects_upsert(payload: ProjectUpsertRequest) -> Dict[str, Any]:
         """Create or update a project entry."""
         return project_registry.upsert_project(project_id=payload.project_id, content=payload.model_dump(), created_by="api")
 
-    @app.post("/memory/timeline", dependencies=[Depends(require_api_key)])
+    @app.post("/memory/timeline", dependencies=[Depends(require_api_key)], tags=["Memory"])
     async def memory_timeline(payload: MemoryTimelineRequest) -> Dict[str, Any]:
         """Query a merged timeline across key namespaces."""
         return timeline_service.timeline(
@@ -917,18 +935,18 @@ def create_app() -> FastAPI:
             limit=payload.limit,
         )
 
-    @app.get("/audit/search", dependencies=[Depends(require_api_key)])
+    @app.get("/audit/search", dependencies=[Depends(require_api_key)], tags=["Audit"])
     async def audit_search(limit: int = 20) -> Dict[str, Any]:
         """Return recent audit events."""
         items = memory_store.search_memory(namespace_prefix=("buyeros", "audit"), limit=min(max(limit, 1), 100))
         return {"ok": True, "items": items}
 
-    @app.get("/ops/status", dependencies=[Depends(require_api_key)])
+    @app.get("/ops/status", dependencies=[Depends(require_api_key)], tags=["Ops"])
     async def ops_status() -> Dict[str, Any]:
         """Return latest backup, rollback, failover, and smoke summaries."""
         return ops_status_service.status()
 
-    @app.get("/cloth/orders", dependencies=[Depends(require_api_key)])
+    @app.get("/cloth/orders", dependencies=[Depends(require_api_key)], tags=["E-Commerce"])
     async def cloth_orders(customer_id: str | None = None, limit: int = 10) -> Dict[str, Any]:
         """List CLOTH orders from the configured e-commerce provider."""
         items = orders_service.list_orders(customer_id=customer_id, limit=min(max(limit, 1), 100))
@@ -938,7 +956,7 @@ def create_app() -> FastAPI:
                 memory_store.save_memory(["buyeros", "orders"], order_key, {"project_id": "cloth", **item}, created_by="orders_service")
         return {"ok": True, "items": items, "configured": orders_service.configured()}
 
-    @app.get("/cloth/orders/{order_id}", dependencies=[Depends(require_api_key)])
+    @app.get("/cloth/orders/{order_id}", dependencies=[Depends(require_api_key)], tags=["E-Commerce"])
     async def cloth_order_get(order_id: str) -> Dict[str, Any]:
         """Return one CLOTH order from the configured e-commerce provider."""
         order = orders_service.get_order(order_id)
@@ -947,14 +965,14 @@ def create_app() -> FastAPI:
             memory_store.save_memory(["buyeros", "orders"], order_id, {"project_id": "cloth", **order}, created_by="orders_service")
         return {"ok": ok, "order": order, "configured": orders_service.configured()}
 
-    @app.post("/automation/daily-report", dependencies=[Depends(require_api_key)])
+    @app.post("/automation/daily-report", dependencies=[Depends(require_api_key)], tags=["Automation"])
     async def automation_daily_report(payload: DailyReportRequest) -> Dict[str, Any]:
         """Create a daily operations report from current BuyerOS memory."""
         result = business_automation.create_daily_report(date=payload.date)
         audit_logger.log(action="automation.daily_report", actor="api", details=result)
         return result
 
-    @app.post("/automation/ocr-posting", dependencies=[Depends(require_api_key)])
+    @app.post("/automation/ocr-posting", dependencies=[Depends(require_api_key)], tags=["Automation"])
     async def automation_ocr_posting(payload: OcrPostingRequest) -> Dict[str, Any]:
         """Create an accounting entry from OCR text."""
         result = business_automation.post_ocr_entry(
@@ -966,7 +984,7 @@ def create_app() -> FastAPI:
         automation_runs_total.labels(workflow="ocr_posting").inc()
         return result
 
-    @app.post("/automation/reconcile", dependencies=[Depends(require_api_key)])
+    @app.post("/automation/reconcile", dependencies=[Depends(require_api_key)], tags=["Automation"])
     async def automation_reconcile(payload: ReconcileRequest) -> Dict[str, Any]:
         """Compare expected and actual totals and create an alert on mismatch."""
         result = business_automation.reconcile_entries(
@@ -978,7 +996,7 @@ def create_app() -> FastAPI:
         automation_runs_total.labels(workflow="reconcile").inc()
         return result
 
-    @app.post("/automation/alerts", dependencies=[Depends(require_api_key)])
+    @app.post("/automation/alerts", dependencies=[Depends(require_api_key)], tags=["Automation"])
     async def automation_alerts(payload: AlertsRequest) -> Dict[str, Any]:
         """Generate anomaly alerts for items above a threshold."""
         result = business_automation.generate_alerts(
@@ -989,7 +1007,7 @@ def create_app() -> FastAPI:
         automation_runs_total.labels(workflow="alerts").inc()
         return result
 
-    @app.post("/automation/approval", dependencies=[Depends(require_api_key)])
+    @app.post("/automation/approval", dependencies=[Depends(require_api_key)], tags=["Automation"])
     async def automation_approval(payload: ApprovalRequest) -> Dict[str, Any]:
         """Create a manual approval task."""
         result = business_automation.request_approval(
@@ -1001,7 +1019,7 @@ def create_app() -> FastAPI:
         automation_runs_total.labels(workflow="approval").inc()
         return result
 
-    @app.post("/automation/retry", dependencies=[Depends(require_api_key)])
+    @app.post("/automation/retry", dependencies=[Depends(require_api_key)], tags=["Automation"])
     async def automation_retry(payload: RetryRequest) -> Dict[str, Any]:
         """Record retry state for an automation task."""
         result = business_automation.record_retry(
@@ -1013,7 +1031,7 @@ def create_app() -> FastAPI:
         automation_runs_total.labels(workflow="retry").inc()
         return result
 
-    @app.post("/automation/close-cycle", dependencies=[Depends(require_api_key)])
+    @app.post("/automation/close-cycle", dependencies=[Depends(require_api_key)], tags=["Automation"])
     async def automation_close_cycle(payload: CloseCycleRequest) -> Dict[str, Any]:
         """Run the CLOTH OCR -> reconcile -> alert -> approval/retry -> report flow."""
         result = business_automation.close_cycle(
@@ -1034,24 +1052,24 @@ def create_app() -> FastAPI:
         automation_runs_total.labels(workflow="close_cycle").inc()
         return result
 
-    @app.post("/reports/create", dependencies=[Depends(require_api_key)])
+    @app.post("/reports/create", dependencies=[Depends(require_api_key)], tags=["Reports"])
     async def reports_create(payload: ReportCreateRequest) -> Dict[str, Any]:
         """Create a buyer report snapshot."""
         result = reporting_service.create_report(period=payload.period, date=payload.date)
         audit_logger.log(action="reports.create", actor="api", details={"period": payload.period, "date": payload.date})
         return result
 
-    @app.get("/reports/history", dependencies=[Depends(require_api_key)])
+    @app.get("/reports/history", dependencies=[Depends(require_api_key)], tags=["Reports"])
     async def reports_history(limit: int = 20) -> Dict[str, Any]:
         """Return report history."""
         return reporting_service.history(limit=min(max(limit, 1), 100))
 
-    @app.post("/reports/export", dependencies=[Depends(require_api_key)])
+    @app.post("/reports/export", dependencies=[Depends(require_api_key)], tags=["Reports"])
     async def reports_export(payload: ReportExportRequest) -> Dict[str, Any]:
         """Export report history as CSV text."""
         return reporting_service.export_csv(report_id=payload.report_id, limit=payload.limit)
 
-    @app.post("/promo/campaigns", dependencies=[Depends(require_api_key)])
+    @app.post("/promo/campaigns", dependencies=[Depends(require_api_key)], tags=["Promo"])
     async def promo_campaigns_create(payload: PromoCampaignRequest) -> Dict[str, Any]:
         """Create an XAU promo campaign."""
         result = promo_service.create_campaign(
@@ -1065,12 +1083,12 @@ def create_app() -> FastAPI:
         audit_logger.log(action="promo.campaigns.create", actor="api", details=result.get("campaign", {}))
         return result
 
-    @app.get("/promo/campaigns", dependencies=[Depends(require_api_key)])
+    @app.get("/promo/campaigns", dependencies=[Depends(require_api_key)], tags=["Promo"])
     async def promo_campaigns_list(limit: int = 20) -> Dict[str, Any]:
         """List XAU promo campaigns."""
         return promo_service.list_campaigns(limit=min(max(limit, 1), 100))
 
-    @app.post("/promo/events", dependencies=[Depends(require_api_key)])
+    @app.post("/promo/events", dependencies=[Depends(require_api_key)], tags=["Promo"])
     async def promo_events(payload: PromoEventRequest) -> Dict[str, Any]:
         """Record XAU promo event or conversion."""
         result = promo_service.record_event(
@@ -1083,12 +1101,12 @@ def create_app() -> FastAPI:
         audit_logger.log(action="promo.events.create", actor="api", details=result.get("event", {}))
         return result
 
-    @app.get("/promo/metrics", dependencies=[Depends(require_api_key)])
+    @app.get("/promo/metrics", dependencies=[Depends(require_api_key)], tags=["Promo"])
     async def promo_metrics(campaign_id: str | None = None) -> Dict[str, Any]:
         """Return XAU promo metrics."""
         return promo_service.metrics(campaign_id=campaign_id)
 
-    @app.post("/tasks", dependencies=[Depends(require_api_key)])
+    @app.post("/tasks", dependencies=[Depends(require_api_key)], tags=["Tasks"])
     async def tasks_create(payload: TaskCreateRequest) -> Dict[str, Any]:
         """Create a cross-AI task board item."""
         result = task_board_service.create_task(
@@ -1101,22 +1119,22 @@ def create_app() -> FastAPI:
         audit_logger.log(action="tasks.create", actor="api", details=result.get("task", {}))
         return result
 
-    @app.get("/tasks", dependencies=[Depends(require_api_key)])
+    @app.get("/tasks", dependencies=[Depends(require_api_key)], tags=["Tasks"])
     async def tasks_list(lane: str | None = None, limit: int = 50) -> Dict[str, Any]:
         """List AI company OS task board items."""
         return task_board_service.list_tasks(lane=lane, limit=min(max(limit, 1), 100))
 
-    @app.post("/tasks/{task_id}/status", dependencies=[Depends(require_api_key)])
+    @app.post("/tasks/{task_id}/status", dependencies=[Depends(require_api_key)], tags=["Tasks"])
     async def tasks_status(task_id: str, payload: TaskStatusRequest) -> Dict[str, Any]:
         """Update task status."""
         return task_board_service.update_status(task_id=task_id, status=payload.status, note=payload.note)
 
-    @app.post("/tasks/{task_id}/run", dependencies=[Depends(require_api_key)])
+    @app.post("/tasks/{task_id}/run", dependencies=[Depends(require_api_key)], tags=["Tasks"])
     async def tasks_run(task_id: str, payload: TaskRunRequest) -> Dict[str, Any]:
         """Record a task run result."""
         return task_board_service.run_task(task_id=task_id, result=payload.result, provider=payload.provider)
 
-    @app.get("/tasks/{task_id}", dependencies=[Depends(require_api_key)])
+    @app.get("/tasks/{task_id}", dependencies=[Depends(require_api_key)], tags=["Tasks"])
     async def tasks_get(task_id: str) -> Dict[str, Any]:
         """Return a task and recent runs."""
         task = memory_store.search_memory(namespace_prefix=("buyeros", "tasks"), memory_key=task_id, limit=1)
@@ -1128,7 +1146,7 @@ def create_app() -> FastAPI:
                 run["content"] = dict(content)
         return {"ok": True, "task": normalized_task, "runs": runs}
 
-    @app.post("/tasks/dispatch", dependencies=[Depends(require_api_key)])
+    @app.post("/tasks/dispatch", dependencies=[Depends(require_api_key)], tags=["Tasks"])
     async def tasks_dispatch(payload: TaskDispatchRequest) -> Dict[str, Any]:
         """Create a task and dispatch it to the provider layer (single-hop)."""
         try:
@@ -1183,7 +1201,7 @@ def create_app() -> FastAPI:
                 capture_exception(exc)
             raise
 
-    @app.post("/tasks/dispatch_plan", dependencies=[Depends(require_api_key)])
+    @app.post("/tasks/dispatch_plan", dependencies=[Depends(require_api_key)], tags=["Tasks"])
     async def tasks_dispatch_plan(payload: DispatchPlanRequest) -> Dict[str, Any]:
         """Create a task + deterministic subtask plan (no execution)."""
         result = dispatcher_service.create_plan(
@@ -1198,12 +1216,12 @@ def create_app() -> FastAPI:
         audit_logger.log(action="tasks.dispatch_plan", actor="api", details={"task_id": result.get("task_id"), "project": payload.project, "task_type": payload.task_type})
         return result
 
-    @app.get("/tasks/{task_id}/subtasks", dependencies=[Depends(require_api_key)])
+    @app.get("/tasks/{task_id}/subtasks", dependencies=[Depends(require_api_key)], tags=["Tasks"])
     async def tasks_subtasks(task_id: str, limit: int = 50) -> Dict[str, Any]:
         """List subtasks for a task."""
         return dispatcher_service.list_subtasks(task_id=task_id, limit=min(max(limit, 1), 200))
 
-    @app.post("/tasks/{task_id}/subtasks/run", dependencies=[Depends(require_api_key)])
+    @app.post("/tasks/{task_id}/subtasks/run", dependencies=[Depends(require_api_key)], tags=["Tasks"])
     async def tasks_subtasks_run(task_id: str, payload: SubtaskRunRequest) -> Dict[str, Any]:
         """Run a specific subtask."""
         return dispatcher_service.run_subtask(
@@ -1213,14 +1231,14 @@ def create_app() -> FastAPI:
             session_id=payload.session_id or f"task-{task_id}",
         )
 
-    @app.post("/tasks/{task_id}/subtasks/next", dependencies=[Depends(require_api_key)])
+    @app.post("/tasks/{task_id}/subtasks/next", dependencies=[Depends(require_api_key)], tags=["Tasks"])
     async def tasks_subtasks_next(task_id: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
         """Run next queued subtask."""
         preferred = (payload or {}).get("preferred_provider") if isinstance(payload, dict) else None
         session_id = (payload or {}).get("session_id") if isinstance(payload, dict) else None
         return dispatcher_service.run_next(task_id=task_id, preferred_provider=preferred, session_id=session_id)
 
-    @app.post("/tasks/{task_id}/run_all", dependencies=[Depends(require_api_key)])
+    @app.post("/tasks/{task_id}/run_all", dependencies=[Depends(require_api_key)], tags=["Tasks"])
     async def tasks_run_all(task_id: str, payload: TaskRunAllRequest) -> Dict[str, Any]:
         """Run queued subtasks sequentially until completed/blocked (no loops)."""
         result = dispatcher_service.run_all(
@@ -1232,7 +1250,7 @@ def create_app() -> FastAPI:
         audit_logger.log(action="tasks.run_all", actor="api", details={"task_id": task_id, "ok": bool(result.get("ok")), "status": result.get("status")})
         return result
 
-    @app.get("/system/capabilities", dependencies=[Depends(require_api_key)])
+    @app.get("/system/capabilities", dependencies=[Depends(require_api_key)], tags=["Meta"])
     async def system_capabilities() -> Dict[str, Any]:
         """Return an operator-friendly capability matrix and configuration gaps."""
         required_env = [
