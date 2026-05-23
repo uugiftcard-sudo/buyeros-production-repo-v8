@@ -104,7 +104,6 @@ def create_app() -> FastAPI:
     context_hub = ContextHub(memory_store)
     session_store = RedisSessionStore(os.getenv("REDIS_URL"))
     audit_logger = AuditLogger(memory_store)
-    business_automation = BusinessAutomationService(memory_store)
     reporting_service = ReportingService(memory_store)
     promo_service = PromoService(memory_store)
     task_board_service = TaskBoardService(memory_store)
@@ -122,6 +121,7 @@ def create_app() -> FastAPI:
     from ..services.buyers_service import BuyersService
     orders_service = OrdersService()
     buyers_service = BuyersService()
+    business_automation = BusinessAutomationService(memory_store, orders_service=orders_service)
 
     ops_agent = OpsAgent(
         memory_store=memory_store,
@@ -188,6 +188,8 @@ def create_app() -> FastAPI:
     app.state.timeline_service = timeline_service
     app.state.dispatcher_service = dispatcher_service
     app.state.ops_status_service = ops_status_service
+    app.state.orders_service = orders_service
+    app.state.buyers_service = buyers_service
 
     @app.post("/telegram/webhook")
     async def telegram_webhook(request: Request) -> JSONResponse:
@@ -389,6 +391,25 @@ def create_app() -> FastAPI:
         """Return latest backup, rollback, failover, and smoke summaries."""
         return ops_status_service.status()
 
+    @app.get("/cloth/orders", dependencies=[Depends(require_api_key)])
+    async def cloth_orders(customer_id: str | None = None, limit: int = 10) -> Dict[str, Any]:
+        """List CLOTH orders from the configured e-commerce provider."""
+        items = orders_service.list_orders(customer_id=customer_id, limit=min(max(limit, 1), 100))
+        for item in items:
+            order_key = str(item.get("order_id") or item.get("id") or item.get("order_number") or "")
+            if order_key:
+                memory_store.save_memory(["buyeros", "orders"], order_key, {"project_id": "cloth", **item}, created_by="orders_service")
+        return {"ok": True, "items": items, "configured": orders_service.configured()}
+
+    @app.get("/cloth/orders/{order_id}", dependencies=[Depends(require_api_key)])
+    async def cloth_order_get(order_id: str) -> Dict[str, Any]:
+        """Return one CLOTH order from the configured e-commerce provider."""
+        order = orders_service.get_order(order_id)
+        ok = not bool(order.get("error"))
+        if ok:
+            memory_store.save_memory(["buyeros", "orders"], order_id, {"project_id": "cloth", **order}, created_by="orders_service")
+        return {"ok": ok, "order": order, "configured": orders_service.configured()}
+
     @app.post("/automation/daily-report", dependencies=[Depends(require_api_key)])
     async def automation_daily_report(payload: DailyReportRequest) -> Dict[str, Any]:
         """Create a daily operations report from current BuyerOS memory."""
@@ -457,6 +478,9 @@ def create_app() -> FastAPI:
             ocr_text=payload.ocr_text,
             expected_total=payload.expected_total,
             actual_total=payload.actual_total,
+            order_id=payload.order_id,
+            image_url=payload.image_url,
+            ocr_language=payload.ocr_language,
             reference=payload.reference,
             source=payload.source,
             retry_error=payload.retry_error,
@@ -687,6 +711,9 @@ def create_app() -> FastAPI:
                 "alerts",
                 "approval",
                 "retry",
+                "close_cycle",
+                "cloth_orders",
+                "ops_status",
                 "xau_promo_campaigns",
                 "xau_promo_events",
                 "ai_task_board",
