@@ -1,0 +1,23 @@
+{
+  "name": "buyeros",
+  "version": "1.0.0",
+  "description": "BuyerOS — 買手對象系統 Monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:admin": "npm run dev --workspace=apps/admin",
+    "build:admin": "npm run build --workspace=apps/admin",
+    "lint": "npm run lint --workspace=apps/admin",
+    "type-check": "npm run type-check --workspace=apps/admin",
+    "db:link": "npx supabase link --project-ref jnzdklfjdjmhjrhntljp",
+    "db:push": "npx supabase db push",
+    "fn:deploy": "cd supabase && for fn in customers orders transactions refunds dashboard telegram-webhook; do npx supabase functions deploy $fn; done",
+    "fn:serve": "cd supabase && npx supabase functions serve --env-file ../.env.local"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

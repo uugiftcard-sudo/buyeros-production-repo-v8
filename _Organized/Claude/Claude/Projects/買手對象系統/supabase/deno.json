@@ -1,0 +1,20 @@
+{
+  "tasks": {
+    "deploy": {
+      "cmd": "supabase functions deploy",
+      "desc": "Deploy all Edge Functions to Supabase"
+    },
+    "serve": {
+      "cmd": "supabase functions serve --env-file ../../.env.local",
+      "desc": "Serve Edge Functions locally"
+    },
+    "lint": {
+      "cmd": "deno lint functions/",
+      "desc": "Lint Edge Functions"
+    },
+    "check": {
+      "cmd": "deno check functions/**/*.ts",
+      "desc": "Type-check Edge Functions"
+    }
+  }
+}

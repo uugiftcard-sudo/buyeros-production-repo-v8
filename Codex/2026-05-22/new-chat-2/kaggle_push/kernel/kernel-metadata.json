@@ -1,0 +1,13 @@
+{
+  "id": "uugiftcard-sudo/faceswap-kaggle-test",
+  "title": "Faceswap Kaggle Test",
+  "code_file": "faceswap_kaggle.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": ["uugiftcard-sudo/faceswap-gpu-upload-bundle"],
+  "competition_sources": [],
+  "kernel_sources": []
+}
