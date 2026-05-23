@@ -44,6 +44,31 @@ infra/smoke_telegram_webhook.sh "$PUBLIC_BASE_URL" "$BUYEROS_API_KEY" "$TELEGRAM
 infra/go_live_audit.sh .env.production.local "$PUBLIC_BASE_URL" root@206.189.116.155 root@167.172.60.38
 ```
 
+Ops drill after deploy:
+
+```bash
+infra/run_ops_drill.sh \
+  .env.production.local \
+  https://buyeros.206.189.116.155.sslip.io \
+  http://167.172.60.38:8000 \
+  root@206.189.116.155
+```
+
+This always syncs backup/failover summaries to the primary release so
+`/ops/status` shows the latest successful or failed drill.
+
+Staging-only rollback drill:
+
+```bash
+infra/run_staging_rollback_drill.sh \
+  .env.production.local \
+  root@167.172.60.38 \
+  root@206.189.116.155
+```
+
+Rollback is performed only on staging. The rollback summary is synced to the
+primary release for `/ops/status` visibility.
+
 `smoke_api.sh` 會先驗證核心 API / context / dispatcher，然後自動驗證三個
 上線工作線：`buyeros`、`cloth`、`xau`。
 
