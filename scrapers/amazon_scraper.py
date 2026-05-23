@@ -96,7 +96,6 @@ def parse_search_results(html: str, keyword: str) -> list[ProductResult]:
 
     # 方法1：从 JSON 嵌入数据提取（最可靠）
     scripts = soup.find_all("script")
-    json_data = {}
 
     for script in scripts:
         text = script.string or ""
