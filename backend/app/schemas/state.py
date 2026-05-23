@@ -97,6 +97,18 @@ class RetryRequest(BaseModel):
     attempt: int = Field(default=1, ge=1)
 
 
+class CloseCycleRequest(BaseModel):
+    ocr_text: str = Field(default="UI 測試 OCR 入帳 HKD 88", min_length=1)
+    expected_total: float = 0
+    actual_total: float = 0
+    reference: str = "ui-close-cycle"
+    source: str = "api"
+    retry_error: Optional[str] = None
+    retry_attempt: int = Field(default=1, ge=1)
+    high_risk: bool = False
+    date: Optional[str] = None
+
+
 class ReportCreateRequest(BaseModel):
     period: str = "daily"
     date: Optional[str] = None

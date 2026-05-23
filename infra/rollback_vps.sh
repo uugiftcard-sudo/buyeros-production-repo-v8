@@ -11,7 +11,25 @@ SSH_TARGET="$1"
 BACKUP_ARCHIVE="$2"
 REMOTE_DIR="${3:-/opt/buyeros}"
 RESTORE_STAMP="$(date +%Y%m%d%H%M%S)"
+SUMMARY_DIR="${BUYEROS_OPS_SUMMARY_DIR:-$(cd "$(dirname "$0")" && pwd)/ops_runs}"
+mkdir -p "$SUMMARY_DIR"
+STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+START_TS="$(date +%s)"
+OK=true
+NOTES="Rollback completed"
 
-ssh "$SSH_TARGET" "set -euo pipefail; test -f '$BACKUP_ARCHIVE'; if [[ -d '$REMOTE_DIR' ]]; then mv '$REMOTE_DIR' '${REMOTE_DIR}.before-rollback-${RESTORE_STAMP}'; fi; mkdir -p '$REMOTE_DIR'; tar -xzf '$BACKUP_ARCHIVE' -C '$REMOTE_DIR'; cd '$REMOTE_DIR'; docker compose up -d --build; docker compose ps"
+if ! ssh "$SSH_TARGET" "set -euo pipefail; test -f '$BACKUP_ARCHIVE'; if [[ -d '$REMOTE_DIR' ]]; then mv '$REMOTE_DIR' '${REMOTE_DIR}.before-rollback-${RESTORE_STAMP}'; fi; mkdir -p '$REMOTE_DIR'; tar -xzf '$BACKUP_ARCHIVE' -C '$REMOTE_DIR'; cd '$REMOTE_DIR'; docker compose up -d --build; docker compose ps"; then
+  OK=false
+  NOTES="Rollback failed"
+fi
 
-echo "Rollback completed on ${SSH_TARGET} from ${BACKUP_ARCHIVE}"
+ENDED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+END_TS="$(date +%s)"
+DURATION=$((END_TS - START_TS))
+SUMMARY="{\"ok\":${OK},\"action\":\"rollback\",\"target\":\"${SSH_TARGET}\",\"started_at\":\"${STARTED_AT}\",\"ended_at\":\"${ENDED_AT}\",\"duration_seconds\":${DURATION},\"notes\":\"${NOTES}\",\"rollback_source\":\"${BACKUP_ARCHIVE}\"}"
+printf '%s\n' "$SUMMARY" | tee "$SUMMARY_DIR/rollback-${RESTORE_STAMP}.json" > "$SUMMARY_DIR/rollback-latest.json"
+printf '%s\n' "$SUMMARY"
+
+if [[ "$OK" != "true" ]]; then
+  exit 1
+fi

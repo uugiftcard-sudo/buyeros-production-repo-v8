@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.memory_store import MemoryStore
 from app.services.business_automation import BusinessAutomationService
+from app.services.ops_status_service import OpsStatusService
 from app.workflows.main import create_app
 
 
@@ -18,6 +19,8 @@ def test_daily_report_counts_memory_records() -> None:
     assert result["ok"] is True
     assert result["workflow"] == "daily_report"
     assert result["data"]["counts"]["refunds"] == 1
+    assert "ocr_entries" in result["data"]["counts"]
+    assert "approvals" in result["data"]["counts"]
     assert memory.search_memory(namespace_prefix=("buyeros", "reports"), memory_key="2026-05-22")
 
 
@@ -73,10 +76,25 @@ def test_automation_api_endpoints(monkeypatch) -> None:
     alerts = client.post("/automation/alerts", json={"items": [{"id": "x", "amount": 9}], "threshold": 1}, headers=headers)
     approval = client.post("/automation/approval", json={"task_id": "ap-1", "reason": "check"}, headers=headers)
     retry = client.post("/automation/retry", json={"task_id": "rt-1", "error": "timeout", "attempt": 2}, headers=headers)
+    close_cycle = client.post(
+        "/automation/close-cycle",
+        json={
+            "ocr_text": "No amount here",
+            "expected_total": 100,
+            "actual_total": 95,
+            "reference": "api-cycle",
+            "high_risk": True,
+            "retry_error": "timeout",
+            "retry_attempt": 1,
+        },
+        headers=headers,
+    )
 
-    for response in [report, ocr, recon, alerts, approval, retry]:
+    for response in [report, ocr, recon, alerts, approval, retry, close_cycle]:
         assert response.status_code == 200
         assert response.json()["ok"] is True
+    assert close_cycle.json()["workflow"] == "close_cycle"
+    assert close_cycle.json()["status"] == "needs_review"
 
 
 def test_automation_api_rejects_invalid_numeric_payload(monkeypatch) -> None:
@@ -91,3 +109,41 @@ def test_automation_api_rejects_invalid_numeric_payload(monkeypatch) -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_close_cycle_persists_all_operational_records() -> None:
+    memory = MemoryStore()
+    service = BusinessAutomationService(memory)
+
+    result = service.close_cycle(
+        ocr_text="Receipt without amount",
+        expected_total=100,
+        actual_total=90,
+        reference="cycle-1",
+        high_risk=True,
+        retry_error="provider timeout",
+    )
+
+    assert result["ok"] is True
+    assert result["workflow"] == "close_cycle"
+    assert result["status"] == "needs_review"
+    assert memory.search_memory(namespace_prefix=("buyeros", "ocr_entries"), limit=10)
+    assert memory.search_memory(namespace_prefix=("buyeros", "reconciliation"), memory_key="cycle-1")
+    assert memory.search_memory(namespace_prefix=("buyeros", "alerts"), limit=10)
+    assert memory.search_memory(namespace_prefix=("buyeros", "approvals"), limit=10)
+    assert memory.search_memory(namespace_prefix=("buyeros", "retries"), limit=10)
+    assert memory.search_memory(namespace_prefix=("buyeros", "reports"), limit=10)
+    assert memory.search_memory(namespace_prefix=("buyeros", "close_cycles"), limit=10)
+
+
+def test_ops_status_reads_latest_summaries(tmp_path) -> None:
+    (tmp_path / "backup-latest.json").write_text(
+        '{"ok":true,"action":"backup","target":"host","started_at":"2026-05-23T00:00:00Z","ended_at":"2026-05-23T00:00:01Z","duration_seconds":1,"notes":"Backup created","archive_path":"host:/backup.tgz"}',
+        encoding="utf-8",
+    )
+
+    status = OpsStatusService(str(tmp_path)).status()
+
+    assert status["ok"] is True
+    assert status["summaries"]["backup"]["ok"] is True
+    assert status["summaries"]["rollback"]["status"] == "尚無執行紀錄"

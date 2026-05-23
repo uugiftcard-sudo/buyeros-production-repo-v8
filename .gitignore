@@ -21,3 +21,6 @@ node_modules/
 frontend/test-results/
 frontend/playwright-report/
 /.vscode/
+infra/ops_runs/
+infra/.smoke_*_pid
+infra/*smoke*.log
