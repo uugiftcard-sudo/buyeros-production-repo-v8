@@ -352,11 +352,10 @@ export default function DashboardPage() {
     recordAction("系統已載入", "等待操作");
     const savedProxyUrl = window.localStorage.getItem("buyeros.api.proxyUrl");
     const savedApiKey = window.localStorage.getItem(apiKeyStorageKey);
-    const queryApiKey = new URLSearchParams(window.location.search).get("k");
     const savedTheme = window.localStorage.getItem("buyeros.ui.theme") as UiTheme | null;
     setApi({
       proxyUrl: savedProxyUrl || defaultProxyUrl,
-      apiKey: savedApiKey || queryApiKey || "",
+      apiKey: savedApiKey || "",  // In production (non-localhost), the proxy handles auth server-side
     });
     if (savedTheme && uiThemes.some((theme) => theme.id === savedTheme)) {
       setUiTheme(savedTheme);
@@ -716,6 +715,14 @@ export default function DashboardPage() {
 
   return (
     <main className="app-shell" data-theme={uiTheme}>
+      {loading && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999,
+          height: 3, background: "linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899)",
+          animation: "buyeros-loading 1.2s ease-in-out infinite",
+        }} />
+      )}
+      <style>{`@keyframes buyeros-loading { 0%{opacity:.4} 50%{opacity:1} 100%{opacity:.4} }`}</style>
       <nav className="mission-rail" aria-label="BuyerOS sections">
         <a href="#overview" title="總覽"><strong>總</strong><span>總覽</span></a>
         <a href="#agents" title="AI 團隊"><strong>AI</strong><span>團隊</span></a>
@@ -800,7 +807,7 @@ export default function DashboardPage() {
             <input value={api.proxyUrl} onChange={(event) => updateApi("proxyUrl", event.target.value)} />
           </label>
           <div className="auto-auth">
-            授權由 Next.js Proxy 使用 server-side 環境變數處理；本機也可用 k=URL 參數臨時帶入。
+            <span style={{ color: "#4ade80" }}>●</span> 授權由 Next.js Proxy 使用 server-side 環境變數處理，API key 不會暴露於 URL。
           </div>
         </aside>
       </header>

@@ -21,12 +21,11 @@ async function proxy(request: NextRequest, context: RouteContext) {
   if (contentType) {
     headers.set("content-type", contentType);
   }
-  // Prefer server-side secret injection (Docker/VPS). If missing, allow the UI
-  // to pass a key via header so local dev doesn't require restarts.
-  const uiApiKey = request.headers.get("x-buyeros-api-key") || request.headers.get("x-api-key");
-  const queryApiKey = new URL(request.url).searchParams.get("k");
+  // Server-side secret injection only — the key NEVER leaves the server.
+  // Remove URL param fallback after confirming production uses BUYEROS_API_KEY env var.
   const envApiKey = process.env.BUYEROS_API_KEY;
-  const apiKey = envApiKey || queryApiKey || uiApiKey;
+  const uiApiKey = request.headers.get("x-buyeros-api-key");
+  const apiKey = envApiKey || uiApiKey;  // uiApiKey only in local dev (no env var set)
   if (apiKey) headers.set("authorization", `Bearer ${apiKey}`);
 
   const method = request.method.toUpperCase();

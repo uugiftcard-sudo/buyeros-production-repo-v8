@@ -24,6 +24,20 @@ if ! ssh "$SSH_TARGET" "set -euo pipefail; mkdir -p '$BACKUP_DIR'; cd '$REMOTE_D
   NOTES="Backup failed"
 fi
 
+# ── Backup retention enforcement ─────────────────────────────────────────────
+RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
+CUTOFF_TS="$(ssh "$SSH_TARGET" date -d \"$RETENTION_DAYS days ago\" +%s 2>/dev/null || date -v-${RETENTION_DAYS}d +%s)"
+DELETED_COUNT=0
+if ssh "$SSH_TARGET" "set -euo pipefail; \
+  for f in $(ls '$BACKUP_DIR'/buyeros-*.tgz 2>/dev/null); do \
+    MTIME=\$(date -r \"\$f\" +%s 2>/dev/null); \
+    if [ -n \"\$MTIME\" ] && [ \"\$MTIME\" -lt '$CUTOFF_TS' ]; then \
+      rm -v \"\$f\" && DELETED_COUNT=\$((\$DELETED_COUNT+1)); \
+    fi; \
+  done"; then
+  NOTES="$NOTES | retention:$RETENTION_DAYS days enforced"
+fi
+
 ENDED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 END_TS="$(date +%s)"
 DURATION=$((END_TS - START_TS))
