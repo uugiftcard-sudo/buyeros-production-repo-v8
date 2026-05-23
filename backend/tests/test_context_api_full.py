@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 
 from app.workflows.main import create_app
@@ -163,6 +165,49 @@ class TestProvidersEndpoint:
             assert "status" in provider
             assert "success_count_24h" in provider
             assert "failure_count_24h" in provider
+
+
+class TestClothOrdersEndpoint:
+    def test_cloth_order_returns_custom_rest_order_and_persists_memory(self, monkeypatch) -> None:
+        monkeypatch.setenv("BUYEROS_API_KEY", "secret")
+        monkeypatch.setenv("ORDERS_API_BASE_URL", "https://orders.example.com")
+        monkeypatch.setenv("ORDERS_API_KEY", "orders-key")
+        monkeypatch.delenv("SHOPIFY_SHOP_DOMAIN", raising=False)
+        monkeypatch.delenv("SHOPIFY_ACCESS_TOKEN", raising=False)
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"order_id": "991", "total_hkd": "100.00", "currency": "HKD", "status": "paid"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("app.services.adapters.custom_ecom_adapter.requests.get", return_value=mock_response):
+            client = TestClient(create_app())
+            response = client.get("/cloth/orders/991", headers={"Authorization": "Bearer secret"})
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["ok"] is True
+        assert body["order"]["order_id"] == "991"
+        assert body["configured"] is True
+
+    def test_cloth_orders_list_returns_items(self, monkeypatch) -> None:
+        monkeypatch.setenv("BUYEROS_API_KEY", "secret")
+        monkeypatch.setenv("ORDERS_API_BASE_URL", "https://orders.example.com")
+        monkeypatch.setenv("ORDERS_API_KEY", "orders-key")
+        monkeypatch.delenv("SHOPIFY_SHOP_DOMAIN", raising=False)
+        monkeypatch.delenv("SHOPIFY_ACCESS_TOKEN", raising=False)
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"orders": [{"order_id": "991", "total": 100, "currency": "HKD"}]}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("app.services.adapters.custom_ecom_adapter.requests.get", return_value=mock_response):
+            client = TestClient(create_app())
+            response = client.get("/cloth/orders?limit=1", headers={"Authorization": "Bearer secret"})
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["ok"] is True
+        assert body["items"][0]["order_id"] == "991"
 
 
 class TestAuditSearchEndpoint:
