@@ -1,15 +1,20 @@
-# BuyerOS Next Steps Go-Live Plan
+# BuyerOS Fast-Push Next Steps
+
+This file is the current operating plan for BuyerOS go-live follow-up. Keep it
+short, executable, and collision-safe.
 
 ## Current Verified State
 
-- PR branch `cursor/test-additions` is green on GitHub Actions:
-  - `lint`
-  - `typecheck`
-  - `test`
-  - `frontend`
-  - `docker-build`
-- Primary VPS is deployed from clean commit `c25767a`.
-- Primary audit passed:
+- Current branch baseline: `main` at `0f0df9e`.
+- Primary production:
+  - Host: `206.189.116.155`
+  - URL: `https://buyeros.206.189.116.155.sslip.io`
+  - Role: production API, UI, Redis, Telegram webhook, provider routing.
+- Staging / hot standby:
+  - Host: `167.172.60.38`
+  - URL: `https://buyeros.167.172.60.38.sslip.io`
+  - Role: staging, failover smoke, rollback drills, ops checks.
+- Latest verified audit passed:
   - env
   - docker compose config
   - HTTPS ping
@@ -17,90 +22,98 @@
   - three workspace smoke: `buyeros`, `cloth`, `xau`
   - Telegram webhook mock smoke
   - Telegram bot token check
-  - primary VPS compose
-- Staging SSH was intentionally skipped in the latest audit.
+  - primary compose
+  - staging SSH
+- Real Telegram webhook target stays on primary only.
+- 24h smoke heartbeat is active and should stay quiet unless a gate fails.
 
-## Immediate P0 Sequence
+## Fast-Push Rules
 
-1. Merge PR #1 after confirming the branch still shows all checks passing.
-2. Keep primary VPS pinned to the merged commit or redeploy from `main` after merge.
-3. Set the real Telegram webhook to the primary HTTPS endpoint:
+- Every plan uses only three groups: `today`, `next`, `defer`.
+- Do not restate history unless a status changed.
+- Do not expand UI unless backend behavior is already wired and tested.
+- Do not deploy from a dirty worktree.
+- Do not work directly on shared `main` for new feature changes.
+- Use a dedicated branch or worktree for new work:
 
-   ```bash
-   cd /Users/rubykan/Downloads/buyeros-production-repo-v8
-   bash infra/set_telegram_webhook.sh \
-     .env.production.local \
-     https://buyeros.206.189.116.155.sslip.io/telegram/webhook
-   ```
+  ```bash
+  git switch -c codex/<short-task-name>
+  ```
 
-4. Run go-live audit after webhook setup:
+- If another conversation leaves dirty changes, stop and audit instead of
+  overwriting them.
 
-   ```bash
-   cd /Users/rubykan/Downloads/buyeros-production-repo-v8
-   ./infra/go_live_audit.sh \
-     .env.production.local \
-     https://buyeros.206.189.116.155.sslip.io \
-     root@206.189.116.155
-   ```
+## Today
 
-5. Start or continue 24h hourly smoke monitoring.
+1. Complete 24h smoke monitoring.
+   - Leave heartbeat active.
+   - Notify only on failing gate.
+   - After 24 hours, summarize pass/fail and pause the heartbeat.
 
-## Local Worktree Hygiene
+2. Do one real Telegram user test.
+   - Send `退款 991`.
+   - Send `991 點？`.
+   - Expected: second message recalls persisted refund state.
 
-Before the next deploy from the local machine, resolve current uncommitted changes:
+3. Stabilize provider status.
+   - Check Claude/Cursor OpenRouter model slugs.
+   - Keep OpenAI fallback active.
+   - `/providers` must show ready/degraded/not_configured clearly.
 
-- Keep candidate:
-  - `backend/app/context/context_hub.py`: broader fallback for historical session payloads.
-  - `infra/smoke_full.sh`: better npm path detection.
-  - `infra/smoke_one_click.sh`: better npm path detection.
-- Review before keeping:
-  - `frontend/tests/buyeros-ui.smoke.spec.ts`: test assertions were loosened; keep only if it still verifies the real three-workspace UI.
-- Do not keep:
-  - any `NEXT_PUBLIC_*API_KEY` fallback in frontend code.
-  - generated smoke logs or pid files.
-  - generated `frontend/next-env.d.ts` route-path changes.
+## Next
 
-## P1 Productization Order
+1. CLOTH first real business flow.
+   - Refund review states.
+   - Daily report push.
+   - Keep OCR posting and reconciliation for the following pass.
 
-1. CLOTH workflow hardening:
-   - refund review states
-   - OCR posting
-   - reconciliation
-   - mismatch alerts
-   - daily report push
+2. Reliability drill.
+   - Run staging rollback drill from latest staging backup.
+   - Run failover smoke from primary to staging.
+   - Record RTO/RPO result in docs.
 
-2. BuyerOS AI Team:
-   - provider config screen
-   - provider fallback quality checks
-   - task rerun / retry
-   - memory timeline filtering
+3. BuyerOS AI Team ops.
+   - Provider fallback quality checks.
+   - Task rerun / retry.
+   - Memory timeline filtering only if backend data is already present.
 
-3. XAU center:
-   - campaign status lifecycle
-   - conversion metrics
-   - Telegram report card
-   - simple CSV export
+## Defer
 
-4. Ops and reliability:
-   - staging SSH fix
-   - backup / restore drill
-   - failover smoke
-   - one rollback record with RTO/RPO notes
+- Extra dashboard panels.
+- Full OCR reconciliation productization.
+- XAU advanced campaign lifecycle.
+- Multi-provider direct credentials beyond OpenRouter unless needed for cost or
+  reliability.
 
 ## Acceptance Commands
 
 ```bash
 cd /Users/rubykan/Downloads/buyeros-production-repo-v8
+
 git status --short
+git branch --show-current
+git log --oneline -3
+
 ./.venv/bin/python -m pytest -q
 cd frontend && npm run lint && npm run build
 cd ..
-./infra/go_live_audit.sh .env.production.local https://buyeros.206.189.116.155.sslip.io root@206.189.116.155
+
+bash infra/go_live_audit.sh \
+  .env.production.local \
+  https://buyeros.206.189.116.155.sslip.io \
+  root@206.189.116.155 \
+  root@167.172.60.38
+```
+
+## Collision Checks
+
+```bash
+git worktree list
+ls /Users/rubykan/.codex/automations
+ssh root@206.189.116.155 'test ! -f /tmp/buyeros-deploy.lock && echo no-deploy-lock'
 ```
 
 ## Decision Rule
 
-Do not deploy from a dirty local worktree. Deploy only from:
-
-- a clean commit that has passed CI, or
-- a temporary clean worktree checked out at the target commit.
+Production accepts clean commits only. Staging may preview new branches, but the
+commit hash must be known and written in the handoff.
