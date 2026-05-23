@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>FaceFusion Quick Links</title>
+	<style>
+		:root {
+			color-scheme: light dark;
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+			background: #f7f7f4;
+			color: #1e2428;
+		}
+
+		body {
+			margin: 0;
+			min-height: 100vh;
+			display: grid;
+			place-items: center;
+			padding: 24px;
+		}
+
+		main {
+			width: min(720px, 100%);
+		}
+
+		h1 {
+			margin: 0 0 8px;
+			font-size: 32px;
+			line-height: 1.1;
+		}
+
+		p {
+			margin: 0 0 22px;
+			color: #56616a;
+			line-height: 1.55;
+		}
+
+		.links {
+			display: grid;
+			gap: 12px;
+		}
+
+		a {
+			display: flex;
+			justify-content: space-between;
+			gap: 16px;
+			padding: 16px 18px;
+			border: 1px solid #d7dbd7;
+			border-radius: 8px;
+			background: #ffffff;
+			color: inherit;
+			text-decoration: none;
+			box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+		}
+
+		a:hover {
+			border-color: #87938b;
+		}
+
+		strong {
+			font-size: 16px;
+		}
+
+		span {
+			color: #69747c;
+			font-size: 14px;
+			text-align: right;
+		}
+
+		.note {
+			margin-top: 22px;
+			padding: 14px 16px;
+			border-radius: 8px;
+			background: #eef4f2;
+			color: #31413b;
+			font-size: 14px;
+		}
+	</style>
+</head>
+<body>
+	<main>
+		<h1>FaceFusion Quick Links</h1>
+		<p>先喺 Pinokio 開對應模式，再用下面連結入 UI。</p>
+
+		<div class="links">
+			<a href="http://127.0.0.1:7861/">
+				<strong>FaceFusion AI Workflow</strong>
+				<span>Run AI Workflow / 7861</span>
+			</a>
+			<a href="http://127.0.0.1:7862/">
+				<strong>Post to AI</strong>
+				<span>Post to AI (7862)</span>
+			</a>
+			<a href="http://127.0.0.1:7860/">
+				<strong>Old FaceFusion Port</strong>
+				<span>Fallback / 7860</span>
+			</a>
+		</div>
+
+		<div class="note">
+			建議順序：Pinokio → Stop Local Ports → Run AI Workflow → Post to AI (7862)。
+			如果連不到，代表對應 server 未啟動。
+		</div>
+	</main>
+</body>
+</html>

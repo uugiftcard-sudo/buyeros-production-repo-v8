@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<script type="application/json" id="cowork-artifact-meta">
+{
+  "name": "Linear Issue Tracker",
+  "schemaVersion": 1,
+  "description": "Live tracker for open Linear issues, grouped by project and priority. Fetches fresh data from Linear on every load. Supports priority filtering (Urgent / High / Medium / Low / No Priority) and shows summary counts at the top.",
+  "mcpTools": [
+    "mcp__782a7f09-5980-4623-b404-999b353c77da__list_issues",
+    "mcp__782a7f09-5980-4623-b404-999b353c77da__list_projects"
+  ],
+  "mcpServerNames": [
+    "Linear",
+    "Linear"
+  ]
+}
+</script>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Linear Issue Tracker</title>
+  <style>
+    :root { color-scheme: light; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fb; color: #1a1a2e; padding: 20px 24px; font-size: 14px; }
+
+    /* ── Header ── */
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .header h1 { font-size: 17px; font-weight: 700; color: #1a1a2e; display: flex; align-items: center; gap: 8px; }
+    .linear-logo { width: 22px; height: 22px; }
+    .meta { display: flex; align-items: center; gap: 10px; }
+    .last-updated { font-size: 12px; color: #9095b0; }
+    .refresh-btn {
+      background: #5e6ad2; color: #fff; border: none; border-radius: 6px;
+      padding: 6px 14px; font-size: 13px; font-weight: 500; cursor: pointer;
+      display: flex; align-items: center; gap: 6px; transition: background 0.15s;
+    }
+    .refresh-btn:hover { background: #4a55c0; }
+    .refresh-btn:disabled { background: #b0b5d8; cursor: not-allowed; }
+    .refresh-icon { transition: transform 0.4s; }
+    .refresh-btn.loading .refresh-icon { animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Summary cards ── */
+    .summary { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .summary-card {
+      background: #fff; border: 1px solid #e8eaf0; border-radius: 10px;
+      padding: 12px 18px; flex: 1; min-width: 90px;
+    }
+    .summary-card .s-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #9095b0; margin-bottom: 3px; }
+    .summary-card .s-val { font-size: 26px; font-weight: 700; color: #1a1a2e; }
+    .summary-card.c-urgent .s-val { color: #d93025; }
+    .summary-card.c-high .s-val { color: #e07000; }
+
+    /* ── Filter chips ── */
+    .filter-bar { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+    .filter-label { font-size: 12px; color: #9095b0; margin-right: 2px; }
+    .chip {
+      background: #fff; border: 1px solid #e0e2ee; border-radius: 14px;
+      padding: 4px 12px; font-size: 12px; font-weight: 500; color: #6b6f87;
+      cursor: pointer; transition: all 0.15s; user-select: none;
+    }
+    .chip:hover { border-color: #5e6ad2; color: #5e6ad2; }
+    .chip.active { background: #5e6ad2; border-color: #5e6ad2; color: #fff; }
+
+    /* ── Project group ── */
+    .project-group { margin-bottom: 28px; }
+    .project-heading {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 14px; font-weight: 700; color: #1a1a2e; margin-bottom: 10px;
+    }
+    .project-dot { width: 9px; height: 9px; border-radius: 50%; background: #5e6ad2; flex-shrink: 0; }
+    .project-count {
+      font-size: 11px; font-weight: 500; color: #9095b0;
+      background: #f0f1f7; padding: 1px 8px; border-radius: 10px;
+    }
+
+    /* ── Priority block ── */
+    .priority-block { margin-bottom: 10px; border-radius: 8px; overflow: hidden; border: 1px solid #e8eaf0; }
+    .priority-hdr {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 12px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.6px;
+    }
+    .priority-hdr .p-count {
+      font-size: 10px; background: rgba(0,0,0,0.07);
+      padding: 1px 7px; border-radius: 10px; margin-left: auto;
+    }
+    .p1 .priority-hdr { background: #fff0f0; color: #b91c1c; }
+    .p2 .priority-hdr { background: #fff7ed; color: #c05000; }
+    .p3 .priority-hdr { background: #fefce8; color: #92400e; }
+    .p4 .priority-hdr { background: #eff6ff; color: #1d4ed8; }
+    .p0 .priority-hdr { background: #f4f4f7; color: #6b6f87; }
+
+    /* ── Issues table ── */
+    .issues-table { width: 100%; border-collapse: collapse; background: #fff; }
+    .issues-table th {
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;
+      color: #9095b0; text-align: left; padding: 7px 14px;
+      border-bottom: 1px solid #f0f1f5; background: #fafafa;
+    }
+    .issues-table td { padding: 9px 14px; border-bottom: 1px solid #f0f1f5; vertical-align: middle; }
+    .issues-table tr:last-child td { border-bottom: none; }
+    .issues-table tr:hover td { background: #f8f9fb; }
+
+    .issue-id { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; font-weight: 600; }
+    .issue-id a { color: #5e6ad2; text-decoration: none; }
+    .issue-id a:hover { text-decoration: underline; }
+    .issue-title a { color: #1a1a2e; text-decoration: none; font-weight: 500; }
+    .issue-title a:hover { color: #5e6ad2; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px;
+      white-space: nowrap;
+    }
+    .s-unstarted { background: #f0f1f5; color: #6b6f87; }
+    .s-started   { background: #e8f2ff; color: #1d55b8; }
+    .s-completed { background: #e6f9ee; color: #166534; }
+    .s-cancelled { background: #f4f4f6; color: #9b9db5; }
+
+    .due { font-size: 12px; color: #9095b0; white-space: nowrap; }
+    .due.overdue { color: #d93025; font-weight: 600; }
+    .due.soon    { color: #e07000; font-weight: 500; }
+
+    /* ── States ── */
+    .center-state { text-align: center; padding: 52px 20px; color: #9095b0; }
+    .spinner {
+      width: 30px; height: 30px;
+      border: 3px solid #e8eaf0; border-top-color: #5e6ad2;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      margin: 0 auto 14px;
+    }
+    .error-box { background: #fff0f0; border: 1px solid #ffd0d0; border-radius: 8px; padding: 14px 16px; color: #b91c1c; margin: 8px 0; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>
+    <svg class="linear-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="46" fill="#5e6ad2"/>
+      <path d="M18 68L50 18l32 50H18z" fill="white" opacity="0.9"/>
+    </svg>
+    Linear Issue Tracker
+  </h1>
+  <div class="meta">
+    <span class="last-updated" id="last-updated"></span>
+    <button class="refresh-btn" id="refresh-btn" onclick="loadData()">
+      <svg class="refresh-icon" width="13" height="13" viewBox="0 0 13 13" fill="none">
+        <path d="M11.5 6.5a5 5 0 1 1-1.46-3.54" stroke="white" stroke-width="1.6" stroke-linecap="round"/>
+        <polyline points="9,1 11.5,3.5 9,6" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="summary" id="summary" style="display:none">
+  <div class="summary-card">
+    <div class="s-label">Open Issues</div>
+    <div class="s-val" id="s-total">0</div>
+  </div>
+  <div class="summary-card c-urgent">
+    <div class="s-label">🔴 Urgent</div>
+    <div class="s-val" id="s-urgent">0</div>
+  </div>
+  <div class="summary-card c-high">
+    <div class="s-label">🟠 High</div>
+    <div class="s-val" id="s-high">0</div>
+  </div>
+  <div class="summary-card">
+    <div class="s-label">📁 Groups</div>
+    <div class="s-val" id="s-groups">0</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="filter-bar" id="filter-bar" style="display:none">
+  <span class="filter-label">Priority:</span>
+  <div class="chip active" onclick="setFilter('all',this)">All</div>
+  <div class="chip" onclick="setFilter(1,this)">🔴 Urgent</div>
+  <div class="chip" onclick="setFilter(2,this)">🟠 High</div>
+  <div class="chip" onclick="setFilter(3,this)">🟡 Medium</div>
+  <div class="chip" onclick="setFilter(4,this)">🔵 Low</div>
+  <div class="chip" onclick="setFilter(0,this)">⚪ No Priority</div>
+</div>
+
+<!-- Main content -->
+<div id="main">
+  <div class="center-state"><div class="spinner"></div>Loading issues from Linear…</div>
+</div>
+
+<script>
+const TOOL_ISSUES   = 'mcp__782a7f09-5980-4623-b404-999b353c77da__list_issues';
+const TOOL_PROJECTS = 'mcp__782a7f09-5980-4623-b404-999b353c77da__list_projects';
+
+const PINFO = {
+  1: { label: 'Urgent',      emoji: '🔴', cls: 'p1' },
+  2: { label: 'High',        emoji: '🟠', cls: 'p2' },
+  3: { label: 'Medium',      emoji: '🟡', cls: 'p3' },
+  4: { label: 'Low',         emoji: '🔵', cls: 'p4' },
+  0: { label: 'No Priority', emoji: '⚪', cls: 'p0' },
+};
+const P_ORDER = [1, 2, 3, 4, 0];
+
+let allIssues = [], allProjects = [], activeFilter = 'all';
+
+function setFilter(val, el) {
+  activeFilter = val;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+async function loadData() {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true; btn.classList.add('loading');
+  document.getElementById('main').innerHTML =
+    '<div class="center-state"><div class="spinner"></div>Fetching from Linear…</div>';
+
+  try {
+    const [ir, pr] = await Promise.all([
+      window.cowork.callMcpTool(TOOL_ISSUES,   { includeArchived: false, limit: 250 }),
+      window.cowork.callMcpTool(TOOL_PROJECTS, { includeArchived: false, limit: 50  }),
+    ]);
+    allIssues   = (ir.issues   || []).filter(i => i.statusType !== 'completed' && i.statusType !== 'cancelled');
+    allProjects = pr.projects  || [];
+
+    updateSummary();
+    render();
+
+    document.getElementById('summary').style.display    = 'flex';
+    document.getElementById('filter-bar').style.display = 'flex';
+    document.getElementById('last-updated').textContent =
+      'Updated ' + new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  } catch(e) {
+    document.getElementById('main').innerHTML =
+      `<div class="error-box">⚠️ Failed to load: ${e.message || e}</div>`;
+  } finally {
+    btn.disabled = false; btn.classList.remove('loading');
+  }
+}
+
+function buildGroups(issues) {
+  const pmap = {};
+  for (const p of allProjects) pmap[p.id] = p.name;
+  const g = {};
+  for (const i of issues) {
+    const key = (i.projectId && pmap[i.projectId]) ? pmap[i.projectId] : (i.team || 'No Team');
+    (g[key] = g[key] || []).push(i);
+  }
+  return g;
+}
+
+function updateSummary() {
+  const g = buildGroups(allIssues);
+  document.getElementById('s-total').textContent  = allIssues.length;
+  document.getElementById('s-urgent').textContent = allIssues.filter(i=>(i.priority?.value??0)===1).length;
+  document.getElementById('s-high').textContent   = allIssues.filter(i=>(i.priority?.value??0)===2).length;
+  document.getElementById('s-groups').textContent = Object.keys(g).length;
+}
+
+function fmtDate(d) {
+  if (!d) return '<span class="due">—</span>';
+  const dt = new Date(d), now = new Date();
+  const diff = Math.ceil((dt-now)/86400000);
+  const label = dt.toLocaleDateString([],{month:'short',day:'numeric'});
+  if (diff < 0)  return `<span class="due overdue">⚠ ${label}</span>`;
+  if (diff <= 3) return `<span class="due soon">${label}</span>`;
+  return `<span class="due">${label}</span>`;
+}
+function esc(s){ return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function render() {
+  const filtered = activeFilter === 'all'
+    ? allIssues
+    : allIssues.filter(i => (i.priority?.value ?? 0) === activeFilter);
+
+  if (!filtered.length) {
+    document.getElementById('main').innerHTML =
+      '<div class="center-state">✅ No open issues' + (activeFilter!=='all'?' for this priority':'') + '</div>';
+    return;
+  }
+
+  const groups = buildGroups(filtered);
+  const sorted = Object.entries(groups).sort((a,b) => b[1].length - a[1].length);
+  let html = '';
+
+  for (const [name, issues] of sorted) {
+    html += `<div class="project-group">
+      <div class="project-heading">
+        <div class="project-dot"></div>
+        ${esc(name)}
+        <span class="project-count">${issues.length} issue${issues.length!==1?'s':''}</span>
+      </div>`;
+
+    const byP = {};
+    for (const i of issues) {
+      const pv = i.priority?.value ?? 0;
+      (byP[pv] = byP[pv]||[]).push(i);
+    }
+
+    for (const pv of P_ORDER) {
+      if (!byP[pv]) continue;
+      const { label, emoji, cls } = PINFO[pv];
+      const rows = byP[pv].map(i => `
+        <tr>
+          <td><span class="issue-id"><a href="${esc(i.url||'#')}" target="_blank">${esc(i.id)}</a></span></td>
+          <td><span class="issue-title"><a href="${esc(i.url||'#')}" target="_blank">${esc(i.title)}</a></span></td>
+          <td><span class="badge s-${esc(i.statusType||'unstarted')}">${esc(i.status||'—')}</span></td>
+          <td>${fmtDate(i.dueDate)}</td>
+        </tr>`).join('');
+
+      html += `<div class="priority-block ${cls}">
+        <div class="priority-hdr">
+          <span>${emoji} ${label}</span>
+          <span class="p-count">${byP[pv].length}</span>
+        </div>
+        <table class="issues-table">
+          <thead><tr>
+            <th style="width:90px">ID</th>
+            <th>Title</th>
+            <th style="width:110px">Status</th>
+            <th style="width:90px">Due</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  document.getElementById('main').innerHTML = html;
+}
+
+loadData();
+</script>
+</body>
+</html>

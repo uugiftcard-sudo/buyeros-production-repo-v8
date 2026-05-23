@@ -1,0 +1,140 @@
+name: Weekly Supabase Storage Backup
+
+# 每週日 HK 02:00 download 全部 receipts → tar.gz → upload R2
+# 原 SOP 個 upload 段唔完整，呢度補上
+
+on:
+  schedule:
+    - cron: '0 18 * * 0'   # UTC 18:00 Sun = HK 02:00 Mon
+  workflow_dispatch:
+
+jobs:
+  backup-storage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60   # storage 多嘢可能行耐啲
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Supabase client
+        run: npm install @supabase/supabase-js
+
+      - name: Download all storage files
+        env:
+          SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          STORAGE_BUCKET: ${{ secrets.STORAGE_BUCKET_NAME }}
+        run: |
+          cat > download.js << 'EOF'
+          const { createClient } = require('@supabase/supabase-js');
+          const fs = require('fs');
+          const path = require('path');
+
+          const supabase = createClient(
+            process.env.SUPABASE_URL,
+            process.env.SUPABASE_SERVICE_KEY
+          );
+          const BUCKET = process.env.STORAGE_BUCKET || 'documents';
+
+          async function listAllFiles(prefix = '', acc = []) {
+            const { data, error } = await supabase.storage
+              .from(BUCKET)
+              .list(prefix, { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
+            if (error) throw error;
+            for (const item of data) {
+              const fullPath = prefix ? `${prefix}/${item.name}` : item.name;
+              if (item.id === null) {
+                // folder → recurse
+                await listAllFiles(fullPath, acc);
+              } else {
+                acc.push(fullPath);
+              }
+            }
+            return acc;
+          }
+
+          (async () => {
+            const files = await listAllFiles();
+            console.log(`Found ${files.length} files in bucket ${BUCKET}`);
+            let ok = 0, fail = 0;
+            for (const f of files) {
+              try {
+                const { data, error } = await supabase.storage.from(BUCKET).download(f);
+                if (error) throw error;
+                const buf = Buffer.from(await data.arrayBuffer());
+                const local = path.join('storage-backup', f);
+                fs.mkdirSync(path.dirname(local), { recursive: true });
+                fs.writeFileSync(local, buf);
+                ok++;
+              } catch (e) {
+                console.error(`FAIL ${f}: ${e.message}`);
+                fail++;
+              }
+            }
+            console.log(`Done: ${ok} ok, ${fail} failed`);
+            if (fail > 0) process.exit(1);
+          })();
+          EOF
+          node download.js
+
+      - name: Compress
+        id: compress
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          tar czf storage-${DATE}.tar.gz storage-backup/
+          SIZE=$(stat -c%s storage-${DATE}.tar.gz)
+          echo "DATE=${DATE}" >> $GITHUB_OUTPUT
+          echo "SIZE=${SIZE}" >> $GITHUB_OUTPUT
+          ls -lh storage-${DATE}.tar.gz
+
+      - name: Upload to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 cp \
+            storage-${{ steps.compress.outputs.DATE }}.tar.gz \
+            s3://${{ secrets.R2_BUCKET }}/supabase-storage/storage-${{ steps.compress.outputs.DATE }}.tar.gz \
+            --endpoint-url ${{ secrets.R2_ENDPOINT }}
+
+      - name: Cleanup R2 old storage backups (keep 12 weeks)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          CUTOFF=$(date -d '84 days ago' +%Y-%m-%d)
+          aws s3 ls s3://${{ secrets.R2_BUCKET }}/supabase-storage/ \
+            --endpoint-url ${{ secrets.R2_ENDPOINT }} | \
+          while read -r line; do
+            FILE=$(echo "$line" | awk '{print $4}')
+            FILE_DATE=$(echo "$FILE" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' || true)
+            if [ -n "$FILE_DATE" ] && [[ "$FILE_DATE" < "$CUTOFF" ]]; then
+              echo "Deleting: $FILE"
+              aws s3 rm s3://${{ secrets.R2_BUCKET }}/supabase-storage/$FILE \
+                --endpoint-url ${{ secrets.R2_ENDPOINT }}
+            fi
+          done
+
+      - name: Telegram alert on success
+        if: success()
+        run: |
+          SIZE_MB=$(echo "scale=2; ${{ steps.compress.outputs.SIZE }} / 1048576" | bc)
+          MSG=$(printf "✅ BuyerOS Storage backup OK\nDate: %s\nSize: %s MB" "${{ steps.compress.outputs.DATE }}" "${SIZE_MB}")
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.ADMIN_TG_ID }}" \
+            --data-urlencode "text=${MSG}"
+
+      - name: Telegram alert on failure
+        if: failure()
+        run: |
+          MSG=$(printf "🚨 BuyerOS Storage backup FAILED\nDate: %s\nRun: https://github.com/%s/actions/runs/%s" "$(date)" "${{ github.repository }}" "${{ github.run_id }}")
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.ADMIN_TG_ID }}" \
+            --data-urlencode "text=${MSG}"

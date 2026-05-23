@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Linear Issue Tracker</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --surface: #ffffff;
+      --surface-2: #f9fafb;
+      --border: #e4e6ef;
+      --border-light: #f0f1f7;
+      --accent: #5e6ad2;
+      --accent-hover: #4a55c0;
+      --accent-soft: #eef0fb;
+      --text-primary: #111827;
+      --text-secondary: #6b7280;
+      --text-muted: #9ca3af;
+      --radius: 10px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,.08);
+      color-scheme: light;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg); color: var(--text-primary);
+      padding: 24px; font-size: 14px; min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 22px; gap: 12px; flex-wrap: wrap;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+    .linear-logo { width: 24px; height: 24px; border-radius: 6px; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .last-updated { font-size: 12px; color: var(--text-muted); }
+    .refresh-btn {
+      background: var(--accent); color: #fff; border: none;
+      border-radius: 7px; padding: 7px 14px; font-size: 13px; font-weight: 500;
+      cursor: pointer; display: flex; align-items: center; gap: 6px;
+      transition: background .15s; box-shadow: var(--shadow-sm);
+    }
+    .refresh-btn:hover { background: var(--accent-hover); }
+    .refresh-btn:disabled { background: #c5c8e8; cursor: not-allowed; box-shadow: none; }
+    .refresh-icon { transition: transform .4s; }
+    .refresh-btn.loading .refresh-icon { animation: spin .9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Summary ── */
+    .summary { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+    .s-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 18px; flex: 1; min-width: 85px;
+      box-shadow: var(--shadow-sm);
+    }
+    .s-card .label { font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .6px; color: var(--text-muted); margin-bottom: 4px; }
+    .s-card .val { font-size: 28px; font-weight: 800; color: var(--text-primary); line-height: 1; }
+    .s-card.urgent .val { color: #dc2626; }
+    .s-card.high .val { color: #d97706; }
+
+    /* ── Toolbar (search + filters) ── */
+    .toolbar {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 14px;
+      margin-bottom: 18px; display: flex; flex-direction: column;
+      gap: 10px; box-shadow: var(--shadow-sm);
+    }
+    .search-row { display: flex; align-items: center; gap: 8px; }
+    .search-wrap {
+      position: relative; flex: 1;
+    }
+    .search-icon {
+      position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+      color: var(--text-muted); pointer-events: none;
+    }
+    .search-input {
+      width: 100%; border: 1px solid var(--border); border-radius: 7px;
+      padding: 7px 10px 7px 32px; font-size: 13px; color: var(--text-primary);
+      background: var(--surface-2); outline: none; transition: border-color .15s;
+    }
+    .search-input:focus { border-color: var(--accent); background: #fff; }
+    .search-input::placeholder { color: var(--text-muted); }
+    .clear-btn {
+      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; color: var(--text-muted);
+      font-size: 16px; line-height: 1; display: none; padding: 2px;
+    }
+    .clear-btn.visible { display: block; }
+
+    .filter-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+    .filter-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .filter-group-label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .5px; color: var(--text-muted); min-width: 50px;
+    }
+    .chip {
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500;
+      color: var(--text-secondary); cursor: pointer; transition: all .15s; user-select: none;
+    }
+    .chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+    .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ── Project groups ── */
+    .project-group { margin-bottom: 26px; }
+    .project-heading {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 700; color: var(--text-primary);
+      margin-bottom: 10px; padding: 0 2px;
+    }
+    .project-icon {
+      width: 22px; height: 22px; border-radius: 6px; background: var(--accent-soft);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; flex-shrink: 0;
+    }
+    .project-count {
+      font-size: 11px; font-weight: 500; color: var(--text-muted);
+      background: var(--border-light); padding: 2px 8px; border-radius: 12px; margin-left: 2px;
+    }
+
+    /* ── Priority block ── */
+    .priority-block {
+      margin-bottom: 8px; border-radius: var(--radius);
+      border: 1px solid var(--border); overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+    .priority-hdr {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .6px;
+    }
+    .priority-hdr .p-count {
+      font-size: 10px; background: rgba(0,0,0,.07);
+      padding: 1px 7px; border-radius: 10px; margin-left: auto; font-weight: 600;
+    }
+    .p1 .priority-hdr { background: #fef2f2; color: #b91c1c; }
+    .p2 .priority-hdr { background: #fffbeb; color: #b45309; }
+    .p3 .priority-hdr { background: #fefce8; color: #854d0e; }
+    .p4 .priority-hdr { background: #eff6ff; color: #1d4ed8; }
+    .p0 .priority-hdr { background: #f9fafb; color: #6b7280; }
+
+    /* ── Issues table ── */
+    .issues-table { width: 100%; border-collapse: collapse; background: var(--surface); }
+    .issues-table th {
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px;
+      color: var(--text-muted); text-align: left; padding: 7px 14px;
+      border-bottom: 1px solid var(--border-light); background: var(--surface-2);
+    }
+    .issues-table td {
+      padding: 10px 14px; border-bottom: 1px solid var(--border-light); vertical-align: middle;
+    }
+    .issues-table tr:last-child td { border-bottom: none; }
+    .issues-table tr:hover td { background: #f8f9fc; }
+
+    .issue-id { font-family: 'SF Mono', 'Fira Code', 'Menlo', monospace; font-size: 12px; font-weight: 600; }
+    .issue-id a { color: var(--accent); text-decoration: none; }
+    .issue-id a:hover { text-decoration: underline; }
+
+    .issue-title a { color: var(--text-primary); text-decoration: none; font-weight: 500; }
+    .issue-title a:hover { color: var(--accent); }
+
+    /* highlight search match */
+    mark { background: #fef08a; color: inherit; border-radius: 2px; padding: 0 1px; }
+
+    /* Assignee */
+    .assignee { display: flex; align-items: center; gap: 6px; }
+    .avatar {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--accent-soft); color: var(--accent);
+      font-size: 9px; font-weight: 700; display: flex; align-items: center;
+      justify-content: center; text-transform: uppercase; flex-shrink: 0;
+      border: 1px solid rgba(94,106,210,.2);
+    }
+    .assignee-name { font-size: 12px; color: var(--text-secondary); white-space: nowrap;
+      max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
+    .unassigned { font-size: 12px; color: var(--text-muted); font-style: italic; }
+
+    /* Status badge */
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 500; padding: 3px 8px;
+      border-radius: 5px; white-space: nowrap;
+    }
+    .s-unstarted { background: #f3f4f6; color: #6b7280; }
+    .s-started   { background: #dbeafe; color: #1d55b8; }
+    .s-completed { background: #dcfce7; color: #166534; }
+    .s-cancelled { background: #f3f4f6; color: #9ca3af; }
+
+    /* Due date */
+    .due { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+    .due.overdue { color: #dc2626; font-weight: 600; }
+    .due.soon    { color: #d97706; font-weight: 500; }
+
+    /* States */
+    .center-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    .center-state p { margin-top: 8px; font-size: 13px; }
+    .error-box {
+      background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius);
+      padding: 14px 16px; color: #b91c1c; font-size: 13px;
+    }
+
+    /* Result count */
+    .result-label {
+      font-size: 12px; color: var(--text-muted); margin-bottom: 14px; padding: 0 2px;
+    }
+
+    @media (max-width: 600px) {
+      body { padding: 14px; }
+      .summary { flex-direction: column; }
+      .filter-row { flex-direction: column; align-items: flex-start; }
+      .issues-table th:nth-child(4),
+      .issues-table td:nth-child(4),
+      .issues-table th:nth-child(5),
+      .issues-table td:nth-child(5) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <svg class="linear-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" rx="18" fill="#5e6ad2"/>
+      <path d="M20 72L50 20l30 52H20z" fill="white" opacity="0.92"/>
+    </svg>
+    <h1>Linear Issue Tracker</h1>
+  </div>
+  <div class="header-right">
+    <span class="last-updated" id="last-updated"></span>
+    <button class="refresh-btn" id="refresh-btn" onclick="loadData()">
+      <svg class="refresh-icon" width="13" height="13" viewBox="0 0 13 13" fill="none">
+        <path d="M11.5 6.5a5 5 0 1 1-1.46-3.54" stroke="white" stroke-width="1.6" stroke-linecap="round"/>
+        <polyline points="9,1 11.5,3.5 9,6" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Summary cards -->
+<div class="summary" id="summary" style="display:none">
+  <div class="s-card">
+    <div class="label">Open Issues</div>
+    <div class="val" id="s-total">0</div>
+  </div>
+  <div class="s-card urgent">
+    <div class="label">🔴 Urgent</div>
+    <div class="val" id="s-urgent">0</div>
+  </div>
+  <div class="s-card high">
+    <div class="label">🟠 High</div>
+    <div class="val" id="s-high">0</div>
+  </div>
+  <div class="s-card">
+    <div class="label">In Progress</div>
+    <div class="val" id="s-inprog">0</div>
+  </div>
+  <div class="s-card">
+    <div class="label">📁 Groups</div>
+    <div class="val" id="s-groups">0</div>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar" id="toolbar" style="display:none">
+  <div class="search-row">
+    <div class="search-wrap">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <input class="search-input" id="search-input" type="text"
+        placeholder="Search issues by title or ID…"
+        oninput="onSearch(this.value)" />
+      <button class="clear-btn" id="clear-btn" onclick="clearSearch()" title="Clear search">✕</button>
+    </div>
+  </div>
+  <div class="filter-row">
+    <div class="filter-group">
+      <span class="filter-group-label">Priority</span>
+      <div class="chip active" data-filter="priority" data-val="all" onclick="setFilter('priority','all',this)">All</div>
+      <div class="chip" data-filter="priority" data-val="1" onclick="setFilter('priority',1,this)">🔴 Urgent</div>
+      <div class="chip" data-filter="priority" data-val="2" onclick="setFilter('priority',2,this)">🟠 High</div>
+      <div class="chip" data-filter="priority" data-val="3" onclick="setFilter('priority',3,this)">🟡 Medium</div>
+      <div class="chip" data-filter="priority" data-val="4" onclick="setFilter('priority',4,this)">🔵 Low</div>
+      <div class="chip" data-filter="priority" data-val="0" onclick="setFilter('priority',0,this)">⚪ No Priority</div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-group-label">Status</span>
+      <div class="chip active" data-filter="status" data-val="all" onclick="setFilter('status','all',this)">All</div>
+      <div class="chip" data-filter="status" data-val="unstarted" onclick="setFilter('status','unstarted',this)">⬜ Todo</div>
+      <div class="chip" data-filter="status" data-val="started" onclick="setFilter('status','started',this)">🔄 In Progress</div>
+    </div>
+  </div>
+</div>
+
+<!-- Main -->
+<div id="main">
+  <div class="center-state"><div class="spinner"></div><p>Loading issues from Linear…</p></div>
+</div>
+
+<script>
+const TOOL_ISSUES   = 'mcp__782a7f09-5980-4623-b404-999b353c77da__list_issues';
+const TOOL_PROJECTS = 'mcp__782a7f09-5980-4623-b404-999b353c77da__list_projects';
+
+const PINFO = {
+  1: { label:'Urgent',      emoji:'🔴', cls:'p1' },
+  2: { label:'High',        emoji:'🟠', cls:'p2' },
+  3: { label:'Medium',      emoji:'🟡', cls:'p3' },
+  4: { label:'Low',         emoji:'🔵', cls:'p4' },
+  0: { label:'No Priority', emoji:'⚪', cls:'p0' },
+};
+const P_ORDER = [1, 2, 3, 4, 0];
+
+let allIssues = [], allProjects = [];
+let filterPriority = 'all', filterStatus = 'all', searchQuery = '';
+
+/* ── Filters ── */
+function setFilter(type, val, el) {
+  if (type === 'priority') filterPriority = val;
+  if (type === 'status')   filterStatus   = val;
+  document.querySelectorAll(`.chip[data-filter="${type}"]`).forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function onSearch(q) {
+  searchQuery = q.trim().toLowerCase();
+  document.getElementById('clear-btn').classList.toggle('visible', q.length > 0);
+  render();
+}
+
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  onSearch('');
+}
+
+function applyFilters(issues) {
+  return issues.filter(i => {
+    const pv = i.priority?.value ?? 0;
+    if (filterPriority !== 'all' && pv !== filterPriority) return false;
+    if (filterStatus !== 'all' && i.statusType !== filterStatus) return false;
+    if (searchQuery) {
+      const id    = (i.id || '').toLowerCase();
+      const title = (i.title || '').toLowerCase();
+      if (!id.includes(searchQuery) && !title.includes(searchQuery)) return false;
+    }
+    return true;
+  });
+}
+
+/* ── Data load ── */
+async function loadData() {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true; btn.classList.add('loading');
+  document.getElementById('main').innerHTML =
+    '<div class="center-state"><div class="spinner"></div><p>Fetching from Linear…</p></div>';
+
+  try {
+    const [ir, pr] = await Promise.all([
+      window.cowork.callMcpTool(TOOL_ISSUES,   { includeArchived: false, limit: 250 }),
+      window.cowork.callMcpTool(TOOL_PROJECTS, { includeArchived: false, limit: 50  }),
+    ]);
+    allIssues   = (ir.issues   || []).filter(i =>
+      i.statusType !== 'completed' && i.statusType !== 'cancelled');
+    allProjects = pr.projects || [];
+
+    updateSummary();
+    render();
+
+    document.getElementById('summary').style.display = 'flex';
+    document.getElementById('toolbar').style.display = 'flex';
+    document.getElementById('last-updated').textContent =
+      'Updated ' + new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  } catch(e) {
+    document.getElementById('main').innerHTML =
+      `<div class="error-box">⚠️ Failed to load: ${e.message || e}</div>`;
+  } finally {
+    btn.disabled = false; btn.classList.remove('loading');
+  }
+}
+
+/* ── Summary ── */
+function updateSummary() {
+  const g = buildGroups(allIssues);
+  document.getElementById('s-total').textContent  = allIssues.length;
+  document.getElementById('s-urgent').textContent = allIssues.filter(i=>(i.priority?.value??0)===1).length;
+  document.getElementById('s-high').textContent   = allIssues.filter(i=>(i.priority?.value??0)===2).length;
+  document.getElementById('s-inprog').textContent = allIssues.filter(i=>i.statusType==='started').length;
+  document.getElementById('s-groups').textContent = Object.keys(g).length;
+}
+
+/* ── Grouping ── */
+function buildGroups(issues) {
+  const pmap = {};
+  for (const p of allProjects) pmap[p.id] = p.name;
+  const g = {};
+  for (const i of issues) {
+    const key = (i.projectId && pmap[i.projectId]) ? pmap[i.projectId]
+              : (i.team || 'No Team');
+    (g[key] = g[key] || []).push(i);
+  }
+  return g;
+}
+
+/* ── Helpers ── */
+function fmtDate(d) {
+  if (!d) return '<span class="due">—</span>';
+  const dt = new Date(d), now = new Date();
+  const diff = Math.ceil((dt - now) / 86400000);
+  const label = dt.toLocaleDateString([], { month:'short', day:'numeric' });
+  if (diff < 0)  return `<span class="due overdue">⚠ ${label}</span>`;
+  if (diff <= 3) return `<span class="due soon">${label}</span>`;
+  return `<span class="due">${label}</span>`;
+}
+
+function esc(s) {
+  return s == null ? '' : String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function highlight(text, q) {
+  if (!q) return esc(text);
+  const safe = esc(text);
+  const idx  = safe.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return safe;
+  return safe.slice(0, idx) +
+    `<mark>${safe.slice(idx, idx + q.length)}</mark>` +
+    safe.slice(idx + q.length);
+}
+
+function initials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  return parts.length >= 2
+    ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase()
+    : name.slice(0,2).toUpperCase();
+}
+
+function assigneeCell(i) {
+  const name = i.assignee?.name || i.assigneeName || null;
+  if (!name) return '<span class="unassigned">Unassigned</span>';
+  return `<div class="assignee">
+    <div class="avatar">${esc(initials(name))}</div>
+    <span class="assignee-name" title="${esc(name)}">${esc(name)}</span>
+  </div>`;
+}
+
+/* ── Render ── */
+function render() {
+  const filtered = applyFilters(allIssues);
+
+  if (!filtered.length) {
+    const reason = searchQuery ? `"${esc(searchQuery)}"` : 'these filters';
+    document.getElementById('main').innerHTML =
+      `<div class="center-state">✅ No open issues matching ${reason}</div>`;
+    return;
+  }
+
+  const groups = buildGroups(filtered);
+  const sorted = Object.entries(groups).sort((a,b) => b[1].length - a[1].length);
+
+  let html = `<div class="result-label">Showing ${filtered.length} issue${filtered.length!==1?'s':''}</div>`;
+
+  for (const [name, issues] of sorted) {
+    const icon = name === 'No Team' ? '📋' : '📁';
+    html += `<div class="project-group">
+      <div class="project-heading">
+        <div class="project-icon">${icon}</div>
+        ${esc(name)}
+        <span class="project-count">${issues.length} issue${issues.length!==1?'s':''}</span>
+      </div>`;
+
+    const byP = {};
+    for (const i of issues) {
+      const pv = i.priority?.value ?? 0;
+      (byP[pv] = byP[pv] || []).push(i);
+    }
+
+    for (const pv of P_ORDER) {
+      if (!byP[pv]) continue;
+      const { label, emoji, cls } = PINFO[pv];
+      const rows = byP[pv].map(i => `
+        <tr>
+          <td><span class="issue-id"><a href="${esc(i.url||'#')}" target="_blank">${highlight(i.id, searchQuery)}</a></span></td>
+          <td><span class="issue-title"><a href="${esc(i.url||'#')}" target="_blank">${highlight(i.title, searchQuery)}</a></span></td>
+          <td>${assigneeCell(i)}</td>
+          <td><span class="badge s-${esc(i.statusType||'unstarted')}">${esc(i.status||'—')}</span></td>
+          <td>${fmtDate(i.dueDate)}</td>
+        </tr>`).join('');
+
+      html += `<div class="priority-block ${cls}">
+        <div class="priority-hdr">
+          <span>${emoji} ${label}</span>
+          <span class="p-count">${byP[pv].length}</span>
+        </div>
+        <table class="issues-table">
+          <thead><tr>
+            <th style="width:88px">ID</th>
+            <th>Title</th>
+            <th style="width:130px">Assignee</th>
+            <th style="width:120px">Status</th>
+            <th style="width:88px">Due</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  document.getElementById('main').innerHTML = html;
+}
+
+loadData();
+</script>
+</body>
+</html>
