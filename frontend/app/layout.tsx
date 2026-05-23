@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { SessionProviderWrapper } from "@/components/SessionProviderWrapper";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { DebugPanel } from "@/components/DebugPanel";
 
 export const metadata: Metadata = {
   title: "BuyerOS 管理台 — 專業版",
@@ -13,7 +14,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="zh-Hant">
       <body>
         <ErrorBoundary>
-          <SessionProviderWrapper>{children}</SessionProviderWrapper>
+          <SessionProviderWrapper>
+            {children}
+            <DebugPanel />
+          </SessionProviderWrapper>
         </ErrorBoundary>
       </body>
     </html>

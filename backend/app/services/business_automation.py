@@ -263,12 +263,31 @@ class BusinessAutomationService:
         return AutomationResult(True, "close_cycle", status, "CLOTH 收單流程已完成並寫入共同記憶。", payload).to_dict()
 
     def _extract_amount(self, text: str) -> Optional[float]:
+        """Extract monetary amount from text — supports HKD/USD/CNY with locale-aware patterns."""
         import re
 
-        match = re.search(r"(?:HKD|港幣|\$)\s*([0-9]+(?:\.[0-9]{1,2})?)", text, re.IGNORECASE)
-        if not match:
-            return None
-        return float(match.group(1))
+        # Match: $123, 456.78 | HKD 123,456 | USD 123,456 | CNY 123456 | ¥123456 | 123.45
+        patterns = [
+            r"(?:HKD|港幣)\s*([0-9]{1,3}(?:[,.]?[0-9]{3})*(?:[.][0-9]{1,2})?)",
+            r"(?:USD|US\\$)\s*([0-9]{1,3}(?:[,.]?[0-9]{3})*(?:[.][0-9]{1,2})?)",
+            r"(?:CNY|RMB|人民幣)\s*([0-9]{1,3}(?:[,.]?[0-9]{3})*(?:[.][0-9]{1,2})?)",
+            r"(?:\\$|¥|HK\\$)\s*([0-9]{1,3}(?:[,.]?[0-9]{3})*(?:[.][0-9]{1,2})?)",
+            r"(?<![0-9])([0-9]{1,3}(?:[,.]?[0-9]{3})*[.][0-9]{1,2})(?![0-9.])",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return float(match.group(1).replace(",", ""))
+        return None
+
+    def _extract_currency(self, text: str) -> str:
+        """Detect currency from text."""
+        import re
+        if re.search(r"(?:HKD|港幣)", text, re.IGNORECASE): return "HKD"
+        if re.search(r"(?:USD|US\\$)", text, re.IGNORECASE): return "USD"
+        if re.search(r"(?:CNY|RMB|人民幣)", text, re.IGNORECASE): return "CNY"
+        if re.search(r"[¥]", text): return "CNY"
+        return "HKD"  # default for CLOTH
 
     def _get_order(self, order_id: str) -> Optional[Dict[str, Any]]:
         if not self.orders_service:
@@ -279,11 +298,15 @@ class BusinessAutomationService:
             return {"order_id": order_id, "error": str(exc)}
 
     def _extract_order_total(self, order: Dict[str, Any]) -> Optional[float]:
-        for key in ("total_hkd", "total", "amount", "total_price"):
+        for key in ("total_hkd", "total_price_set", "amount", "total_price", "total"):
             value = order.get(key)
             amount = self._coerce_amount(value)
             if amount is not None:
                 return amount
+        # Shopify returns { "amount": "100.00", "currency_code": "HKD" }
+        total_set = order.get("total_price_set") or order.get("total_set")
+        if isinstance(total_set, dict):
+            return self._coerce_amount(total_set.get("shop_money", {}).get("amount"))
         return None
 
     def _coerce_amount(self, value: Any) -> Optional[float]:
@@ -296,5 +319,5 @@ class BusinessAutomationService:
             return None
         import re
 
-        match = re.search(r"([0-9]+(?:\.[0-9]{1,2})?)", text)
+        match = re.search(r"([0-9]+(?:[.][0-9]{1,2})?)", text)
         return float(match.group(1)) if match else None
