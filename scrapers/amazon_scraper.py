@@ -108,7 +108,6 @@ def parse_search_results(html: str, keyword: str) -> list[ProductResult]:
                     try:
                         obj = json.loads(m)
                         if obj.get("ASIN") or obj.get("asin"):
-                            json_data = obj
                             break
                     except json.JSONDecodeError:
                         pass

@@ -12,6 +12,7 @@ rate_limits:
   ebay: 30
   loyalty: 10
   supermarket: 40
+  aliexpress: 30
 
 # ── Delay Between Requests (seconds) ───────────────────────────
 delays:
@@ -22,7 +23,7 @@ delays:
   amazon: 3.0
   ebay: 2.0
   loyalty: 5.0
-  supermarket: 2.0
+  aliexpress: 2.0
 
 # ── User-Agent Rotation Pool ──────────────────────────────────
 user_agents:

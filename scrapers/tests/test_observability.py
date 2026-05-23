@@ -1,8 +1,6 @@
 """Unit tests for src/observability.py."""
 
-import logging
 
-import pytest
 
 
 class TestSetupObservability:

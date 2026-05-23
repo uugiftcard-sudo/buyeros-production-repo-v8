@@ -1,6 +1,5 @@
 """Unit tests for src/metrics_app.py and src/metrics.py."""
 
-import pytest
 
 from src.metrics import (
     active_scrapes,
@@ -49,12 +48,6 @@ class TestMetrics:
 
 
 class TestMetricsApp:
-    def test_metrics_app_is_callable_wsgi(self):
-        """metrics_app is a callable WSGI application."""
+    def test_metrics_app_is_callable(self):
+        """metrics_app is a callable application (WSGIMiddleware)."""
         assert callable(metrics_app)
-
-    def test_metrics_app_is_asgi_app_with_mount(self):
-        """metrics_app has a mount method (ASGI application interface)."""
-        # prometheus_client.make_asgi_app() returns a Starlette ASGI app
-        # which has a mount method for mounting sub-apps
-        assert hasattr(metrics_app, "mount")

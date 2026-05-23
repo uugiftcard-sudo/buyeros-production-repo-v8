@@ -13,14 +13,14 @@ B2B Contact Finder — Apollo.io + Hunter.io + Companies House
 - 免费层额度有限，请合理使用
 """
 
-import os
-import requests
+import argparse
 import csv
 import json
+import os
 import time
-import argparse
-from dataclasses import dataclass, asdict, field
-from typing import Optional
+from dataclasses import asdict, dataclass, field
+
+import requests
 
 # ────────────────────────────────────────────────
 # 配置区 — 从环境变量或直接填入
@@ -233,7 +233,7 @@ def search_hunter_by_email_finder(
     first_name: str,
     last_name: str,
     domain: str,
-) -> Optional[str]:
+) -> str | None:
     """
     通过姓名 + 域名查找具体邮箱
     免费账号每请求消耗 1 次额度

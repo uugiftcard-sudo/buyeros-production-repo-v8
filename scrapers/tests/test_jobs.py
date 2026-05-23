@@ -1,8 +1,6 @@
 """Unit tests for src/jobs.py."""
 
-import time
 
-import pytest
 
 from src.jobs import Job, JobQueue
 

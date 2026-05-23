@@ -1,6 +1,5 @@
 """Unit tests for src/scrapers/async_base.py."""
 
-import pytest
 
 from src.scrapers.async_base import AsyncBaseScraper
 

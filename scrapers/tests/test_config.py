@@ -1,16 +1,15 @@
 """Unit tests for src/config.py."""
 
-import pytest
 
 from src.config import (
     Settings,
-    get_settings,
     get_delay,
     get_http_timeout,
     get_log_level,
     get_max_retries,
     get_output_dir,
     get_rate_limit,
+    get_settings,
     get_user_agents,
     get_yaml_value,
 )

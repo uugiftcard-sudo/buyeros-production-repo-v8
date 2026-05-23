@@ -478,6 +478,86 @@ def cmd_ebay(
 
 
 # ════════════════════════════════════════════════════════════════════
+# AliExpress
+# ════════════════════════════════════════════════════════════════════
+
+
+@cli.command("aliexpress")
+@click.argument("url", required=False)
+@click.option("--keyword", "-k", help="Search keyword")
+@click.option("--pages", type=int, default=1, help="Number of search result pages to scrape")
+@click.option("--domain", type=click.Choice(["com", "ru", "id", "br"]), default="com")
+@click.option("-d", "--delay", type=float, default=2.0)
+@click.option(
+    "--browser/--no-browser",
+    "use_browser",
+    default=False,
+    help="Use Playwright headless browser (bypasses anti-bot, slower but more reliable)",
+)
+@pass_opts
+def cmd_aliexpress(
+    opts: GlobalOptions,
+    url: str | None,
+    keyword: str | None,
+    pages: int,
+    domain: str,
+    delay: float,
+    use_browser: bool,
+) -> None:
+    """Scrape AliExpress products — by URL (detail) or keyword (search)."""
+    from src.storage.writer import save_any
+
+    if opts.dry_run:
+        console.print("[cyan]Dry-run: would scrape[/cyan]")
+        console.print(f"  url={url} keyword={keyword} pages={pages} browser={use_browser}")
+        return
+
+    if use_browser:
+        console.print("[cyan]Using Playwright headless browser...[/cyan]")
+        try:
+            from src.scrapers.aliexpress_browser import AliExpressBrowserScraper
+        except ImportError:
+            console.print("[red]aliexpress_browser not installed — run: pip install scrapers[browser][/red]")
+            return
+
+        scraper = AliExpressBrowserScraper(delay=delay)
+        try:
+            if url:
+                results = [r for r in [scraper.get_product(url)] if r is not None]
+                output = opts.output or "aliexpress_product.csv"
+            else:
+                if not keyword:
+                    console.print("[yellow]Provide --keyword or a product URL[/yellow]")
+                    return
+                results = scraper.search(keyword, pages=pages)
+                output = opts.output or f"aliexpress_{keyword[:20].replace(' ', '_')}.csv"
+        finally:
+            scraper.close()
+    else:
+        from src.scrapers.aliexpress import AliExpressScraper
+
+        scraper = AliExpressScraper(delay=delay)
+
+        if url:
+            results = [r for r in [scraper.scrape_product(url)] if r is not None]
+            output = opts.output or "aliexpress_product.csv"
+        else:
+            if not keyword:
+                console.print("[yellow]Provide --keyword or a product URL[/yellow]")
+                return
+            results = scraper.scrape_search(keyword, pages=pages)
+            output = opts.output or f"aliexpress_{keyword[:20].replace(' ', '_')}.csv"
+
+    if not results:
+        console.print("[yellow]No results — page structure may have changed or anti-bot blocked requests[/yellow]")
+        return
+
+    path = save_any(results, output, opts.format)
+    console.print(f"[green]✓ Saved {len(results)} results → {path}[/green]")
+    _print_table(results[:5], "AliExpress Products")
+
+
+# ════════════════════════════════════════════════════════════════════
 # Loyalty
 # ════════════════════════════════════════════════════════════════════
 
@@ -643,6 +723,114 @@ def cmd_supermarket(
 
     path = save_any(results, output, opts.format)
     console.print(f"[green]✓ Saved {len(results)} results → {path}[/green]")
+
+
+# ════════════════════════════════════════════════════════════════════
+# Vinted
+# ════════════════════════════════════════════════════════════════════
+
+
+@cli.command("vinted")
+@click.argument("url_or_search", nargs=-1, required=False)
+@click.option("--search", "-s", help="Search keyword (overrides positional arg)")
+@click.option("--brand", help="Filter by brand name")
+@click.option("--size", help="Filter by size label (e.g. M, 38, 12)")
+@click.option(
+    "--condition",
+    type=click.Choice(["new_with_tags", "new_without_tags", "very_good", "good", "satisfactory"]),
+    help="Filter by item condition",
+)
+@click.option("--min-price", type=float, default=None, help="Minimum price (GBP)")
+@click.option("--max-price", type=float, default=None, help="Maximum price (GBP)")
+@click.option("--category", help="Filter by category name")
+@click.option("--gender", type=click.Choice(["male", "female", "unisex"]), help="Gender filter")
+@click.option("--pages", type=int, default=1, help="Number of search result pages")
+@click.option("-d", "--delay", type=float, default=2.0)
+@pass_opts
+def cmd_vinted(
+    opts: GlobalOptions,
+    url_or_search: tuple[str, ...],
+    search: str | None,
+    brand: str | None,
+    size: str | None,
+    condition: str | None,
+    min_price: float | None,
+    max_price: float | None,
+    category: str | None,
+    gender: str | None,
+    pages: int,
+    delay: float,
+) -> None:
+    """Scrape Vinted (vinted.co.uk) fashion listings."""
+    from src.scrapers.vinted import VintedScraper
+    from src.storage.writer import save_any
+
+    if opts.dry_run:
+        console.print("[cyan]Dry-run: would scrape Vinted[/cyan]")
+        console.print(f"  search={search} brand={brand} size={size} condition={condition}")
+        console.print(f"  pages={pages} min_price={min_price} max_price={max_price}")
+        return
+
+    scraper = VintedScraper(delay=delay)
+    results: list = []
+
+    # Build filters dict
+    filters: dict = {}
+    if brand:
+        filters["brand"] = brand
+    if size:
+        filters["size"] = size
+    if condition:
+        filters["condition"] = condition
+    if min_price is not None:
+        filters["min_price"] = min_price
+    if max_price is not None:
+        filters["max_price"] = max_price
+    if category:
+        filters["category"] = category
+    if gender:
+        filters["gender"] = gender
+
+    # Priority 1: direct item URL
+    if url_or_search:
+        for raw_url in url_or_search:
+            if "vinted.co.uk/items/" in raw_url or "/items/" in raw_url:
+                console.print(f"[cyan]Fetching item: {raw_url}[/cyan]")
+                product = scraper.scrape_product(raw_url)
+                if product:
+                    results.append(product)
+                continue
+
+            # Treat as search keyword
+            keyword = raw_url.strip()
+            if not search:
+                search = keyword
+
+    # Priority 2: explicit --search
+    if search and not results:
+        console.print(f"[cyan]Searching Vinted: '{search}' ({pages} page(s))[/cyan]")
+        results = scraper.scrape_search(search, pages=pages, filters=filters or None)
+        output = opts.output or f"vinted_{search[:20].replace(' ', '_')}.csv"
+
+    elif results:
+        # Direct URL results
+        output = opts.output or "vinted_items.csv"
+
+    else:
+        console.print(
+            "[yellow]Provide a search term with --search or as a positional argument,[/yellow]\n"
+            "       or pass a Vinted item URL directly."
+        )
+        return
+
+    if not results:
+        console.print("[yellow]No results found[/yellow]")
+        return
+
+    path = save_any(results, output, opts.format)
+    console.print(f"[green]✓ Saved {len(results)} results → {path}[/green]")
+
+    _print_table(results[:5], "Vinted Listings")
 
 
 # ─── Entry point ──────────────────────────────────────────────────
