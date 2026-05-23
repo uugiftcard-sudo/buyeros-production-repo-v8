@@ -249,3 +249,15 @@ def test_staging_rollback_drill_script_exists_and_never_targets_primary_rollback
     assert "rollback_vps.sh\" \"$STAGING_SSH\"" in script
     assert "rollback_vps.sh\" \"$PRIMARY_SSH\"" not in script
     assert "smoke_api.sh\" \"$STAGING_URL\"" in script
+
+
+def test_rollback_vps_supports_release_layout_current_symlink() -> None:
+    path = REPO_ROOT / "infra/rollback_vps.sh"
+
+    assert os.path.exists(path)
+    assert os.access(path, os.X_OK)
+    with open(path, "r", encoding="utf-8") as fh:
+        script = fh.read()
+    assert "$REMOTE_DIR/current/docker-compose.yml" in script
+    assert "COMPOSE_DIR='$REMOTE_DIR/current'" in script
+    assert "No docker-compose.yml found" in script
