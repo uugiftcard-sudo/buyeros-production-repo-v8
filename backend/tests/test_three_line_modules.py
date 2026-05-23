@@ -249,6 +249,9 @@ def test_staging_rollback_drill_script_exists_and_never_targets_primary_rollback
     assert "rollback_vps.sh\" \"$STAGING_SSH\"" in script
     assert "rollback_vps.sh\" \"$PRIMARY_SSH\"" not in script
     assert "smoke_api.sh\" \"$STAGING_URL\"" in script
+    assert "wait for staging after rollback" in script
+    assert "SMOKE_STATUS=0" in script
+    assert "Summaries were synced" in script
 
 
 def test_rollback_vps_supports_release_layout_current_symlink() -> None:
