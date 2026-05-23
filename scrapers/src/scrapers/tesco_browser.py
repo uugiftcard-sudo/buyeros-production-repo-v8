@@ -13,8 +13,6 @@ Usage:
 from __future__ import annotations
 
 import logging
-import time
-from typing import Optional
 
 from playwright.sync_api import Page
 
@@ -61,7 +59,7 @@ class TescoBrowserScraper:
             except Exception:  # noqa: BLE001
                 _LOG.warning("[tesco] Product grid not found — page may require login")
 
-            results = self._parse_search_results(page, keyword)
+            results = self._parse_search_results(page, keyword, limit)
             _LOG.info("[tesco] Got %d results for '%s'", len(results), keyword)
 
             page.close()
@@ -71,7 +69,9 @@ class TescoBrowserScraper:
 
         return results
 
-    def _parse_search_results(self, page: Page, keyword: str) -> list[SupermarketResult]:
+    def _parse_search_results(
+        self, page: Page, keyword: str, limit: int = 30
+    ) -> list[SupermarketResult]:
         """Parse Tesco search results page."""
         results: list[SupermarketResult] = []
 
@@ -125,12 +125,14 @@ class TescoBrowserScraper:
 
                 # Image
                 img_el = tile.query_selector("img[src], img[data-src]")
-                img = img_el.get_attribute("src") or img_el.get_attribute("data-src") or "" if img_el else ""
+                img = (
+                    img_el.get_attribute("src") or img_el.get_attribute("data-src") or ""
+                    if img_el
+                    else ""
+                )
 
                 # Promotion
-                promo_el = (
-                    tile.query_selector("[class*='promotion'], [class*='deal']")
-                )
+                promo_el = tile.query_selector("[class*='promotion'], [class*='deal']")
                 promotion = promo_el.inner_text().strip() if promo_el else ""
 
                 results.append(
@@ -153,7 +155,7 @@ class TescoBrowserScraper:
 
         return results[:limit]
 
-    def get_product(self, url: str) -> Optional[SupermarketResult]:
+    def get_product(self, url: str) -> SupermarketResult | None:
         """Get product details from a Tesco product page URL."""
         _LOG.info("[tesco] Fetching: %s", url)
 

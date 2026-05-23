@@ -9,14 +9,11 @@ Priority (highest to lowest):
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 # ─── Find config.yaml relative to this file ─────────────────────
 _CONFIG_PATH = Path(__file__).parent.parent / "config.yaml"

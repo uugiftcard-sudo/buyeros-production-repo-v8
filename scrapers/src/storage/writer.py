@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import csv
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
-    from src.models.base import BaseScrapedItem
+    pass
 
 _LOG_NAME = "scrapers.storage"
 

@@ -16,8 +16,6 @@ Usage:
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import click
@@ -27,8 +25,7 @@ from rich.table import Table
 from src.logging_config import setup_logging
 
 if TYPE_CHECKING:
-    from src.models.base import BaseScrapedItem
-    from src.storage.writer import StorageWriter
+    pass
 
 console = Console(stderr=True)
 
@@ -82,7 +79,14 @@ pass_opts = click.make_pass_decorator(GlobalOptions, ensure=True)
 
 @click.group(cls=click.Group)
 @click.option("--output", "-o", default="", help="Output file path")
-@click.option("--format", "-f", "output_format", default="csv", type=click.Choice(["csv", "json"]), help="Output format")
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    default="csv",
+    type=click.Choice(["csv", "json"]),
+    help="Output format",
+)
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose (DEBUG) logging")
 @click.option("--dry-run", is_flag=True, help="Validate inputs without making network requests")
 @click.pass_context
@@ -109,7 +113,9 @@ def cli(
 
 @cli.command("linkedin")
 @click.argument("urls", nargs=-1)
-@click.option("-f", "--file", "url_file", type=click.Path(exists=True), help="File with URLs (one per line)")
+@click.option(
+    "-f", "--file", "url_file", type=click.Path(exists=True), help="File with URLs (one per line)"
+)
 @click.option("-k", "--keyword", help="Keyword search via Google (site:linkedin.com/in)")
 @click.option("--search-limit", type=int, default=10, help="Max results from keyword search")
 @click.option("-d", "--delay", type=float, default=3.0, help="Delay between requests (seconds)")
@@ -123,8 +129,8 @@ def cmd_linkedin(
     delay: float,
 ) -> None:
     """Scrape LinkedIn public profiles."""
-    from src.scrapers.linkedin import LinkedInScraper
     from src.models.linkedin import LinkedInProfile
+    from src.scrapers.linkedin import LinkedInScraper
     from src.storage.writer import save_any
 
     if opts.dry_run:
@@ -220,7 +226,7 @@ def cmd_b2b(
             details = scraper.get_company_details(company_number)
             output = opts.output or f"company_{company_number}.json"
             save_any([details], output, "json")
-            console.print(f"[green]Saved company details[/green]")
+            console.print("[green]Saved company details[/green]")
         return
 
     if company:
@@ -261,7 +267,9 @@ def cmd_b2b(
 
 
 @cli.command("trip")
-@click.option("--type", "trip_type", required=True, type=click.Choice(["flight", "hotel", "attraction"]))
+@click.option(
+    "--type", "trip_type", required=True, type=click.Choice(["flight", "hotel", "attraction"])
+)
 @click.option("--from", "depart", help="Departure airport IATA code (e.g. LHR)")
 @click.option("--to", "arrive", help="Arrival airport IATA code")
 @click.option("--date", help="Departure date (YYYY-MM-DD)")
@@ -339,8 +347,12 @@ def cmd_trip(
 @click.option("--domain", type=click.Choice(["com", "co.uk"]), default="com")
 @click.option("--pages", type=int, default=2, help="Number of result pages")
 @click.option("-d", "--delay", type=float, default=3.0)
-@click.option("--browser/--no-browser", "use_browser", default=False,
-              help="Use Playwright headless browser (bypasses anti-bot, slower but reliable)")
+@click.option(
+    "--browser/--no-browser",
+    "use_browser",
+    default=False,
+    help="Use Playwright headless browser (bypasses anti-bot, slower but reliable)",
+)
 @pass_opts
 def cmd_amazon(
     opts: GlobalOptions,
@@ -366,6 +378,7 @@ def cmd_amazon(
     if use_browser:
         console.print("[cyan]Using Playwright headless browser...[/cyan]")
         from src.scrapers.amazon_browser import AmazonBrowserScraper
+
         scraper = AmazonBrowserScraper(domain=domain, delay=delay)
         try:
             if keyword:
@@ -380,6 +393,7 @@ def cmd_amazon(
             scraper.close()
     else:
         from src.scrapers.amazon import AmazonScraper
+
         scraper = AmazonScraper(domain=domain, delay=delay)
         if keyword:
             results = scraper.search_by_keyword(keyword, pages=pages)
@@ -486,7 +500,6 @@ def cmd_loyalty(
     output: str,
 ) -> None:
     """Check UK loyalty card balances — Nectar, Tesco Clubcard."""
-    from src.models.loyalty import GiftcardBalance, NectarAccount, TescoClubcard
     from src.storage.writer import save_any
 
     if opts.dry_run:
@@ -540,12 +553,18 @@ def cmd_loyalty(
 
 @cli.command("supermarket")
 @click.option("--keyword", "-k", help="Search keyword")
-@click.option("--retailer", "-r", type=click.Choice(["john-lewis", "tesco", "ms", "all"]), default="all")
+@click.option(
+    "--retailer", "-r", type=click.Choice(["john-lewis", "tesco", "ms", "all"]), default="all"
+)
 @click.option("--limit", "-l", type=int, default=30)
 @click.option("--compare", "-c", is_flag=True, help="Compare across all retailers")
 @click.option("-d", "--delay", type=float, default=2.0)
-@click.option("--browser/--no-browser", "use_browser", default=False,
-              help="Use Playwright headless browser (recommended for Tesco, Amazon)")
+@click.option(
+    "--browser/--no-browser",
+    "use_browser",
+    default=False,
+    help="Use Playwright headless browser (recommended for Tesco, Amazon)",
+)
 @pass_opts
 def cmd_supermarket(
     opts: GlobalOptions,
@@ -561,12 +580,15 @@ def cmd_supermarket(
 
     if opts.dry_run:
         console.print("[cyan]Dry-run: would search[/cyan]")
-        console.print(f"  keyword={keyword} retailer={retailer} compare={compare} browser={use_browser}")
+        console.print(
+            f"  keyword={keyword} retailer={retailer} compare={compare} browser={use_browser}"
+        )
         return
 
     if use_browser and retailer in ("tesco", "all"):
         console.print("[cyan]Using Playwright headless browser for Tesco...[/cyan]")
         from src.scrapers.tesco_browser import TescoBrowserScraper
+
         tesco_scraper = TescoBrowserScraper(delay=delay)
         try:
             results = tesco_scraper.search(keyword or "milk", limit=limit)

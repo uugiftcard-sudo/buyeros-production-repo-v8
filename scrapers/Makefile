@@ -1,4 +1,4 @@
-.PHONY: help install test lint lint-fix clean scrape docker-build docker-run docker-up
+.PHONY: help install install-dev install-pro install-full test lint lint-fix clean scrape docker-build docker-run docker-up docker-clean api dashboard setup-hooks
 
 # ──────────────────────────────────────────────────────────────
 # Project: scrapers
@@ -86,5 +86,25 @@ docker-up:
 docker-clean:
 	docker compose down -v --remove-orphans
 	docker rmi scrapers:latest || true
+
+# ── Pro targets ────────────────────────────────────────────────
+
+install-dev:
+	pip install -e ".[dev]"
+
+install-pro:
+	pip install -e ".[pro]"
+
+install-full:
+	pip install -e ".[full]"
+
+setup-hooks:
+	pre-commit install
+
+api:
+	uvicorn src.api.server:app --reload --port 8000
+
+dashboard:
+	python -c "from src.dashboard import run_dashboard; run_dashboard()"
 
 .DEFAULT_GOAL := help

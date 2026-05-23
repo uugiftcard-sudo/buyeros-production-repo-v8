@@ -7,7 +7,6 @@ All modules import `log` from this module for consistent log formatting.
 from __future__ import annotations
 
 import logging
-import sys
 
 from rich.console import Console
 from rich.logging import RichHandler

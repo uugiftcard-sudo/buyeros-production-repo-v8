@@ -16,6 +16,7 @@
 | **eBay** | Product search and seller profiles — price, condition, seller ratings. |
 | **Loyalty** | Nectar & Tesco Clubcard balance checker + Amazon gift card balance. |
 | **Supermarket** | UK supermarket price comparison — John Lewis, Tesco, M&S. |
+| **Playwright** | Headless browser scraper for JS-heavy pages (Amazon, Tesco). |
 
 ### Architecture Highlights
 
@@ -190,19 +191,34 @@ Key settings you can override:
 ```
 scrapers/
 ├── src/
+│   ├── __init__.py
 │   ├── cli.py              # Click CLI entry point
 │   ├── config.py           # Config loader (yaml + env)
 │   ├── logging_config.py   # Structured logging setup
+│   ├── types.py            # Shared TypedDict types
+│   ├── metrics.py          # Prometheus metrics
+│   ├── cache.py            # Redis cache layer
+│   ├── observability.py    # structlog + Sentry setup
+│   ├── jobs.py             # Background job queue
+│   ├── dashboard.py        # Live terminal dashboard
+│   ├── api/
+│   │   └── server.py      # FastAPI REST API
 │   ├── models/             # Pydantic data models
 │   ├── scrapers/           # Platform scraper implementations
+│   │   ├── base.py         # BaseScraper (sync, retries)
+│   │   ├── async_base.py   # AsyncBaseScraper (concurrent)
+│   │   ├── browser_scraper.py
+│   │   ├── amazon.py
+│   │   ├── amazon_browser.py
+│   │   └── ...
 │   ├── storage/            # CSV + JSON output writers
 │   └── utils/              # HTTP client + HTML helpers
 ├── tests/                  # Unit tests
 ├── config.yaml             # All configuration
 ├── .env.example            # API keys template
+├── .pre-commit-config.yaml # Pre-commit hooks
 ├── Dockerfile              # Multi-stage Docker image
 ├── docker-compose.yml      # Docker Compose setup
-├── .dockerignore           # Docker build exclusions
 ├── Makefile                # Development commands
 └── pyproject.toml          # Package definition
 ```
@@ -256,13 +272,142 @@ docker run --rm -it \
 
 ---
 
+## Pro Features
+
+### FastAPI Server
+
+Run the REST API to enqueue scrape jobs asynchronously and poll for results.
+
+```bash
+pip install -e ".[pro]"
+make api
+# → http://localhost:8000/docs  (Swagger UI)
+```
+
+**Endpoints:**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/scrape` | Enqueue a scrape job |
+| `GET` | `/scrape/{job_id}` | Get job status + results |
+| `GET` | `/jobs` | List recent jobs |
+| `DELETE` | `/scrape/{job_id}` | Delete a job |
+| `GET` | `/health` | Health check |
+| `GET` | `/metrics` | Prometheus metrics |
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:8000/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"scraper": "amazon", "params": {"keyword": "laptop", "pages": 2}}'
+```
+
+### Dashboard
+
+Live terminal dashboard showing job queue status and metrics.
+
+```bash
+make dashboard
+```
+
+Starts the API + renders a Rich Live view of all jobs. Press Ctrl+C to exit.
+
+### Async Scraper
+
+For high-throughput batch scraping, use the async base class:
+
+```python
+from src.scrapers.async_base import AsyncBaseScraper
+
+class MyAsyncScraper(AsyncBaseScraper[MyItem]):
+    name = "my_scraper"
+
+    async def scrape_item(self, url: str, client: httpx.AsyncClient) -> MyItem | None:
+        resp = await client.get(url)
+        return MyItem.model_validate_json(resp.text)
+
+result = await scraper.scrape_batch(urls)
+```
+
+### Redis Cache
+
+Enable response caching to avoid re-scraping the same URLs:
+
+```bash
+redis-server &
+# Set REDIS_URL=redis://localhost:6379/0 in .env
+```
+
+```python
+from src.cache import Cache
+
+cache = Cache(ttl=1800)  # 30-minute TTL
+cached = cache.get("amazon", "laptop")
+if cached is None:
+    results = scraper.search("laptop")
+    cache.set("amazon", "laptop", results)
+```
+
+### Prometheus Metrics
+
+Metrics are exposed at `/metrics` on the API server:
+
+```bash
+curl http://localhost:8000/metrics | grep scraper_requests
+curl http://localhost:8000/metrics | grep scraper_active
+curl http://localhost:8000/metrics | grep scraper_cache
+```
+
+Metrics available:
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `scraper_requests_total` | Counter | scraper, status | Total requests |
+| `scraper_duration_seconds` | Histogram | scraper | Scrape duration |
+| `scraper_active_scrapes` | Gauge | scraper | Currently running |
+| `scraper_cache_hits_total` | Counter | scraper | Cache hits |
+| `scraper_cache_misses_total` | Counter | scraper | Cache misses |
+| `scraper_queued_jobs` | Gauge | — | Pending queue depth |
+| `scraper_completed_jobs_total` | Counter | scraper, outcome | Completed jobs |
+
+### Sentry Error Tracking
+
+```bash
+SENTRY_DSN=https://xxxxx@o123.ingest.sentry.io/456 scrapers amazon ...
+```
+
+Errors are automatically captured with full stack traces and request context.
+
+### Pre-commit Hooks
+
+```bash
+make setup-hooks
+```
+
+Runs `ruff format` + `ruff check` on staged files before every commit.
+
+### Full Installation
+
+```bash
+pip install -e ".[full]"
+# or
+make install-full
+```
+
+---
+
 ## Development
 
 ```bash
-make install   # Install + dev dependencies
-make test      # Run pytest
-make lint      # Run ruff linter
-make lint-fix  # Auto-fix lint issues
+make install        # Install base + dev dependencies
+make install-pro   # Install base + pro (FastAPI, Redis, Prometheus)
+make install-full  # Install everything
+make test          # Run pytest
+make lint          # Run ruff linter
+make lint-fix      # Auto-fix lint issues
+make api           # Start FastAPI REST API
+make dashboard     # Start API + live terminal dashboard
 make scrape ARGS='...'  # Run scraper locally
 ```
 

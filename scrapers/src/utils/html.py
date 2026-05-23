@@ -15,19 +15,21 @@ if TYPE_CHECKING:
     from bs4 import BeautifulSoup
 
 
-def make_soup(html: str) -> "BeautifulSoup":
+def make_soup(html: str) -> BeautifulSoup:
     """Parse HTML into a BeautifulSoup tree using lxml parser."""
     from bs4 import BeautifulSoup
+
     return BeautifulSoup(html, "lxml")
 
 
-def make_soup_htmlparser(html: str) -> "BeautifulSoup":
+def make_soup_htmlparser(html: str) -> BeautifulSoup:
     """Parse HTML using the built-in html.parser (no lxml needed)."""
     from bs4 import BeautifulSoup
+
     return BeautifulSoup(html, "html.parser")
 
 
-def select_one(soup: "BeautifulSoup", *selectors: str) -> Any | None:
+def select_one(soup: BeautifulSoup, *selectors: str) -> Any | None:
     """
     Try each selector in order, return the first non-None result.
     Useful for multi-selector fallbacks in the same DOM region.
@@ -39,7 +41,7 @@ def select_one(soup: "BeautifulSoup", *selectors: str) -> Any | None:
     return None
 
 
-def select_all(soup: "BeautifulSoup", selector: str, limit: int = 0) -> list[Any]:
+def select_all(soup: BeautifulSoup, selector: str, limit: int = 0) -> list[Any]:
     """
     Select all elements matching `selector`, optionally limited to `limit` results.
     """
@@ -64,7 +66,7 @@ def attr(tag: Any | None, key: str, default: str = "") -> str:
 
 
 def extract_json_from_scripts(
-    soup: "BeautifulSoup",
+    soup: BeautifulSoup,
     key: str,
     limit: int = 20,
 ) -> list[dict[str, Any]]:
@@ -84,7 +86,7 @@ def extract_json_from_scripts(
     scripts = soup.find_all("script")
 
     for script in scripts:
-        text_content = (script.string or "")
+        text_content = script.string or ""
         if key not in text_content:
             continue
 
@@ -104,7 +106,7 @@ def extract_json_from_scripts(
     return results[:limit] if results else []
 
 
-def extract_jsonld_products(soup: "BeautifulSoup") -> list[dict[str, Any]]:
+def extract_jsonld_products(soup: BeautifulSoup) -> list[dict[str, Any]]:
     """
     Extract all JSON-LD Product objects from a page.
     """
@@ -147,6 +149,7 @@ def clean_url(url: str, base: str = "") -> str:
     url = re.split(r"\?", url)[0].rstrip("/")
     if not url.startswith("http") and base:
         from urllib.parse import urljoin
+
         url = urljoin(base, url)
     return url
 

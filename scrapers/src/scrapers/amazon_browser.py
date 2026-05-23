@@ -15,12 +15,10 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Optional
 
-from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout
+from playwright.sync_api import Page
 
 from src.models.amazon import AmazonProductResult
-from src.scrapers.base import BaseScraper
 from src.scrapers.browser_scraper import BrowserScraper
 from src.utils.html import extract_price
 
@@ -93,10 +91,7 @@ class AmazonBrowserScraper:
         for card in cards:
             try:
                 # ASIN
-                asin = (
-                    card.get_attribute("data-asin")
-                    or ""
-                )
+                asin = card.get_attribute("data-asin") or ""
                 if not asin or len(asin) < 5:
                     continue
 
@@ -121,7 +116,9 @@ class AmazonBrowserScraper:
                 original_price = extract_price(orig_el.inner_text()) if orig_el else ""
 
                 # Rating
-                rating_el = card.query_selector(".a-icon-star-small .a-icon-alt, [class*='rating'] span")
+                rating_el = card.query_selector(
+                    ".a-icon-star-small .a-icon-alt, [class*='rating'] span"
+                )
                 rating = rating_el.inner_text().strip().split()[0] if rating_el else ""
 
                 # Review count
@@ -134,8 +131,7 @@ class AmazonBrowserScraper:
 
                 # Badge
                 badge_el = card.query_selector(
-                    ".a-badge-label .a-badge-text, "
-                    "[class*='badge'] span"
+                    ".a-badge-label .a-badge-text, [class*='badge'] span"
                 )
                 badge = badge_el.inner_text().strip() if badge_el else ""
 
@@ -160,7 +156,7 @@ class AmazonBrowserScraper:
 
     # ── ASIN detail ───────────────────────────────────────────
 
-    def get_product(self, asin: str) -> Optional[AmazonProductResult]:
+    def get_product(self, asin: str) -> AmazonProductResult | None:
         """Get full product details for a single ASIN."""
         url = f"{self.base_url}/dp/{asin}"
         _LOG.info("[amazon] Fetching ASIN: %s", asin)
@@ -198,7 +194,9 @@ class AmazonBrowserScraper:
         reviews = re.sub(r"[^\d]", "", reviews_el.inner_text()) if reviews_el else ""
 
         # Bullet points / description
-        bullets = [el.inner_text().strip() for el in page.query_selector_all("#feature-bullets li span")]
+        bullets = [
+            el.inner_text().strip() for el in page.query_selector_all("#feature-bullets li span")
+        ]
         description = " | ".join(b for b in bullets if b) if bullets else ""
 
         # Category

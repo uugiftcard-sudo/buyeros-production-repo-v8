@@ -6,6 +6,7 @@ Wraps httpx for synchronous use with tenacity-powered retries.
 
 from __future__ import annotations
 
+import logging
 import random
 import time
 from typing import TYPE_CHECKING, Any
@@ -23,7 +24,7 @@ from tenacity import (
 from src.config import get_http_timeout, get_max_retries, get_user_agents
 
 if TYPE_CHECKING:
-    from bs4 import BeautifulSoup
+    pass
 
 _LOG_TEMPLATE = "httpx request failed [attempt {attempt}/{max_retries}]: {sleep}s backoff"
 
@@ -57,6 +58,7 @@ def _is_blocked(resp: httpx.Response | requests.Response) -> bool:
 def _retry_callback(retry_state: RetryCallState) -> None:
     """Log each retry attempt."""
     import logging
+
     log = logging.getLogger("scrapers.http")
     attempt = retry_state.attempt_number
     wait = retry_state.next_action.sleep if retry_state.next_action else 0
@@ -104,7 +106,7 @@ def http_get(
                 )
             )
         ),
-        before_sleep=before_sleep_log(__import__("logging").getLogger("scrapers.http"), logging.WARNING),
+        before_sleep=before_sleep_log(logging.getLogger("scrapers.http"), logging.WARNING),
         reraise=True,
     ):
         with attempt:
@@ -121,6 +123,7 @@ def http_get(
                     # Exponential backoff for blocked responses
                     backoff = random.uniform(5, 15)
                     import logging
+
                     logging.getLogger("scrapers.http").warning(
                         f"Blocked ({resp.status_code}), sleeping {backoff:.0f}s"
                     )
@@ -129,9 +132,10 @@ def http_get(
                 return resp
             except requests.RequestException as exc:
                 import logging
+
                 log = logging.getLogger("scrapers.http")
                 if attempt.retry_state.attempt_number < max_retries:
-                    wait = min(2 ** attempt.retry_state.attempt_number, 30)
+                    wait = min(2**attempt.retry_state.attempt_number, 30)
                     log.debug(f"Request failed: {exc}, retrying in {wait}s")
                 raise
 
@@ -157,7 +161,7 @@ def http_post(
     for attempt in Retrying(
         stop=stop_after_attempt(max_retries),
         wait=wait_exponential(multiplier=1, min=1, max=30),
-        before_sleep=before_sleep_log(__import__("logging").getLogger("scrapers.http"), logging.WARNING),
+        before_sleep=before_sleep_log(logging.getLogger("scrapers.http"), logging.WARNING),
         reraise=True,
     ):
         with attempt:

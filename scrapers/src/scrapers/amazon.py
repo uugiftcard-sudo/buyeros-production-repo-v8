@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Any
 
 import requests
 
@@ -111,9 +110,7 @@ class AmazonScraper(BaseScraper[ProductResult]):
                 p.title = title_tag.get_text(strip=True)
 
             # Price
-            price_tag = item.select_one(
-                "[class*='price'] span.a-offscreen, .a-price .a-offscreen"
-            )
+            price_tag = item.select_one("[class*='price'] span.a-offscreen, .a-price .a-offscreen")
             if price_tag:
                 p.price = price_tag.get_text(strip=True)
 

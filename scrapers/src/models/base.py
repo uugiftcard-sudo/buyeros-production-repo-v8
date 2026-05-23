@@ -1,9 +1,11 @@
 """Base Pydantic models for all scrapers."""
 
 from datetime import datetime
-from typing import Any, Self
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
+
+T = TypeVar("T")
 
 
 class BaseScrapedItem(BaseModel):
@@ -38,9 +40,11 @@ class BaseScrapedItem(BaseModel):
                 result[name] = ""
             elif isinstance(value, list):
                 import json
+
                 result[name] = json.dumps(value, ensure_ascii=False)
             elif isinstance(value, dict):
                 import json
+
                 result[name] = json.dumps(value, ensure_ascii=False)
             else:
                 result[name] = value
@@ -59,7 +63,7 @@ class HTTPError(BaseModel):
     attempt: int = 1
 
 
-class ScrapeResult[T](BaseModel):
+class ScrapeResult(BaseModel, Generic[T]):
     """
     Container for scrape operation results.
 

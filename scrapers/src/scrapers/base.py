@@ -13,13 +13,13 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 import requests
-from tenacity import Retrying, stop_after_attempt, wait_exponential, before_sleep_log
+from tenacity import Retrying, before_sleep_log, stop_after_attempt, wait_exponential
 
 from src.config import get_delay, get_max_retries, get_user_agents
 from src.models.base import BaseScrapedItem, HTTPError, ScrapeResult
 
 if TYPE_CHECKING:
-    from pydantic import BaseModel
+    pass
 
 T = TypeVar("T", bound=BaseScrapedItem)
 
@@ -177,9 +177,7 @@ class BaseScraper(ABC, Generic[T]):
                     )
             except Exception as exc:  # noqa: BLE001
                 _LOG.error(f"[{self.name}] Failed to scrape {url}: {exc}")
-                self._result.errors.append(
-                    HTTPError(url=url, error_message=str(exc))
-                )
+                self._result.errors.append(HTTPError(url=url, error_message=str(exc)))
         return self._result
 
     def scrape(self, *args: Any, **kwargs: Any) -> list[T]:

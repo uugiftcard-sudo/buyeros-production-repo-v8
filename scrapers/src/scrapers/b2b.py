@@ -14,7 +14,6 @@ import requests
 
 from src.config import get_settings
 from src.models.b2b import B2BContact, UKCompany
-from src.utils.html import make_soup
 
 _LOG = logging.getLogger(__name__)
 
@@ -117,7 +116,9 @@ class B2BScraper:
             payload["countries"] = [country]
 
         try:
-            resp = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=15)
+            resp = requests.post(
+                url, json=payload, headers={"Content-Type": "application/json"}, timeout=15
+            )
             resp.raise_for_status()
             data = resp.json()
 

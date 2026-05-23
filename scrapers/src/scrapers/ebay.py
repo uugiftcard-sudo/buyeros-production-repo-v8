@@ -38,12 +38,14 @@ class EbayScraper(BaseScraper[ItemResult]):
     def __init__(self, delay: float = 2.0) -> None:
         super().__init__(delay=delay)
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        })
+        self.session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }
+        )
 
     def scrape_item(self, url: str) -> ItemResult | None:
         """Stub — use search_items() instead."""
@@ -66,7 +68,9 @@ class EbayScraper(BaseScraper[ItemResult]):
 
         Tries the Browse API first, falls back to HTML scraping.
         """
-        results = self._search_via_api(keyword, category, condition, max_price, min_price, sort, limit)
+        results = self._search_via_api(
+            keyword, category, condition, max_price, min_price, sort, limit
+        )
         if not results:
             _LOG.info("[eBay] API returned no results, trying HTML fallback")
             results = self._search_via_html(keyword, limit)
@@ -225,7 +229,9 @@ class EbayScraper(BaseScraper[ItemResult]):
 
             s.top_rated = bool(soup.select_one("[class*='top-rated']"))
 
-            _LOG.info(f"[eBay] Seller {s.seller_id}: score={s.feedback_score}, location={s.location}")
+            _LOG.info(
+                f"[eBay] Seller {s.seller_id}: score={s.feedback_score}, location={s.location}"
+            )
             return s
 
         except requests.RequestException as e:

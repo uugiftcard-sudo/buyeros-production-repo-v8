@@ -52,9 +52,7 @@ class TripScraper:
         """GET with retry and backoff."""
         for attempt in range(3):
             try:
-                resp = requests.get(
-                    url, params=params, headers=self._headers(), timeout=15
-                )
+                resp = requests.get(url, params=params, headers=self._headers(), timeout=15)
                 if resp.status_code in (403, 429, 999):
                     backoff = 5 + attempt * 5 + (attempt * 2)
                     _LOG.warning(f"Blocked ({resp.status_code}), sleeping {backoff}s")
@@ -64,7 +62,7 @@ class TripScraper:
                 return make_soup(resp.text)
             except requests.RequestException as e:
                 if attempt < 2:
-                    wait = (2 ** attempt) + 1
+                    wait = (2**attempt) + 1
                     _LOG.warning(f"Attempt {attempt + 1} failed: {e}, retrying in {wait}s")
                     time.sleep(wait)
                 else:
@@ -129,9 +127,7 @@ class TripScraper:
             if "flightList" not in text and "flightNo" not in text:
                 continue
 
-            for match in re.finditer(
-                r'"flightList"\s*:\s*(\[.*?\])\s*[,}]', text, re.DOTALL
-            ):
+            for match in re.finditer(r'"flightList"\s*:\s*(\[.*?\])\s*[,}]', text, re.DOTALL):
                 try:
                     flight_data = __import__("json").loads(match.group(1))
                     if isinstance(flight_data, list):
@@ -139,9 +135,7 @@ class TripScraper:
                             r = FlightResult(
                                 search_url=search_url, searched_at=now, currency=currency
                             )
-                            r.airline = f.get("airlineName", "") or self._safe(
-                                f, "airline", "name"
-                            )
+                            r.airline = f.get("airlineName", "") or self._safe(f, "airline", "name")
                             r.flight_no = f.get("flightNo", "")
                             r.depart_time = f.get("departureDateTime", "")
                             r.arrive_time = f.get("arrivalDateTime", "")
@@ -235,9 +229,7 @@ class TripScraper:
             if "hotelList" not in text and "hotelName" not in text:
                 continue
 
-            for match in re.finditer(
-                r'"hotelList"\s*:\s*(\[.*?\])\s*[,}]', text, re.DOTALL
-            ):
+            for match in re.finditer(r'"hotelList"\s*:\s*(\[.*?\])\s*[,}]', text, re.DOTALL):
                 try:
                     hotel_data = __import__("json").loads(match.group(1))
                     if isinstance(hotel_data, list):
@@ -257,7 +249,11 @@ class TripScraper:
                             r.amenities = ",".join(str(f) for f in facilities[:8])
                             r.has_breakfast = "Yes" if h.get("hasBreakfast") else "No"
                             r.free_cancellation = "Yes" if h.get("freeCancellation") else "No"
-                            img = h.get("imageUrl") or (h.get("hotelImage", [{}])[0].get("url") if h.get("hotelImage") else "")
+                            img = h.get("imageUrl") or (
+                                h.get("hotelImage", [{}])[0].get("url")
+                                if h.get("hotelImage")
+                                else ""
+                            )
                             r.image_url = img if isinstance(img, str) else ""
                             du = h.get("detailUrl", "")
                             r.detail_url = (_BASE_URL + du) if not du.startswith("http") else du
@@ -312,9 +308,7 @@ class TripScraper:
             if "poiList" not in text and "attraction" not in text.lower():
                 continue
 
-            for match in re.finditer(
-                r'"poiList"\s*:\s*(\[.*?\])\s*[,}]', text, re.DOTALL
-            ):
+            for match in re.finditer(r'"poiList"\s*:\s*(\[.*?\])\s*[,}]', text, re.DOTALL):
                 try:
                     data = __import__("json").loads(match.group(1))
                     if isinstance(data, list):

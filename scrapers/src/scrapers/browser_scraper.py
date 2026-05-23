@@ -14,18 +14,17 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import random
 import time
 from typing import TYPE_CHECKING, Any
 
-from playwright.sync_api import sync_playwright, Browser, Page, BrowserContext
+from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
 
 from src.config import get_delay, get_user_agents
 
 if TYPE_CHECKING:
-    from playwright.sync_api import TimeoutError as PlaywrightTimeout
+    pass
 
 _LOG = logging.getLogger(__name__)
 
@@ -108,7 +107,7 @@ class BrowserScraper:
             self._playwright.stop()
             self._playwright = None
 
-    def __enter__(self) -> "BrowserScraper":
+    def __enter__(self) -> BrowserScraper:
         return self
 
     def __exit__(self, *args: Any) -> None:
@@ -192,9 +191,7 @@ class BrowserScraper:
     def _scroll_page(page: Page) -> None:
         """Scroll to bottom to trigger lazy-loading."""
         for _ in range(3):
-            page.evaluate(
-                "window.scrollTo(0, document.body.scrollHeight)"
-            )
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             time.sleep(0.5)
 
     # ── Text / Content extraction ──────────────────────────────
@@ -220,10 +217,7 @@ class BrowserScraper:
     def extract_attrs(page: Page, selector: str, attr: str) -> list[str]:
         """Extract an attribute from all elements matching `selector`."""
         try:
-            return [
-                el.get_attribute(attr) or ""
-                for el in page.query_selector_all(selector)
-            ]
+            return [el.get_attribute(attr) or "" for el in page.query_selector_all(selector)]
         except Exception:  # noqa: BLE001
             return []
 
