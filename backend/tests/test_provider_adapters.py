@@ -141,7 +141,7 @@ class TestProviderRegistry:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
         monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-xxx")
         monkeypatch.setenv("OPENROUTER_MODEL_OPENAI", "openai/gpt-4o-mini")
-        monkeypatch.setenv("OPENROUTER_MODEL_CLAUDE", "anthropic/claude-3.5-sonnet")
+        monkeypatch.setenv("OPENROUTER_MODEL_CLAUDE", "anthropic/claude-sonnet-4.5")
         memory = MemoryStore()
         hub = ContextHub(memory)
         registry = ProviderRegistry(context_hub=hub)
@@ -231,6 +231,13 @@ class TestProviderRegistry:
 
         chosen = registry.choose_provider("fix code bug")
         assert chosen == "cursor"
+
+    def test_coding_adapters_default_to_available_openrouter_claude_model(self) -> None:
+        memory = MemoryStore()
+        hub = ContextHub(memory)
+
+        assert ClaudeProviderAdapter(context_hub=hub).default_openrouter_model == "anthropic/claude-sonnet-4.5"
+        assert CursorProviderAdapter(context_hub=hub).default_openrouter_model == "anthropic/claude-sonnet-4.5"
 
     def test_choose_provider_research_keyword(self, monkeypatch) -> None:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")

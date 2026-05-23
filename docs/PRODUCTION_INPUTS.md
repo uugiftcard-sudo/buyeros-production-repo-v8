@@ -80,7 +80,7 @@ Authorization: Bearer YOUR_KEY
 | --- | --- |
 | `OPENROUTER_API_KEY` | `TODO_OPENROUTER_API_KEY` |
 | Supervisor model | `openai/gpt-4o-mini` |
-| Claude/Cursor model | `anthropic/claude-3.5-sonnet` |
+| Claude/Cursor model | `anthropic/claude-sonnet-4.5` |
 | Gemini model | `google/gemini-pro-1.5` |
 | DeepSeek model | `deepseek/deepseek-chat` |
 | MiniMax model | `minimax/minimax-01` |
