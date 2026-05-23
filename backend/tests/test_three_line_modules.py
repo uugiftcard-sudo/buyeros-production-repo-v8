@@ -223,3 +223,29 @@ def test_smoke_full_script_exists() -> None:
     assert "smoke_api.sh" in script
     assert "npm run ui:smoke" in script
     assert "BUYEROS_API_KEY" in script
+
+
+def test_run_ops_drill_syncs_summaries_even_when_failover_fails() -> None:
+    path = REPO_ROOT / "infra/run_ops_drill.sh"
+
+    assert os.path.exists(path)
+    assert os.access(path, os.X_OK)
+    with open(path, "r", encoding="utf-8") as fh:
+        script = fh.read()
+    assert "FAILOVER_STATUS=0" in script
+    assert "|| FAILOVER_STATUS=$?" in script
+    assert "rsync -az \"$SUMMARY_DIR/\"" in script
+    assert "Summaries were synced" in script
+
+
+def test_staging_rollback_drill_script_exists_and_never_targets_primary_rollback() -> None:
+    path = REPO_ROOT / "infra/run_staging_rollback_drill.sh"
+
+    assert os.path.exists(path)
+    assert os.access(path, os.X_OK)
+    with open(path, "r", encoding="utf-8") as fh:
+        script = fh.read()
+    assert "backup_vps.sh\" \"$STAGING_SSH\"" in script
+    assert "rollback_vps.sh\" \"$STAGING_SSH\"" in script
+    assert "rollback_vps.sh\" \"$PRIMARY_SSH\"" not in script
+    assert "smoke_api.sh\" \"$STAGING_URL\"" in script
