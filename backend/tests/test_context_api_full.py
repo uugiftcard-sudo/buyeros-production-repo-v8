@@ -142,7 +142,7 @@ class TestProvidersEndpoint:
     def test_providers_returns_list(self, monkeypatch) -> None:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
         monkeypatch.setenv("OPENROUTER_MODEL_OPENAI", "openai/gpt-4o-mini")
-        monkeypatch.setenv("OPENROUTER_MODEL_CLAUDE", "anthropic/claude-3.5-sonnet")
+        monkeypatch.setenv("OPENROUTER_MODEL_CLAUDE", "anthropic/claude-sonnet-4.5")
         monkeypatch.setenv("BUYEROS_API_KEY", "secret")
         client = TestClient(create_app())
 
