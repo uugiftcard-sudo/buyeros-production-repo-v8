@@ -55,6 +55,14 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+NPM_CMD=""
+if command -v npm >/dev/null 2>&1; then
+  NPM_CMD="npm"
+elif [[ -x "/usr/local/bin/npm" ]]; then
+  NPM_CMD="/usr/local/bin/npm"
+elif [[ -x "${REPO_ROOT}/node_modules/.bin/npm" ]]; then
+  NPM_CMD="${REPO_ROOT}/node_modules/.bin/npm"
+fi
 
 if [[ ! -f "$ENV_FILE" ]]; then
   if [[ -f "$REPO_ROOT/.env" ]]; then
@@ -142,9 +150,9 @@ launch_local_services() {
   frontend_pid=""
 
   (cd "$REPO_ROOT/backend" && BUYEROS_API_KEY="$BUYEROS_API_KEY" "$REPO_ROOT/.venv/bin/uvicorn" app.workflows.main:create_app --factory --host 127.0.0.1 --port 8000 >"$REPO_ROOT/infra/backend-smoke-one-click.log" 2>&1 & echo $! >"$REPO_ROOT/infra/.smoke_backend_pid")
-  if command -v npm >/dev/null 2>&1; then
+  if [[ -n "$NPM_CMD" ]]; then
     FRONTEND_STARTED=1
-    (cd "$REPO_ROOT/frontend" && BUYEROS_API_KEY="$BUYEROS_API_KEY" BUYEROS_BACKEND_URL="http://127.0.0.1:8000" npm run dev -- --hostname 127.0.0.1 --port 3000 >"$REPO_ROOT/infra/frontend-smoke-one-click.log" 2>&1 & echo $! >"$REPO_ROOT/infra/.smoke_frontend_pid")
+    (cd "$REPO_ROOT/frontend" && BUYEROS_API_KEY="$BUYEROS_API_KEY" BUYEROS_BACKEND_URL="http://127.0.0.1:8000" "$NPM_CMD" run dev -- --hostname 127.0.0.1 --port 3000 >"$REPO_ROOT/infra/frontend-smoke-one-click.log" 2>&1 & echo $! >"$REPO_ROOT/infra/.smoke_frontend_pid")
   else
     FRONTEND_STARTED=0
     echo "npm not found: skipping local frontend boot. Backend smoke + readiness checks will run only."

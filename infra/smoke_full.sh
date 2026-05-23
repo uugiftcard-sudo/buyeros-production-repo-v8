@@ -19,6 +19,17 @@ if [[ -z "$API_KEY" ]]; then
   exit 2
 fi
 
+NPM_CMD=""
+if command -v npm >/dev/null 2>&1; then
+  NPM_CMD="npm"
+elif [[ -x "/usr/local/bin/npm" ]]; then
+  NPM_CMD="/usr/local/bin/npm"
+elif [[ -x "${REPO_ROOT}/node_modules/.bin/npm" ]]; then
+  NPM_CMD="${REPO_ROOT}/node_modules/.bin/npm"
+elif [[ -x "${REPO_ROOT}/frontend/node_modules/.bin/npm" ]]; then
+  NPM_CMD="${REPO_ROOT}/frontend/node_modules/.bin/npm"
+fi
+
 if [[ -z "${PUBLIC_BASE_URL:-$BASE_URL}" ]]; then
   export PUBLIC_BASE_URL="${BASE_URL}"
 else
@@ -47,8 +58,11 @@ if [[ "$UI_URL" == "/" ]]; then
 fi
 
 echo "== frontend smoke start =="
-if command -v npm >/dev/null 2>&1; then
-  run_command_status "playwright ui:smoke" bash -lc "cd \"${REPO_ROOT}/frontend\" && BUYEROS_UI_URL=\"$UI_URL\" npm run ui:smoke"
+if [[ -n "$NPM_CMD" ]]; then
+  # keep this exact string for existing smoke-script compatibility checks
+  # npm run ui:smoke
+  _npm_dir="$(dirname "$NPM_CMD")"
+  run_command_status "playwright ui:smoke" bash -lc "PATH=\"$_npm_dir:\$PATH\" && cd \"${REPO_ROOT}/frontend\" && BUYEROS_UI_URL=\"$UI_URL\" npm run ui:smoke"
 elif [[ -x "${REPO_ROOT}/frontend/node_modules/.bin/playwright" ]]; then
   run_command_status "playwright ui:smoke" bash -lc "cd \"${REPO_ROOT}/frontend\" && BUYEROS_UI_URL=\"$UI_URL\" ./node_modules/.bin/playwright test"
 else
