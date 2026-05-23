@@ -1,0 +1,96 @@
+# ──────────────────────────────────────────────────────────────
+# docker-compose.yml — scrapers
+#
+# Usage:
+#   cp .env.example .env
+#   # add your API keys to .env
+#   docker compose up --rm amazon
+#   docker compose run --rm scrapers amazon --keyword laptop
+#   docker compose run --rm scrapers supermarket -c -k "whole milk"
+# ──────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Generic scraper runner ────────────────────────────────
+  scrapers:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: scrapers:latest
+    container_name: scrapers
+
+    # Mount output dir so results persist on host
+    volumes:
+      - ./output:/app/output
+
+    # Pass env vars from .env (edit .env with your API keys)
+    env_file:
+      - .env
+
+    # Optional: use a proxy inside the container
+    # environment:
+    #   - HTTP_PROXY=http://host.docker.internal:7890
+    #   - HTTPS_PROXY=http://host.docker.internal:7890
+
+    # Optional: override the default command
+    # command: ["amazon", "--keyword", "laptop", "--domain", "co.uk"]
+
+    # Interactive mode for commands that prompt (e.g. loyalty checker)
+    stdin_open: true
+    tty: true
+
+    # Network mode — use 'host' if you need localhost access
+    # network_mode: "host"
+
+    # Restart policy
+    restart: "no"
+
+    # Resource limits (optional)
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: "512M"
+
+  # ── Quick one-off examples ────────────────────────────────
+  # Run any of these with: docker compose up --rm <service>
+
+  amazon-keyword:
+    <<: *scrapers
+    profiles: ["examples"]
+    command: ["amazon", "--keyword", "laptop", "--pages", "2"]
+    container_name: scrapers-amazon
+
+  supermarket-compare:
+    <<: *scrapers
+    profiles: ["examples"]
+    command: ["supermarket", "-c", "-k", "whole milk"]
+    container_name: scrapers-supermarket
+
+  ebay-search:
+    <<: *scrapers
+    profiles: ["examples"]
+    command: ["ebay", "--search", "iphone 15"]
+    container_name: scrapers-ebay
+
+  linkedin-profile:
+    <<: *scrapers
+    profiles: ["examples"]
+    command: ["linkedin", "--help"]
+    container_name: scrapers-linkedin
+
+# ── YAML anchor ─────────────────────────────────────────────
+x-scrapers-base: &scrapers
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: scrapers:latest
+  volumes:
+    - ./output:/app/output
+  env_file:
+    - .env
+
+# ── Named volumes ────────────────────────────────────────────
+volumes:
+  output:
+    driver: local

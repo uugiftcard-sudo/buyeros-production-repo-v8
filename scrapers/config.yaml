@@ -1,0 +1,104 @@
+# ──────────────────────────────────────────────────────────────
+# Scrapers — Configuration File
+# All settings are overridable via environment variables.
+# ──────────────────────────────────────────────────────────────
+
+# ── Rate Limits (requests per minute) ──────────────────────────
+rate_limits:
+  linkedin: 30
+  b2b: 60
+  trip: 60
+  amazon: 20
+  ebay: 30
+  loyalty: 10
+  supermarket: 40
+
+# ── Delay Between Requests (seconds) ───────────────────────────
+delays:
+  default: 2.0
+  linkedin: 3.0
+  b2b: 1.0
+  trip: 2.0
+  amazon: 3.0
+  ebay: 2.0
+  loyalty: 5.0
+  supermarket: 2.0
+
+# ── User-Agent Rotation Pool ──────────────────────────────────
+user_agents:
+  - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+  - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15"
+  - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+  - "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+  - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+  - "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"
+
+# ── HTTP Settings ────────────────────────────────────────────
+http:
+  timeout: 15
+  max_retries: 3
+  backoff_factor: 2.0
+  max_backoff: 30.0
+  verify_ssl: true
+
+# ── Proxy (optional) ─────────────────────────────────────────
+proxies:
+  http: ""
+  https: ""
+
+# ── Output ────────────────────────────────────────────────────
+output:
+  directory: "./output"
+  default_format: "csv"
+
+# ── Logging ───────────────────────────────────────────────────
+logging:
+  level: "INFO"
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+  date_format: "%H:%M:%S"
+  rich_logging: true
+
+# ── Scraper-specific Settings ─────────────────────────────────
+scrapers:
+  linkedin:
+    base_url: "https://uk.linkedin.com"
+    search_via_google: true
+    google_search_limit: 10
+
+  b2b:
+    apollo_base_url: "https://api.apollo.io/v1"
+    hunter_base_url: "https://api.hunter.io/v2"
+    companies_house_url: "https://api.companyinformation.service.gov.uk"
+    max_results_per_query: 25
+
+  trip:
+    base_url: "https://www.trip.com"
+    default_currency: "CNY"
+
+  amazon:
+    default_domain: "com"
+    domains:
+      com: "https://www.amazon.com"
+      co.uk: "https://www.amazon.co.uk"
+
+  ebay:
+    api_base_url: "https://api.ebay.com/buy/browse/v1"
+    html_base_url: "https://www.ebay.com"
+    default_sort: "best_match"
+    sort_options:
+      - "best_match"
+      - "price_asc"
+      - "price_desc"
+      - "newly_listed"
+
+  loyalty:
+    nectar_api_url: "https://api.nectar.com"
+    nectar_base_url: "https://www.nectar.com"
+    tesco_api_url: "https://www.tesco.com/api/guest-identity-service/v1"
+    tesco_base_url: "https://www.tesco.com"
+
+  supermarket:
+    john_lewis_url: "https://www.johnlewis.com/search"
+    tesco_url: "https://www.tesco.com/groceries"
+    marksandspencer_url: "https://www.marksandspencer.com/search"
+    default_limit: 30

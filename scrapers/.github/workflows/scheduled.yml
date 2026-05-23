@@ -1,0 +1,85 @@
+name: Scheduled Scrape
+
+on:
+  schedule:
+    # Run at 7am and 7pm UTC daily (good for price tracking)
+    - cron: "0 7,19 * * *"
+  workflow_dispatch:
+    inputs:
+      scraper:
+        description: "Scraper to run"
+        required: true
+        default: "supermarket"
+      keyword:
+        description: "Search keyword"
+        required: false
+        default: "whole milk"
+      output_format:
+        description: "Output format"
+        required: false
+        default: "json"
+
+jobs:
+  scrape:
+    name: Run ${{ inputs.scraper || 'supermarket' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install scrapers
+        run: pip install -e .
+
+      - name: Run scraper
+        id: scrape
+        run: |
+          SCRAPER=${{ inputs.scraper || 'supermarket' }}
+          KEYWORD="${{ inputs.keyword || 'whole milk' }}"
+          FORMAT=${{ inputs.output_format || 'json' }}
+
+          case "$SCRAPER" in
+            supermarket)
+              OUTPUT="supermarket_$(date +%Y%m%d_%H%M).$FORMAT"
+              scrapers supermarket -c -k "$KEYWORD" -f "$FORMAT" -o "$OUTPUT"
+              ;;
+            amazon)
+              OUTPUT="amazon_$(date +%Y%m%d_%H%M).$FORMAT"
+              scrapers amazon -k "$KEYWORD" -f "$FORMAT" -o "$OUTPUT"
+              ;;
+            ebay)
+              OUTPUT="ebay_$(date +%Y%m%d_%H%M).$FORMAT"
+              scrapers ebay --search "$KEYWORD" -f "$FORMAT" -o "$OUTPUT"
+              ;;
+            *)
+              OUTPUT="result_$(date +%Y%m%d_%H%M).$FORMAT"
+              scrapers "$SCRAPER" -f "$FORMAT" -o "$OUTPUT"
+              ;;
+          esac
+
+          echo "output_file=$OUTPUT" >> $GITHUB_OUTPUT
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrape-results-${{ github.run_number }}
+          path: ${{ steps.scrape.outputs.output_file }}
+          retention-days: 30
+
+      - name: Summary
+        run: |
+          echo "## Scrape Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Scraper | ${{ inputs.scraper || 'supermarket' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Keyword | ${{ inputs.keyword || 'whole milk' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Output | \`${{ steps.scrape.outputs.output_file }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Run | #${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
