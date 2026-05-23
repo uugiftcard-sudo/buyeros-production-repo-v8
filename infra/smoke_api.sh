@@ -3,12 +3,20 @@ set -euo pipefail
 
 if [[ $# -lt 2 ]]; then
   echo "Usage: infra/smoke_api.sh <public_base_url> <buyeros_api_key>"
+  echo "       infra/smoke_api.sh <public_base_url> -  # reads BUYEROS_API_KEY from env"
   echo "Example: infra/smoke_api.sh https://buyeros.example.com \"\$BUYEROS_API_KEY\""
   exit 2
 fi
 
 BASE_URL="${1%/}"
 API_KEY="$2"
+if [[ "$API_KEY" == "-" ]]; then
+  API_KEY="${BUYEROS_API_KEY:-}"
+fi
+if [[ -z "$API_KEY" ]]; then
+  echo "BUYEROS_API_KEY is required when api key argument is '-'."
+  exit 2
+fi
 SESSION_ID="smoke-$(date +%Y%m%d%H%M%S)"
 TASK_ID="task-${SESSION_ID}"
 TMP_DIR="$(mktemp -d)"
