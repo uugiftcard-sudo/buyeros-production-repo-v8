@@ -3,7 +3,20 @@
 import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 
-const SETTING_SECTIONS = [
+type SettingField =
+  | { key: string; label: string; type: 'text'; placeholder?: string; description: string }
+  | { key: string; label: string; type: 'select'; options: string[]; description: string }
+  | { key: string; label: string; type: 'number'; placeholder?: string; description: string }
+  | { key: string; label: string; type: 'toggle'; description: string };
+
+type SettingSection = {
+  key: string;
+  label: string;
+  icon: string;
+  fields: SettingField[];
+};
+
+const SETTING_SECTIONS: SettingSection[] = [
   {
     key: 'general',
     label: '一般設定',
@@ -151,7 +164,7 @@ export default function SettingsPage() {
                     )}
                     {field.type === 'select' && (
                       <select className="form-select" name={field.key}>
-                        {(field.options ?? []).map(opt => (
+                        {((field as { options: string[] }).options ?? []).map(opt => (
                           <option key={opt} value={opt}>{opt}</option>
                         ))}
                       </select>

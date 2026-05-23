@@ -3,14 +3,11 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '@/lib/supabase';
 import Sidebar from '@/components/Sidebar';
 import { formatDate } from '@/lib/api';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+const supabase = getSupabaseClient();
 
 type Channel = 'telegram' | 'whatsapp' | 'email' | 'phone' | 'sms';
 type Direction = 'inbound' | 'outbound';

@@ -1,21 +1,30 @@
 // lib/api.ts — API Client for Edge Functions
 // 所有對 Edge Functions 的請求都通過這裡
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+function getSupabaseUrl(): string {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  return url ?? '';
+}
+
+function getAnonKey(): string {
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return key ?? '';
+}
 
 async function apiFetch<T = unknown>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<{ data?: T; error?: { code: string; message: string } }> {
-  const url = `${SUPABASE_URL}/functions/v1/${endpoint}`;
+  const baseUrl = getSupabaseUrl();
+  if (!baseUrl) return { error: { code: 'CONFIG_MISSING', message: 'NEXT_PUBLIC_SUPABASE_URL is not configured' } };
+  const url = `${baseUrl}/functions/v1/${endpoint}`;
 
   const res = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      'apikey': ANON_KEY,
-      'Authorization': `Bearer ${ANON_KEY}`,
+      'apikey': getAnonKey(),
+      'Authorization': `Bearer ${getAnonKey()}`,
       ...options.headers,
     },
   });
@@ -415,11 +424,11 @@ export async function exportAuditCsv(params?: { table?: string; from?: string; t
   if (params?.from) qs.set('from', params.from);
   if (params?.to) qs.set('to', params.to);
   const qsStr = qs.toString();
-  const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/audit-log/export${qsStr ? `?${qsStr}` : ''}`, {
+  const res = await fetch(`${getSupabaseUrl()}/functions/v1/audit-log/export${qsStr ? `?${qsStr}` : ''}`, {
     headers: {
       'Content-Type': 'application/json',
-      'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+      'apikey': getAnonKey(),
+      'Authorization': `Bearer ${getAnonKey()}`,
     },
   });
   const text = await res.text();
