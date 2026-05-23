@@ -49,10 +49,12 @@ if [[ -z "${BUYEROS_API_KEY:-}" ]]; then
 fi
 
 echo "== backup primary =="
-BUYEROS_OPS_SUMMARY_DIR="$SUMMARY_DIR" bash "$SCRIPT_DIR/backup_vps.sh" "$PRIMARY_SSH" "$REMOTE_DIR" "$BACKUP_DIR"
+BACKUP_STATUS=0
+BUYEROS_OPS_SUMMARY_DIR="$SUMMARY_DIR" bash "$SCRIPT_DIR/backup_vps.sh" "$PRIMARY_SSH" "$REMOTE_DIR" "$BACKUP_DIR" || BACKUP_STATUS=$?
 
 echo "== failover smoke =="
-BUYEROS_OPS_SUMMARY_DIR="$SUMMARY_DIR" bash "$SCRIPT_DIR/failover_smoke.sh" "$PRIMARY_URL" "$SECONDARY_URL" "$BUYEROS_API_KEY" "$MAX_RTO_SECONDS"
+FAILOVER_STATUS=0
+BUYEROS_OPS_SUMMARY_DIR="$SUMMARY_DIR" bash "$SCRIPT_DIR/failover_smoke.sh" "$PRIMARY_URL" "$SECONDARY_URL" "$BUYEROS_API_KEY" "$MAX_RTO_SECONDS" || FAILOVER_STATUS=$?
 
 echo "== sync summaries to primary current release =="
 ssh "$PRIMARY_SSH" "mkdir -p '$REMOTE_DIR/current/infra/ops_runs'"
@@ -60,5 +62,10 @@ rsync -az "$SUMMARY_DIR/" "$PRIMARY_SSH:$REMOTE_DIR/current/infra/ops_runs/"
 
 echo "== verify production ops status =="
 curl -fsS -H "Authorization: Bearer ${BUYEROS_API_KEY}" "${PRIMARY_URL}/ops/status" | "$PYTHON_BIN" -m json.tool
+
+if [[ "$BACKUP_STATUS" -ne 0 || "$FAILOVER_STATUS" -ne 0 ]]; then
+  echo "Ops drill completed with failures: backup=${BACKUP_STATUS} failover=${FAILOVER_STATUS}. Summaries were synced."
+  exit 1
+fi
 
 echo "Ops drill OK: summaries synced to ${PRIMARY_SSH}:${REMOTE_DIR}/current/infra/ops_runs"
