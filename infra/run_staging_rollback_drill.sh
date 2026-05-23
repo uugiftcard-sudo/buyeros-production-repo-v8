@@ -65,8 +65,23 @@ PY
 echo "== rollback staging from latest backup =="
 BUYEROS_OPS_SUMMARY_DIR="$SUMMARY_DIR" bash "$SCRIPT_DIR/rollback_vps.sh" "$STAGING_SSH" "$BACKUP_ARCHIVE" "$REMOTE_DIR"
 
+echo "== wait for staging after rollback =="
+READY=0
+for _attempt in $(seq 1 30); do
+  if curl -fsS "${STAGING_URL%/}/ping" >/dev/null 2>&1; then
+    READY=1
+    break
+  fi
+  sleep 2
+done
+
+if [[ "$READY" -ne 1 ]]; then
+  echo "Staging did not become ready before smoke; summaries will still sync."
+fi
+
 echo "== staging smoke after rollback =="
-bash "$SCRIPT_DIR/smoke_api.sh" "$STAGING_URL" "$BUYEROS_API_KEY"
+SMOKE_STATUS=0
+bash "$SCRIPT_DIR/smoke_api.sh" "$STAGING_URL" "$BUYEROS_API_KEY" || SMOKE_STATUS=$?
 
 echo "== sync rollback summaries to primary current release =="
 ssh "$PRIMARY_SSH" "mkdir -p '$REMOTE_DIR/current/infra/ops_runs'"
@@ -74,5 +89,10 @@ rsync -az "$SUMMARY_DIR/" "$PRIMARY_SSH:$REMOTE_DIR/current/infra/ops_runs/"
 
 echo "== verify production ops status =="
 curl -fsS -H "Authorization: Bearer ${BUYEROS_API_KEY}" "${PUBLIC_BASE_URL%/}/ops/status" | "$PYTHON_BIN" -m json.tool
+
+if [[ "$SMOKE_STATUS" -ne 0 ]]; then
+  echo "Staging rollback completed, but post-rollback smoke failed with status ${SMOKE_STATUS}. Summaries were synced."
+  exit "$SMOKE_STATUS"
+fi
 
 echo "Staging rollback drill OK: rollback summary synced to ${PRIMARY_SSH}:${REMOTE_DIR}/current/infra/ops_runs"
