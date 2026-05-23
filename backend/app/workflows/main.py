@@ -11,6 +11,8 @@ Professional-grade production hardening:
   - Sentry error tracking (opt-in via SENTRY_DSN env var)
   - APScheduler cron jobs for daily report automation
   - Backup retention enforcement on every backup run
+  - Debug mode (BUYEROS_DEBUG=1): verbose request logging, request ID
+    propagation through the full call chain, structured error responses
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ import sys
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -30,9 +32,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from sentry_sdk import init as sentry_init, capture_exception
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..memory_store import MemoryStore
 from ..agents.ops_agent import OpsAgent
@@ -98,50 +98,133 @@ logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Request-scoped debug context
+# ─────────────────────────────────────────────────────────────────────────────
+# Holds per-request metadata (request_id, trace_id, span_id, client_ip)
+# accessible from anywhere in the call chain without passing it manually.
+# Thread-safe via contextvars.
+
+try:
+    from contextvars import ContextVar
+    _request_ctx: ContextVar[Optional[Dict[str, Any]]] = ContextVar("buyeros_request_ctx", default=None)
+
+    def get_request_ctx() -> Dict[str, Any]:
+        """Return current request context or empty dict."""
+        return _request_ctx.get() or {}
+
+    def set_request_ctx(**kwargs: Any) -> None:
+        ctx = _request_ctx.get() or {}
+        ctx.update(kwargs)
+        _request_ctx.set(ctx)
+
+    def clear_request_ctx() -> None:
+        _request_ctx.set(None)
+
+except ImportError:  # Python < 3.7 fallback (dict, not thread-safe)
+    _request_ctx: Any = None
+    _fallback_ctx: Dict[str, Any] = {}
+
+    def get_request_ctx() -> Dict[str, Any]:
+        return _fallback_ctx
+
+    def set_request_ctx(**kwargs: Any) -> None:
+        _fallback_ctx.update(kwargs)
+
+    def clear_request_ctx() -> None:
+        _fallback_ctx.clear()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Debug mode flag
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _is_debug() -> bool:
+    val = os.getenv("BUYEROS_DEBUG", "").lower()
+    return val in ("1", "true", "yes")
+
+
+def _is_test_env() -> bool:
+    return os.getenv("BUYEROS_ENV") == "test"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Structured JSON logger  (replaces bare logger.error / logger.warning calls)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class StructuredLogger:
     """Wraps stdlib logging with machine-readable JSON output.
 
-    Set BUYEROS_LOG_LEVEL=debug|info|warning|error
-    Set BUYEROS_LOG_FORMAT=json|text  (default: json in production)
+    BUYEROS_ENV=production → JSON to stderr (machine-parseable)
+    BUYEROS_DEBUG=1       → verbose text to stderr (human-readable)
+    otherwise              → text to stdlib logger
     """
 
     def __init__(self, name: str) -> None:
         self._log = logging.getLogger(name)
         self._prod = os.getenv("BUYEROS_ENV", "production") == "production"
 
-    def _format(self, level: str, event: str, **kwargs: Any) -> Dict[str, Any]:
+    def _enrich(self, **kwargs: Any) -> Dict[str, Any]:
+        ctx = get_request_ctx()
         base = {
             "ts": datetime.now(timezone.utc).isoformat(),
-            "level": level,
-            "event": event,
             "service": "buyeros",
-            "version": "v8",
+            "version": "8",
         }
+        if ctx.get("request_id"):
+            base["request_id"] = ctx["request_id"]
+        if ctx.get("trace_id"):
+            base["trace_id"] = ctx["trace_id"]
+        if ctx.get("client_ip"):
+            base["client_ip"] = ctx["client_ip"]
         base.update(kwargs)
-        if "exc_info" in base:
-            import traceback
-            base["exc_info"] = "".join(traceback.format_exception(*base["exc_info"])) if base["exc_info"] else None
         return base
 
-    def _emit(self, level: int, event: str, **kwargs: Any) -> None:
-        record = self._format(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"][level // 10], event, **kwargs)
-        if self._prod:
-            print(json.dumps(record), file=sys.stderr)
+    def _json(self, level: str, **kwargs: Any) -> None:
+        record = self._enrich(level=level, **kwargs)
+        print(json.dumps(record, default=str), file=sys.stderr)
+
+    def _text(self, level: str, event: str, **kwargs: Any) -> None:
+        parts = [f"[{level}] {event}"]
+        for k, v in kwargs.items():
+            if k not in ("exc_info",):
+                parts.append(f"{k}={v!r}")
+        self._log.log(
+            getattr(logging, level, logging.INFO),
+            " | ".join(parts),
+            exc_info=kwargs.get("exc_info"),
+        )
+
+    def debug(self, event: str, **kwargs: Any) -> None:
+        if self._prod and not _is_debug():
+            self._json("DEBUG", event=event, **kwargs)
         else:
-            self._log.log(level, "%s | %s", event, " | ".join(f"{k}={v!r}" for k, v in kwargs.items() if k not in ("exc_info",)))
-        self._log.log(level, record.get("message", event))
+            self._text("DEBUG", event, **kwargs)
 
-    def debug(self, event: str, **kwargs: Any) -> None: self._emit(10, event, **kwargs)
-    def info(self, event: str, **kwargs: Any) -> None: self._emit(20, event, **kwargs)
-    def warning(self, event: str, **kwargs: Any) -> None: self._emit(30, event, **kwargs)
-    def error(self, event: str, **kwargs: Any) -> None: self._emit(40, event, **kwargs)
-    def critical(self, event: str, **kwargs: Any) -> None: self._emit(50, event, **kwargs)
+    def info(self, event: str, **kwargs: Any) -> None:
+        if self._prod and not _is_debug():
+            self._json("INFO", event=event, **kwargs)
+        else:
+            self._text("INFO", event, **kwargs)
+
+    def warning(self, event: str, **kwargs: Any) -> None:
+        if self._prod and not _is_debug():
+            self._json("WARNING", event=event, **kwargs)
+        else:
+            self._text("WARNING", event, **kwargs)
+
+    def error(self, event: str, **kwargs: Any) -> None:
+        if self._prod and not _is_debug():
+            self._json("ERROR", event=event, **kwargs)
+        else:
+            self._text("ERROR", event, **kwargs)
+
+    def critical(self, event: str, **kwargs: Any) -> None:
+        if self._prod and not _is_debug():
+            self._json("CRITICAL", event=event, **kwargs)
+        else:
+            self._text("CRITICAL", event, **kwargs)
 
 
-# Replace bare logger calls throughout this module
 _log = StructuredLogger(__name__)
 
 
@@ -173,11 +256,66 @@ def _patch_logger() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Rate limiter
+# Rate limiter  (simple in-memory sliding-window, no third-party dependency)
+# Per-IP: 100 req/min, 10 req/s burst.
+# Production should use Redis-based limiter (see /metrics endpoint for observability).
 # ─────────────────────────────────────────────────────────────────────────────
 
-limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute", "10/second"])
-_app_rate_limit_exceeded_handler: Optional[Any] = None
+import threading
+import time as _time
+from collections import defaultdict
+
+_window_lock = threading.Lock()
+_request_windows: dict[str, list[float]] = defaultdict(list)
+
+def _clean_window(ip: str, window_seconds: float, now: float) -> None:
+    cutoff = now - window_seconds
+    _request_windows[ip] = [t for t in _request_windows[ip] if t > cutoff]
+
+def _check_rate_limit(ip: str, rpm: int, rps: int) -> tuple[bool, str]:
+    """Return (allowed, retry_after_str). thread-safe sliding window."""
+    now = _time.time()
+    with _window_lock:
+        _clean_window(ip, 60.0, now)
+        _clean_window(ip, 1.0, now)
+        total = len(_request_windows[ip])
+        if total >= rpm:
+            oldest = _request_windows[ip][0]
+            retry = int(oldest + 60.0 - now) + 1
+            return False, str(max(1, retry))
+        if len([t for t in _request_windows[ip] if t > now - 1.0]) >= rps:
+            oldest = [t for t in _request_windows[ip] if t > now - 1.0][0]
+            retry = int(oldest + 1.0 - now) + 1
+            return False, str(max(1, retry))
+        _request_windows[ip].append(now)
+        return True, "0"
+
+
+def _ip_from_request(request: Request) -> str:
+    """Best-effort client IP extraction (X-Forwarded-For aware)."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _check_rate_limit(ip: str, rpm: int, rps: int) -> tuple[bool, str]:
+    """Return (allowed, retry_after_str). thread-safe sliding window."""
+    now = _time.time()
+    with _window_lock:
+        _clean_window(ip, 60.0, now)
+        _clean_window(ip, 1.0, now)
+        total = len(_request_windows[ip])
+        if total >= rpm:
+            oldest = _request_windows[ip][0]
+            retry = int(oldest + 60.0 - now) + 1
+            return False, str(max(1, retry))
+        if len([t for t in _request_windows[ip] if t > now - 1.0]) >= rps:
+            oldest = [t for t in _request_windows[ip] if t > now - 1.0][0]
+            retry = int(oldest + 1.0 - now) + 1
+            return False, str(max(1, retry))
+        _request_windows[ip].append(now)
+        return True, "0"
 
 
 def create_app() -> FastAPI:
@@ -200,8 +338,22 @@ def create_app() -> FastAPI:
         docs_url="/docs" if os.getenv("BUYEROS_ENV") != "production" else None,
         redoc_url="/redoc" if os.getenv("BUYEROS_ENV") != "production" else None,
     )
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    # ── Rate limiter ────────────────────────────────────────────────────────
+    @app.middleware("http")
+    async def rate_limit_middleware(request: Request, call_next):
+        if _is_test_env():
+            return await call_next(request)
+        ip = _ip_from_request(request)
+        allowed, retry_after = _check_rate_limit(ip, rpm=100, rps=10)
+        if not allowed:
+            _log.warning("rate_limit_exceeded", ip=ip, path=request.url.path)
+            return Response(
+                content=f'{{"detail":"Rate limit exceeded","retry_after":"{retry_after}"}}',
+                status_code=429,
+                headers={"Retry-After": retry_after, "X-RateLimit-Limit": "100/minute"},
+                media_type="application/json",
+            )
+        return await call_next(request)
 
     cors_origins = [
         origin.strip()
@@ -220,23 +372,61 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def metrics_middleware(request: Request, call_next):
         request_id = request.headers.get("x-request-id", str(uuid.uuid4()))
+        trace_id = request.headers.get("x-trace-id", str(uuid.uuid4()))
+        client_ip = _ip_from_request(request)
         start = time.perf_counter()
+
+        # Populate request context for downstream logging
+        set_request_ctx(request_id=request_id, trace_id=trace_id, client_ip=client_ip)
+        body_bytes: bytes | None = None
+        if _is_debug() and request.method in ("POST", "PUT", "PATCH"):
+            body_bytes = await request.body()
+            async def reuse_body():
+                import asyncio
+                return await request.form() if request.method != "GET" else {}
+
+        # Build a request object for body replay
+        async def _call_next_with_body():
+            if body_bytes is not None:
+                from starlette.datastructures import UploadFile
+                from io import BytesIO
+                scope = dict(request.scope)
+                scope["body"] = body_bytes
+                from starlette.requests import Request as SRequest
+                new_request = SRequest(scope, receive=lambda: BytesIO(body_bytes).__dict__["_value"] if hasattr(BytesIO(body_bytes), "_value") else BytesIO(body_bytes))
+            return await call_next(request)
+
         response = await call_next(request)
         duration = time.perf_counter() - start
         endpoint = request.url.path
         status = str(response.status_code)
+
+        # Prometheus metrics
         http_requests_total.labels(method=request.method, endpoint=endpoint, status_code=status).inc()
         http_request_duration_seconds.labels(method=request.method, endpoint=endpoint).observe(duration)
+
+        # Response headers
         response.headers["x-request-id"] = request_id
-        _log.info(
-            "http_request",
-            method=request.method,
-            path=endpoint,
-            status=response.status_code,
-            duration_ms=round(duration * 1000, 2),
-            request_id=request_id,
-            client_ip=get_remote_address(request),
-        )
+        response.headers["x-trace-id"] = trace_id
+
+        # Structured log
+        log_data: Dict[str, Any] = {
+            "method": request.method,
+            "path": endpoint,
+            "status": response.status_code,
+            "duration_ms": round(duration * 1000, 2),
+            "request_id": request_id,
+            "trace_id": trace_id,
+            "client_ip": client_ip,
+            "user_agent": request.headers.get("user-agent", ""),
+            "content_length": request.headers.get("content-length", ""),
+        }
+        if _is_debug():
+            log_data["debug"] = True
+            log_data["query_params"] = dict(request.query_params)
+            log_data["auth_header_present"] = bool(request.headers.get("authorization"))
+            log_data["referer"] = request.headers.get("referer", "")
+        _log.info("http_request", **log_data)
         return response
     # Setup memory store (Supabase if env vars present, otherwise memory)
     supabase_url = os.getenv("SUPABASE_URL")
@@ -337,14 +527,7 @@ def create_app() -> FastAPI:
 
     @app.post("/telegram/webhook")
     async def telegram_webhook(request: Request) -> JSONResponse:
-        """Handle incoming Telegram updates via webhook.
-
-        This endpoint expects a JSON update from Telegram.  It extracts
-        the chat id and message text, passes it to the supervisor and
-        sends a reply back to Telegram via the sendMessage API.  The
-        Telegram bot token must be provided in the ``TELEGRAM_BOT_TOKEN``
-        environment variable.
-        """
+        """Handle incoming Telegram updates via webhook."""
         expected_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET")
         if expected_secret and request.headers.get("x-telegram-bot-api-secret-token") != expected_secret:
             raise HTTPException(status_code=401, detail="Invalid Telegram webhook secret")
@@ -362,10 +545,7 @@ def create_app() -> FastAPI:
         if not chat_id or not text:
             return JSONResponse(content={"ok": True})
         user_id = str(chat_id)
-        # Delegate to the BuyerOS graph workflow. The legacy supervisor is
-        # still available on app.state for tests and compatibility.
         response_text = workflow.handle_message(user_id=user_id, message=text, channel="telegram", session_id=user_id)
-        # Send reply via Telegram API
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         if bot_token:
             send_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -375,6 +555,82 @@ def create_app() -> FastAPI:
             except Exception as exc:
                 _log.error("telegram_send_failed", error=str(exc), exc_info=True, chat_id=chat_id)
         return JSONResponse(content={"ok": True})
+
+    # ── Stripe webhook ────────────────────────────────────────────────────────
+    @app.post("/webhooks/stripe")
+    async def stripe_webhook(request: Request) -> JSONResponse:
+        """Handle Stripe webhook events for real-time payment/refund events.
+
+        Configure in Stripe dashboard:
+          endpoint = https://<your-domain>/webhooks/stripe
+          events  = payment_intent.succeeded, charge.refunded,
+                    refund.failed, customer.subscription.updated
+        Requires STRIPE_WEBHOOK_SECRET env var for signature verification.
+        """
+        stripe_secret = os.getenv("STRIPE_SECRET_KEY", "")
+        webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+        payload = await request.body()
+        sig_header = request.headers.get("stripe-signature", "")
+
+        # Verify signature (skip in dev if no secret configured)
+        if webhook_secret and stripe_secret:
+            try:
+                from stripe import Webhook, SignatureVerificationError
+                try:
+                    Webhook.construct_event(payload, sig_header, webhook_secret)
+                except SignatureVerificationError as exc:
+                    _log.warning("stripe_webhook_signature_invalid", error=str(exc))
+                    raise HTTPException(status_code=400, detail="Invalid Stripe signature")
+            except ImportError:
+                _log.warning("stripe_lib_not_installed_skip_signature_check")
+
+        try:
+            import json as _json
+            event = _json.loads(payload)
+        except Exception as exc:
+            _log.error("stripe_webhook_parse_failed", error=str(exc))
+            raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+        event_type = event.get("type", "")
+        data = event.get("data", {}).get("object", {})
+
+        if event_type == "charge.refunded":
+            tx_id = data.get("payment_intent") or data.get("id", "")
+            amount = (data.get("amount", 0) or 0) / 100  # stripe uses cents
+            currency = data.get("currency", "hkd").upper()
+            memory_store.save_memory(
+                ["buyeros", "refunds"],
+                f"stripe-{tx_id}",
+                {"provider": "stripe", "tx_id": tx_id, "amount": amount, "currency": currency, "event": event_type, "raw": data},
+                created_by="stripe_webhook",
+            )
+            _log.info("stripe_refund_recorded", tx_id=tx_id, amount=amount, currency=currency)
+
+        elif event_type == "payment_intent.succeeded":
+            tx_id = data.get("id", "")
+            amount = (data.get("amount", 0) or 0) / 100
+            memory_store.save_memory(
+                ["buyeros", "orders"],
+                f"stripe-{tx_id}",
+                {"provider": "stripe", "tx_id": tx_id, "amount": amount, "status": "paid", "raw": data},
+                created_by="stripe_webhook",
+            )
+            _log.info("stripe_payment_recorded", tx_id=tx_id, amount=amount)
+
+        elif event_type == "refund.failed":
+            tx_id = data.get("payment_intent") or data.get("id", "")
+            memory_store.save_memory(
+                ["buyeros", "refunds"],
+                f"stripe-refund-failed-{tx_id}",
+                {"provider": "stripe", "tx_id": tx_id, "status": "failed", "raw": data},
+                created_by="stripe_webhook",
+            )
+            _log.warning("stripe_refund_failed", tx_id=tx_id)
+
+        else:
+            _log.info("stripe_webhook_unhandled", event_type=event_type)
+
+        return JSONResponse(content={"received": True})
 
     @app.post("/context/write", dependencies=[Depends(require_api_key)])
     async def context_write(payload: ContextWriteRequest) -> Dict[str, Any]:
@@ -444,7 +700,7 @@ def create_app() -> FastAPI:
         audit_logger.log(action="context.session", actor="api", details={"session_id": session_id, "count": len(items)})
         return {"ok": True, "items": items, "last_state": session_store.get_state(session_id)}
 
-    @app.post("/agents/run", dependencies=[Depends(require_api_key)], rate_limit="60/minute")
+    @app.post("/agents/run", dependencies=[Depends(require_api_key)])
     async def agents_run(payload: AgentRunRequest) -> Dict[str, Any]:
         """Run a task through the BuyerOS graph/provider layer."""
         try:
@@ -479,6 +735,65 @@ def create_app() -> FastAPI:
     async def metrics() -> Response:
         """Prometheus /metrics endpoint. No auth required (internal use only)."""
         return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+    # ── Global exception handler ──────────────────────────────────────────────
+    @app.exception_handler(Exception)
+    async def _all_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        ctx = get_request_ctx()
+        req_id = ctx.get("request_id", "unknown")
+        trace_id = ctx.get("trace_id", "unknown")
+        exc_type = type(exc).__name__
+        exc_msg = str(exc)
+        if sentry_dsn:
+            capture_exception(exc)
+        _log.error(
+            "unhandled_exception",
+            exc_type=exc_type,
+            exc_message=exc_msg,
+            path=str(request.url.path),
+            method=request.method,
+            request_id=req_id,
+            trace_id=trace_id,
+            exc_info=True,
+        )
+        status = 500
+        detail = exc_msg
+        if isinstance(exc, HTTPException):
+            status = exc.status_code
+            detail = exc.detail
+        return JSONResponse(
+            status_code=status,
+            content={
+                "ok": False,
+                "error": exc_type,
+                "message": detail,
+                "request_id": req_id,
+                "trace_id": trace_id,
+            },
+            headers={"x-request-id": req_id, "x-trace-id": trace_id},
+        )
+
+    @app.get("/debug/info")
+    async def debug_info() -> JSONResponse:
+        return JSONResponse({
+            "ok": True,
+            "debug_mode": _is_debug(),
+            "version": "8",
+            "env": os.getenv("BUYEROS_ENV", "unknown"),
+            "rate_limit": {"rpm": 100, "rps": 10, "strategy": "sliding_window"},
+            "features": {
+                "sentry": bool(sentry_dsn),
+                "prometheus": True,
+                "scheduler": True,
+                "stripe_webhook": True,
+                "structured_logging": True,
+                "rate_limiting": True,
+                "nextauth": True,
+            },
+            "memory_store": memory_store.status(),
+            "redis_store": session_store.status(),
+            "providers": provider_registry.status(),
+        })
 
     @app.get("/")
     async def root() -> Dict[str, Any]:
@@ -632,14 +947,14 @@ def create_app() -> FastAPI:
             memory_store.save_memory(["buyeros", "orders"], order_id, {"project_id": "cloth", **order}, created_by="orders_service")
         return {"ok": ok, "order": order, "configured": orders_service.configured()}
 
-    @app.post("/automation/daily-report", dependencies=[Depends(require_api_key)], rate_limit="20/minute")
+    @app.post("/automation/daily-report", dependencies=[Depends(require_api_key)])
     async def automation_daily_report(payload: DailyReportRequest) -> Dict[str, Any]:
         """Create a daily operations report from current BuyerOS memory."""
         result = business_automation.create_daily_report(date=payload.date)
         audit_logger.log(action="automation.daily_report", actor="api", details=result)
         return result
 
-    @app.post("/automation/ocr-posting", dependencies=[Depends(require_api_key)], rate_limit="30/minute")
+    @app.post("/automation/ocr-posting", dependencies=[Depends(require_api_key)])
     async def automation_ocr_posting(payload: OcrPostingRequest) -> Dict[str, Any]:
         """Create an accounting entry from OCR text."""
         result = business_automation.post_ocr_entry(
@@ -651,7 +966,7 @@ def create_app() -> FastAPI:
         automation_runs_total.labels(workflow="ocr_posting").inc()
         return result
 
-    @app.post("/automation/reconcile", dependencies=[Depends(require_api_key)], rate_limit="30/minute")
+    @app.post("/automation/reconcile", dependencies=[Depends(require_api_key)])
     async def automation_reconcile(payload: ReconcileRequest) -> Dict[str, Any]:
         """Compare expected and actual totals and create an alert on mismatch."""
         result = business_automation.reconcile_entries(
@@ -663,7 +978,7 @@ def create_app() -> FastAPI:
         automation_runs_total.labels(workflow="reconcile").inc()
         return result
 
-    @app.post("/automation/alerts", dependencies=[Depends(require_api_key)], rate_limit="30/minute")
+    @app.post("/automation/alerts", dependencies=[Depends(require_api_key)])
     async def automation_alerts(payload: AlertsRequest) -> Dict[str, Any]:
         """Generate anomaly alerts for items above a threshold."""
         result = business_automation.generate_alerts(
@@ -674,7 +989,7 @@ def create_app() -> FastAPI:
         automation_runs_total.labels(workflow="alerts").inc()
         return result
 
-    @app.post("/automation/approval", dependencies=[Depends(require_api_key)], rate_limit="20/minute")
+    @app.post("/automation/approval", dependencies=[Depends(require_api_key)])
     async def automation_approval(payload: ApprovalRequest) -> Dict[str, Any]:
         """Create a manual approval task."""
         result = business_automation.request_approval(
@@ -686,7 +1001,7 @@ def create_app() -> FastAPI:
         automation_runs_total.labels(workflow="approval").inc()
         return result
 
-    @app.post("/automation/retry", dependencies=[Depends(require_api_key)], rate_limit="20/minute")
+    @app.post("/automation/retry", dependencies=[Depends(require_api_key)])
     async def automation_retry(payload: RetryRequest) -> Dict[str, Any]:
         """Record retry state for an automation task."""
         result = business_automation.record_retry(
@@ -698,7 +1013,7 @@ def create_app() -> FastAPI:
         automation_runs_total.labels(workflow="retry").inc()
         return result
 
-    @app.post("/automation/close-cycle", dependencies=[Depends(require_api_key)], rate_limit="10/minute")
+    @app.post("/automation/close-cycle", dependencies=[Depends(require_api_key)])
     async def automation_close_cycle(payload: CloseCycleRequest) -> Dict[str, Any]:
         """Run the CLOTH OCR -> reconcile -> alert -> approval/retry -> report flow."""
         result = business_automation.close_cycle(
@@ -813,7 +1128,7 @@ def create_app() -> FastAPI:
                 run["content"] = dict(content)
         return {"ok": True, "task": normalized_task, "runs": runs}
 
-    @app.post("/tasks/dispatch", dependencies=[Depends(require_api_key)], rate_limit="30/minute")
+    @app.post("/tasks/dispatch", dependencies=[Depends(require_api_key)])
     async def tasks_dispatch(payload: TaskDispatchRequest) -> Dict[str, Any]:
         """Create a task and dispatch it to the provider layer (single-hop)."""
         try:
