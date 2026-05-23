@@ -432,6 +432,92 @@ export async function exportAuditCsv(params?: { table?: string; from?: string; t
   URL.revokeObjectURL(url);
 }
 
+// ─── Dashboard / Financials ───────────────────────────────────────────────────
+
+export interface FinancialsSummary {
+  totalRevenueCents: number;
+  totalExpenseCents: number;
+  netProfitCents: number;
+}
+
+export interface TrialBalanceRow {
+  account_code: string;
+  account_name: string;
+  type: string;
+  total_debit_cents: number;
+  total_credit_cents: number;
+  balance_cents: number;
+}
+
+export interface MonthlyPnLRow {
+  month: string;
+  type: string;
+  account_name: string;
+  amount_cents: number;
+}
+
+export interface PnLSummaryRow {
+  period: string;
+  label: string;
+  amount_cents: number;
+  sort_order: number;
+}
+
+export interface BalanceSheetRow {
+  account_code: string;
+  account_name: string;
+  type: 'asset' | 'liability' | 'equity';
+  balance_cents: number;
+}
+
+export interface ARAgingRow {
+  customer_id: string;
+  customer_name: string;
+  order_id: string;
+  amount_cents: number;
+  days_overdue: number;
+  bucket: string;
+}
+
+export interface FinancialsData {
+  period: string;
+  periodStatus: 'open' | 'closed' | 'archived';
+  summary: FinancialsSummary;
+  trialBalance: TrialBalanceRow[];
+  monthlyPnL: MonthlyPnLRow[];
+  balanceSheet: BalanceSheetRow[];
+  arAging: ARAgingRow[];
+  generatedAt: string;
+}
+
+export interface ClosePeriodResponse {
+  success: boolean;
+  period: string;
+  periodId?: string;
+  closedAt: string;
+  closingEntryId: string | null;
+}
+
+export async function getFinancials(params?: {
+  period?: string;
+  months?: number;
+  asOf?: string;
+}) {
+  const qs = new URLSearchParams();
+  if (params?.period) qs.set('period', params.period);
+  if (params?.months) qs.set('months', String(params.months));
+  if (params?.asOf) qs.set('as_of', params.asOf);
+  const qsStr = qs.toString();
+  return apiFetch<FinancialsData>(`dashboard/financials${qsStr ? `?${qsStr}` : ''}`);
+}
+
+export async function closePeriod(period: string) {
+  return apiFetch<ClosePeriodResponse>('dashboard/financials', {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'close-period', period }),
+  });
+}
+
 // ─── Batch Operations ────────────────────────────────────────────────
 
 export interface BatchUpdateResult {

@@ -851,6 +851,57 @@ body {
 .quick-link:hover { background: var(--border); }
 
 /* ══════════════════════════════════════════════════════════════
+   SKELETON LOADERS
+   ══════════════════════════════════════════════════════════════ */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+.skeleton-line {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--border) 25%,
+    var(--border-subtle) 50%,
+    var(--border) 75%
+  );
+  background-size: 600px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BADGE VARIANTS
+   ══════════════════════════════════════════════════════════════ */
+.badge-sm {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.25rem;
+}
+.badge-muted {
+  background: var(--border);
+  color: var(--text-muted);
+}
+.badge-orange {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MODAL BOX (used by ConfirmModal)
+   ══════════════════════════════════════════════════════════════ */
+.modal-box {
+  background: var(--surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 440px;
+  animation: slideUp 0.2s ease;
+  overflow: hidden;
+}
+
+/* ══════════════════════════════════════════════════════════════
    RESPONSIVE
    ══════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
