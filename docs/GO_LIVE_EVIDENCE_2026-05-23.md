@@ -63,6 +63,8 @@
 
 ## Follow-Up
 
-- Confirm DigitalOcean Cloud Firewall inbound TCP `80` rule.
-- Let the 24h watch finish and review `smoke-latest.json`.
-- Keep Telegram pointed only to production HTTPS; do not point it at the failover node unless performing a controlled cutover.
+- [ ] **CRITICAL — DigitalOcean Cloud Firewall:** Add inbound TCP 80 rule. Go to Cloud Firewall dashboard → create firewall → inbound rule: `HTTP (TCP/80) source: all`. Required for Caddy Let's Encrypt HTTP-01 challenges and automatic HTTPS renewal. Without this, HTTPS certs will not renew after expiry (~90 days).
+- [ ] **CRITICAL — Purchase production domain:** Using sslip.io long-term is not recommended. Point your real domain A record to `206.189.116.155` and update `BUYEROS_DOMAIN` in `.env.production`.
+- [ ] Confirm Supabase `agent_memory` table schema is live and working.
+- [ ] Let the 24h watch finish and review `smoke-latest.json` on the production host.
+- [ ] Keep Telegram pointed only to production HTTPS; do not point it at the failover node unless performing a controlled cutover.
