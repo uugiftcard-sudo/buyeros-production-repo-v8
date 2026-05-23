@@ -9,12 +9,12 @@ UK Loyalty Card Checker — Nectar & Tesco Clubcard
 ⚠️ 需要输入账号密码，请勿保存明文密码
 """
 
-import requests
+import argparse
 import json
 import time
-import argparse
-from dataclasses import dataclass, asdict
-from typing import Optional
+from dataclasses import asdict, dataclass
+
+import requests
 
 HEADERS = {
     "User-Agent": (
@@ -60,7 +60,7 @@ class TescoClubcard:
 # ────────────────────────────────────────────────
 # Nectar 积分查询
 # ────────────────────────────────────────────────
-def check_nectar_points(email: str, password: str) -> Optional[NectarAccount]:
+def check_nectar_points(email: str, password: str) -> NectarAccount | None:
     """
     查询 Nectar 积分余额
     官网: https://www.nectar.com
@@ -118,7 +118,7 @@ def check_nectar_points(email: str, password: str) -> Optional[NectarAccount]:
         return None
 
 
-def _nectar_html_fallback(email: str, password: str) -> Optional[NectarAccount]:
+def _nectar_html_fallback(email: str, password: str) -> NectarAccount | None:
     """HTML 备用方式（通过网页抓取）"""
     print("[INFO] 尝试网页抓取方式...")
     session = requests.Session()
@@ -177,7 +177,7 @@ def _nectar_html_fallback(email: str, password: str) -> Optional[NectarAccount]:
 # ────────────────────────────────────────────────
 # Tesco Clubcard 查询
 # ────────────────────────────────────────────────
-def check_tesco_clubcard(email: str, password: str) -> Optional[TescoClubcard]:
+def check_tesco_clubcard(email: str, password: str) -> TescoClubcard | None:
     """
     查询 Tesco Clubcard 积分和优惠券
     官网: https://www.tesco.com/clubcard
@@ -229,7 +229,7 @@ class GiftcardBalance:
     last_updated: str = ""
 
 
-def check_amazon_giftcard(code_or_email: str) -> Optional[GiftcardBalance]:
+def check_amazon_giftcard(code_or_email: str) -> GiftcardBalance | None:
     """
     查询 Amazon 礼品卡余额
     方法1: 礼品卡码 → https://www.amazon.co.uk/gc/redeem
@@ -272,7 +272,7 @@ def check_amazon_giftcard(code_or_email: str) -> Optional[GiftcardBalance]:
         return None
 
 
-def check_generic_giftcard(card_number: str, pin: str = "", provider: str = "") -> Optional[GiftcardBalance]:
+def check_generic_giftcard(card_number: str, pin: str = "", provider: str = "") -> GiftcardBalance | None:
     """
     通用礼品卡余额查询
     支持：Vanilla Gift, One4All, etc.

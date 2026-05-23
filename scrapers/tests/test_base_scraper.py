@@ -1,7 +1,5 @@
 """Unit tests for the BaseScraper class."""
 
-import pytest
-from unittest.mock import MagicMock, patch
 
 from src.models.linkedin import LinkedInProfile
 from src.scrapers.base import BaseScraper

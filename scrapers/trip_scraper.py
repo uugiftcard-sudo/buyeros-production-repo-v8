@@ -11,16 +11,15 @@ Trip.com Scraper
 - Trip.com 页面结构可能变更，请关注输出
 """
 
+import argparse
 import csv
 import json
-import time
-import re
-import random
-import argparse
 import logging
+import random
+import re
+import time
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from dataclasses import dataclass, asdict
-from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
@@ -120,7 +119,7 @@ class AttractionResult:
 # ─────────────────────────────────────────────
 # 通用请求层
 # ─────────────────────────────────────────────
-def _fetch(url: str, params: dict = None, timeout: int = 15) -> Optional[BeautifulSoup]:
+def _fetch(url: str, params: dict = None, timeout: int = 15) -> BeautifulSoup | None:
     """通用 GET 请求，含重试"""
     for attempt in range(3):
         try:

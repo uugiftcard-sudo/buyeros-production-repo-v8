@@ -1,13 +1,11 @@
 """Unit tests for Pydantic models."""
 
-import pytest
-from pydantic import ValidationError
 
-from src.models.base import BaseScrapedItem, HTTPError, ScrapeResult
-from src.models.linkedin import LinkedInProfile
-from src.models.b2b import B2BContact, UKCompany
 from src.models.amazon import ProductResult
+from src.models.b2b import B2BContact, UKCompany
+from src.models.base import BaseScrapedItem, HTTPError, ScrapeResult
 from src.models.ebay import ItemResult, SellerResult
+from src.models.linkedin import LinkedInProfile
 from src.models.loyalty import GiftcardBalance, NectarAccount, TescoClubcard
 from src.models.supermarket import SupermarketResult
 from src.models.trip import AttractionResult, FlightResult, HotelResult

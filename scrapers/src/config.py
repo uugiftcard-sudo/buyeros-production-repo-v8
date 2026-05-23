@@ -84,6 +84,15 @@ def get_settings() -> Settings:
     return _settings
 
 
+# Module-level attribute — import `from src.config import settings`
+# to get the singleton without calling get_settings() each time.
+def __getattr__(name: str):
+    """Lazy module-level access: settings, get_settings, etc. are all accessible here."""
+    if name == "settings":
+        return get_settings()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 def get_rate_limit(scraper_name: str) -> int:
     """Return requests-per-minute limit for a scraper."""
     limits = _YAML.get("rate_limits", {})

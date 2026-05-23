@@ -12,18 +12,17 @@ LinkedIn Public Profile Scraper
 - 建议添加 random delay 避免触发反爬
 """
 
-import requests
-from bs4 import BeautifulSoup
+import argparse
 import csv
 import json
-import time
-import re
-import random
-import argparse
 import logging
-from dataclasses import dataclass, asdict
-from typing import Optional
-from urllib.parse import urljoin, urlparse
+import random
+import re
+import time
+from dataclasses import asdict, dataclass
+
+import requests
+from bs4 import BeautifulSoup
 
 # ─────────────────────────────────────────────
 # 日志配置
@@ -64,7 +63,7 @@ def _get_headers() -> dict:
     }
 
 
-def _get_proxy() -> Optional[dict]:
+def _get_proxy() -> dict | None:
     """从 PROXIES 池轮流返回一项（Round-robin）"""
     if not PROXIES:
         return None
@@ -92,7 +91,7 @@ class LinkedInProfile:
 # ─────────────────────────────────────────────
 # 请求层 — 含重试、超时、UA 轮换
 # ─────────────────────────────────────────────
-def fetch_page(url: str, timeout: int = 10, max_retries: int = 3) -> Optional[BeautifulSoup]:
+def fetch_page(url: str, timeout: int = 10, max_retries: int = 3) -> BeautifulSoup | None:
     """
     获取任意 LinkedIn 页面 HTML
     - 随机 UA，防止频率指纹
@@ -293,7 +292,7 @@ def scrape_profiles(urls: list[str], delay: float = 2.0) -> list[LinkedInProfile
                 f"| {profile.location}"
             )
         else:
-            print(f"  ✗ 抓取失败，跳过")
+            print("  ✗ 抓取失败，跳过")
         # 随机抖动延迟
         jitter = random.uniform(-0.5, 0.5)
         time.sleep(max(0.5, delay + jitter))
@@ -368,7 +367,7 @@ def main():
     # 收集 URL
     urls = list(args.urls)
     if args.file:
-        with open(args.file, "r") as f:
+        with open(args.file) as f:
             urls.extend([line.strip() for line in f if line.strip()])
 
     # 关键词搜索

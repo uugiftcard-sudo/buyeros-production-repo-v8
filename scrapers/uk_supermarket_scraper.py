@@ -8,14 +8,14 @@ UK Supermarket Price Scraper — John Lewis & Tesco
 ⚠️ 仅供个人比价使用，禁止商业批量采集
 """
 
-import requests
+import argparse
 import csv
 import json
-import time
 import re
-import argparse
-from dataclasses import dataclass, asdict
-from typing import Optional
+import time
+from dataclasses import asdict, dataclass
+
+import requests
 
 HEADERS = {
     "User-Agent": (
@@ -161,9 +161,9 @@ def search_tesco(keyword: str, limit: int = 30, delay: float = 2.0) -> list[Prod
     print(f"[INFO] Tesco 搜索: {keyword}")
     results = []
 
-    # Tesco Groceries Search API
-    api_url = "https:// Tesco.com/groceries/api/products/search"
-    params = {
+    # Tesco Groceries Search API (placeholder — scrape-based approach below)
+    _api_url = "https:// Tesco.com/groceries/api/products/search"
+    _params = {
         "query": keyword,
         "pageSize": limit,
         "group": "Tesco",

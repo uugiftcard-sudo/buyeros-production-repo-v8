@@ -150,7 +150,7 @@ def run_dashboard(port: int = 8000) -> None:
     console.print(
         Panel(
             f"[green]API server running at http://localhost:{port}[/green]\n"
-            "[dim]Swagger docs: http://localhost:{port}/docs[/dim]",
+            f"[dim]Swagger docs: http://localhost:{port}/docs[/dim]",
             title="[bold]Scrapers Pro Dashboard[/bold]",
             border_style="cyan",
         )

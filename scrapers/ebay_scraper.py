@@ -8,14 +8,14 @@ eBay Seller & Product Scraper
 ⚠️ 仅供个人使用，禁止批量采集用于商业销售
 """
 
-import requests
+import argparse
 import csv
 import json
-import time
 import re
-import argparse
-from dataclasses import dataclass, asdict
-from typing import Optional
+import time
+from dataclasses import asdict, dataclass
+
+import requests
 
 HEADERS = {
     "User-Agent": (
@@ -198,7 +198,7 @@ def _search_items_html(keyword: str, limit: int, delay: float) -> list[ItemResul
 # ────────────────────────────────────────────────
 # 卖家信息
 # ────────────────────────────────────────────────
-def fetch_seller(seller_id: str) -> Optional[SellerResult]:
+def fetch_seller(seller_id: str) -> SellerResult | None:
     """获取卖家公开信息"""
     url = f"{BASE_URL}/usr/{seller_id}"
     s = SellerResult()

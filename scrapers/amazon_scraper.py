@@ -9,14 +9,14 @@ Amazon Product Price Monitor
 ⚠️ 添加延时，避免触发反爬
 """
 
-import requests
+import argparse
 import csv
 import json
-import time
 import re
-import argparse
-from dataclasses import dataclass, asdict
-from typing import Optional
+import time
+from dataclasses import asdict, dataclass
+
+import requests
 
 HEADERS = {
     "User-Agent": (
@@ -74,7 +74,7 @@ def _get_optional(product: dict, *keys) -> str:
     return ""
 
 
-def fetch_search_page(keyword: str, page: int = 1, domain: str = "com") -> Optional[str]:
+def fetch_search_page(keyword: str, page: int = 1, domain: str = "com") -> str | None:
     """获取搜索结果页 HTML"""
     base = BASE_URL if domain == "com" else UK_URL
     page_param = f"&page={page}" if page > 1 else ""
@@ -95,7 +95,6 @@ def parse_search_results(html: str, keyword: str) -> list[ProductResult]:
     results = []
 
     # 方法1：从 JSON 嵌入数据提取（最可靠）
-    import re
     scripts = soup.find_all("script")
     json_data = {}
 
@@ -174,7 +173,7 @@ def parse_search_results(html: str, keyword: str) -> list[ProductResult]:
     return results
 
 
-def fetch_product_detail(asin: str, domain: str = "com") -> Optional[ProductResult]:
+def fetch_product_detail(asin: str, domain: str = "com") -> ProductResult | None:
     """获取单个商品详情页"""
     base = BASE_URL if domain == "com" else UK_URL
     url = f"{base}/dp/{asin}"

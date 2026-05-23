@@ -11,18 +11,16 @@ Amazon Product Price Monitor
 - 添加延时，避免触发反爬
 """
 
-import os
+import argparse
 import csv
 import json
-import time
-import re
-import random
-import argparse
 import logging
+import random
+import re
+import time
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from dataclasses import dataclass, asdict
-from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
@@ -69,7 +67,7 @@ def _headers() -> dict:
     }
 
 
-def _proxy() -> Optional[dict]:
+def _proxy() -> dict | None:
     return random.choice(PROXIES) if PROXIES else None
 
 
@@ -122,7 +120,7 @@ def _url_for(domain: str, path: str) -> str:
     return f"{base}{path}"
 
 
-def _extract_number(text: str) -> Optional[float]:
+def _extract_number(text: str) -> float | None:
     """从价格文本提取数字"""
     if not text:
         return None
@@ -137,7 +135,7 @@ def _domain_currency(domain: str) -> str:
 # ─────────────────────────────────────────────
 # 请求层
 # ─────────────────────────────────────────────
-def _fetch(url: str, timeout: int = 20) -> Optional[BeautifulSoup]:
+def _fetch(url: str, timeout: int = 20) -> BeautifulSoup | None:
     """通用 GET 请求，自动重试"""
     for attempt in range(3):
         try:
@@ -162,7 +160,7 @@ def _fetch(url: str, timeout: int = 20) -> Optional[BeautifulSoup]:
 # ─────────────────────────────────────────────
 # 搜索结果页
 # ─────────────────────────────────────────────
-def fetch_search_page(keyword: str, page: int = 1, domain: str = "com") -> Optional[str]:
+def fetch_search_page(keyword: str, page: int = 1, domain: str = "com") -> str | None:
     base = _url_for(domain, "")
     page_param = f"&page={page}" if page > 1 else ""
     url = f"{base}/s?k={requests.utils.quote(keyword)}{page_param}"
@@ -281,7 +279,7 @@ def parse_search_results(html: str, keyword: str, domain: str = "com") -> list[P
 # ─────────────────────────────────────────────
 # 商品详情页
 # ─────────────────────────────────────────────
-def fetch_product_detail(asin: str, domain: str = "com") -> Optional[ProductResult]:
+def fetch_product_detail(asin: str, domain: str = "com") -> ProductResult | None:
     url = _url_for(domain, f"/dp/{asin}")
     currency = _domain_currency(domain)
     p = ProductResult(asin=asin, domain=domain, currency=currency,
