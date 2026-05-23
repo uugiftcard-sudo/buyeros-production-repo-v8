@@ -1,6 +1,7 @@
 """Pydantic models for Vinted scraper."""
 
 from datetime import datetime
+from enum import Enum as _Enum
 from enum import StrEnum
 from typing import Any
 
@@ -120,7 +121,7 @@ class VintedProduct(BaseScrapedItem):
             value = getattr(self, name)
             if value is None:
                 result[name] = ""
-            elif isinstance(value, Enum):
+            elif isinstance(value, _Enum):
                 result[name] = value.value
             elif isinstance(value, list):
                 import json

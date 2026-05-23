@@ -60,6 +60,7 @@ class AliExpressScraper(BaseScraper[AliExpressProduct]):
     def _random_ua(self) -> str:
         """Override to use session-level headers; UA is set in __init__."""
         import random
+
         from src.config import get_user_agents
 
         return random.choice(get_user_agents())
@@ -67,6 +68,7 @@ class AliExpressScraper(BaseScraper[AliExpressProduct]):
     def _headers(self, extra: dict[str, str] | None = None) -> dict[str, str]:
         """Build headers with a random User-Agent."""
         import random
+
         from src.config import get_user_agents
 
         base = {
