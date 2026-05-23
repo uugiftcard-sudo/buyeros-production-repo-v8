@@ -63,13 +63,13 @@ class ContextHub:
         limit: int = 5,
     ) -> List[Dict[str, Any]]:
         namespace = tuple(self.namespace_for(source_provider)) if source_provider else AI_CONTEXT_ROOT
-        entries = self.memory_store.search_memory(namespace_prefix=namespace, query=query, limit=limit * 2)
-        if session_id:
-            entries = [
-                entry
-                for entry in entries
-                if (entry.get("content") or {}).get("session_id") == session_id
-            ]
+        entries = self.memory_store.search_memory(
+            namespace_prefix=namespace,
+            query=query,
+            session_id=session_id,
+            source_provider=source_provider,
+            limit=limit,
+        )
         return entries[:limit]
 
     def summarize_context(
@@ -98,7 +98,21 @@ class ContextHub:
         return {"count": len(entries), "summary": "\n".join(lines), "items": entries}
 
     def get_session(self, session_id: str, *, limit: int = 50) -> List[Dict[str, Any]]:
-        return self.search_context(session_id=session_id, limit=limit)
+        items = self.search_context(session_id=session_id, limit=limit)
+        if items:
+            return items
+
+        # Fallback for historical / non-canonical payload layouts where session_id is
+        # only present in serialized content or memory key.
+        by_query = self.search_context(query=session_id, limit=limit)
+        if by_query:
+            return by_query
+
+        return self.memory_store.search_memory(
+            namespace_prefix=AI_CONTEXT_ROOT,
+            memory_key=session_id,
+            limit=limit,
+        )
 
     def _summarize_content(self, content: Dict[str, Any]) -> str:
         text = content.get("summary") or content.get("result") or content.get("reply") or content.get("text")
@@ -106,4 +120,3 @@ class ContextHub:
             text = json.dumps(content, ensure_ascii=False, sort_keys=True)
         text = str(text).strip()
         return text[:240] + ("..." if len(text) > 240 else "")
-

@@ -15,3 +15,12 @@ CREATE INDEX IF NOT EXISTS agent_memory_key_idx
 
 CREATE INDEX IF NOT EXISTS agent_memory_created_at_idx
     ON agent_memory (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS agent_memory_content_session_id_idx
+    ON agent_memory ((content->>'session_id'));
+
+CREATE INDEX IF NOT EXISTS agent_memory_content_task_id_idx
+    ON agent_memory ((content->>'task_id'));
+
+CREATE INDEX IF NOT EXISTS agent_memory_content_source_provider_idx
+    ON agent_memory ((content->>'source_provider'));

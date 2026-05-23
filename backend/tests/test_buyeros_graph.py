@@ -49,5 +49,6 @@ def test_graph_routes_coding_task_to_provider() -> None:
         session_id="s-code",
     )
 
-    assert "claude" in reply.lower()
-
+    assert "provider key is not configured" in reply.lower()
+    assert workflow.context_hub.search_context(source_provider="claude", session_id="s-code")
+    assert workflow.context_hub.search_context(source_provider="openai", session_id="s-code")
