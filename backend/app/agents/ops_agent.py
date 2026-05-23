@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from ..registry import ToolRegistry
 from ..memory_store import MemoryStore
@@ -96,7 +96,7 @@ class OpsAgent:
         self.memory.save_memory(
             ["buyeros", "refunds"],
             txn_id,
-            {"result": result, "provider": "ops_agent"},
+            {"result": result, "provider": "ops_agent", "project_id": "cloth", "project": "cloth"},
             created_by="ops_agent",
         )
         return result

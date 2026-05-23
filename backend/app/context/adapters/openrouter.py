@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import os
+import logging
 from typing import Any, Dict, List, Optional
 
 import requests
 
 from ..provider_registry import BaseProviderAdapter
+
+logger = logging.getLogger(__name__)
 
 
 class OpenRouterProviderAdapter(BaseProviderAdapter):
@@ -27,13 +30,23 @@ class OpenRouterProviderAdapter(BaseProviderAdapter):
             {"role": "system", "content": "You are a BuyerOS provider. Use the supplied shared context and answer concisely."},
             {"role": "user", "content": f"Shared context:\n{context_text}\n\nTask:\n{prompt}"},
         ]
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": model, "messages": messages},
-            timeout=30,
-        )
-        response.raise_for_status()
-        data = response.json()
-        reply = data["choices"][0]["message"]["content"]
-        return {"provider": self.name, "ok": True, "reply": reply, "model": model}
+        try:
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={"model": model, "messages": messages},
+                timeout=30,
+            )
+            response.raise_for_status()
+            data = response.json()
+            reply = data["choices"][0]["message"]["content"]
+            return {"provider": self.name, "ok": True, "reply": reply, "model": model}
+        except Exception as exc:
+            logger.error("OpenRouter provider call failed: %s", exc)
+            return {
+                "provider": self.name,
+                "ok": False,
+                "reply": "[openrouter] provider call failed; stored task context only.",
+                "error": str(exc),
+                "model": model,
+            }

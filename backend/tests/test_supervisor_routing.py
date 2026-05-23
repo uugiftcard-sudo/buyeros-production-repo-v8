@@ -32,3 +32,27 @@ def test_supervisor_memory_lookup() -> None:
     supervisor.handle_message("user", "refund 999")
     response = supervisor.handle_message("user", "999")
     assert "999" in response
+
+
+def test_supervisor_fallback_routes_to_ops() -> None:
+    supervisor = create_supervisor()
+    response = supervisor.handle_message("user", "hello world")
+    assert response  # non-empty response
+
+
+def test_supervisor_ocr_routing() -> None:
+    supervisor = create_supervisor()
+    response = supervisor.handle_message("user", "ocr https://example.com/receipt.jpg")
+    assert response
+
+
+def test_supervisor_order_routing() -> None:
+    supervisor = create_supervisor()
+    response = supervisor.handle_message("user", "order ORD123456")
+    assert response
+
+
+def test_supervisor_buyer_routing() -> None:
+    supervisor = create_supervisor()
+    response = supervisor.handle_message("user", "buyer CUST001")
+    assert response

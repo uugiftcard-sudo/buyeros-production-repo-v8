@@ -1,0 +1,45 @@
+#!/usr/bin/expect -f
+set timeout 45
+
+set host $env(STAGING_HOST)
+set oldpass $env(STAGING_OLD_PASSWORD)
+set newpass $env(STAGING_NEW_PASSWORD)
+set pubkey $env(STAGING_PUBLIC_KEY)
+
+spawn ssh -tt -o StrictHostKeyChecking=accept-new -o PreferredAuthentications=password -o PubkeyAuthentication=no $host
+
+expect {
+  -re "(?i)password:" {
+    send "$oldpass\r"
+    exp_continue
+  }
+  -re "Current password:" {
+    send "$oldpass\r"
+    exp_continue
+  }
+  -re "New password:" {
+    send "$newpass\r"
+    exp_continue
+  }
+  -re "Retype new password:" {
+    send "$newpass\r"
+    exp_continue
+  }
+  -re {[$#] $} {
+    send "mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && grep -qxF '$pubkey' ~/.ssh/authorized_keys || echo '$pubkey' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && echo STAGING_KEY_INSTALLED\r"
+    exp_continue
+  }
+  -re "STAGING_KEY_INSTALLED" {
+    puts "STAGING_KEY_INSTALLED"
+    send "exit\r"
+    exp_continue
+  }
+  eof {
+    catch wait result
+    exit [lindex $result 3]
+  }
+  timeout {
+    puts "timeout installing staging ssh key"
+    exit 124
+  }
+}
