@@ -99,8 +99,11 @@ class RetryRequest(BaseModel):
 
 class CloseCycleRequest(BaseModel):
     ocr_text: str = Field(default="UI 測試 OCR 入帳 HKD 88", min_length=1)
-    expected_total: float = 0
-    actual_total: float = 0
+    expected_total: Optional[float] = None
+    actual_total: Optional[float] = None
+    order_id: Optional[str] = None
+    image_url: Optional[str] = None
+    ocr_language: str = "eng"
     reference: str = "ui-close-cycle"
     source: str = "api"
     retry_error: Optional[str] = None

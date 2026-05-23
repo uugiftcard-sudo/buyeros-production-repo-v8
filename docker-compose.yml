@@ -6,6 +6,10 @@ services:
       - .env
     ports:
       - "8000:8000"
+    environment:
+      - BUYEROS_OPS_SUMMARY_DIR=/infra/ops_runs
+    volumes:
+      - ./infra/ops_runs:/infra/ops_runs
     depends_on:
       - redis
     command: ["uvicorn", "app.workflows.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]

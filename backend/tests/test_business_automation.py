@@ -136,6 +136,62 @@ def test_close_cycle_persists_all_operational_records() -> None:
     assert memory.search_memory(namespace_prefix=("buyeros", "close_cycles"), limit=10)
 
 
+def test_close_cycle_uses_order_total_and_ocr_image_text() -> None:
+    class FakeOrders:
+        def get_order(self, order_id: str) -> dict:
+            return {"order_id": order_id, "total_hkd": "100.00", "currency": "HKD", "status": "paid"}
+
+    class FakeOcr:
+        def extract_text(self, *, image_url: str = "", language: str = "eng") -> dict:
+            return {"ok": "true", "text": "Receipt total HKD 88.00", "provider": "ocr_space"}
+
+    memory = MemoryStore()
+    service = BusinessAutomationService(memory, orders_service=FakeOrders(), ocr_service=FakeOcr())
+
+    result = service.close_cycle(
+        ocr_text="fallback text",
+        expected_total=None,
+        actual_total=None,
+        order_id="991",
+        image_url="https://example.com/receipt.jpg",
+        reference="cycle-real-991",
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "needs_review"
+    assert result["data"]["expected_total_source"] == "order"
+    assert result["data"]["actual_total_source"] == "ocr"
+    assert result["data"]["reconciliation"]["data"]["expected_total"] == 100
+    assert result["data"]["reconciliation"]["data"]["actual_total"] == 88
+    assert memory.search_memory(namespace_prefix=("buyeros", "orders"), memory_key="991")
+
+
+def test_close_cycle_missing_order_or_ocr_amount_creates_approval() -> None:
+    class FakeOrders:
+        def get_order(self, order_id: str) -> dict:
+            return {"order_id": order_id, "error": "not found"}
+
+    class FakeOcr:
+        def extract_text(self, *, image_url: str = "", language: str = "eng") -> dict:
+            return {"ok": "true", "text": "Receipt without amount", "provider": "ocr_space"}
+
+    memory = MemoryStore()
+    service = BusinessAutomationService(memory, orders_service=FakeOrders(), ocr_service=FakeOcr())
+
+    result = service.close_cycle(
+        ocr_text="fallback text",
+        expected_total=None,
+        actual_total=None,
+        order_id="missing",
+        image_url="https://example.com/blank.jpg",
+        reference="cycle-review",
+    )
+
+    assert result["status"] == "needs_review"
+    assert result["data"]["approval"] is not None
+    assert result["data"]["review_reasons"]
+
+
 def test_ops_status_reads_latest_summaries(tmp_path) -> None:
     (tmp_path / "backup-latest.json").write_text(
         '{"ok":true,"action":"backup","target":"host","started_at":"2026-05-23T00:00:00Z","ended_at":"2026-05-23T00:00:01Z","duration_seconds":1,"notes":"Backup created","archive_path":"host:/backup.tgz"}',
