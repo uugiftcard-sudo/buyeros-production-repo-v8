@@ -50,8 +50,8 @@ All inherit from `BaseProviderAdapter`. Providers exchange context via `ContextH
 
 | Provider | Default OpenRouter Model | Env Override |
 |---|---|---|
-| `claude` | `anthropic/claude-3.5-sonnet` | `OPENROUTER_MODEL_CLAUDE` |
-| `cursor` | `openai/gpt-4o-mini` | `OPENROUTER_MODEL_CURSOR` |
+| `claude` | `anthropic/claude-sonnet-4.5` | `OPENROUTER_MODEL_CLAUDE` |
+| `cursor` | `anthropic/claude-sonnet-4.5` | `OPENROUTER_MODEL_CURSOR` |
 | `openai` | `openai/gpt-4o-mini` | `OPENROUTER_MODEL_OPENAI` |
 | `openrouter` | `openai/gpt-4o-mini` | `OPENROUTER_MODEL_SUPERVISOR` |
 | `gemini` | `google/gemini-pro-1.5` | `OPENROUTER_MODEL_GEMINI` |

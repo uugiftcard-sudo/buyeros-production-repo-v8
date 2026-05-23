@@ -5,4 +5,4 @@ from ..provider_registry import BaseProviderAdapter
 
 class ClaudeProviderAdapter(BaseProviderAdapter):
     name = "claude"
-    default_openrouter_model = "anthropic/claude-3.5-sonnet"
+    default_openrouter_model = "anthropic/claude-sonnet-4.5"

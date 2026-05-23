@@ -45,7 +45,7 @@ class TestAIModelRouter:
 
     def test_route_finance_model_selected(self, monkeypatch) -> None:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
-        monkeypatch.setenv("OPENROUTER_MODEL_FINANCE", "anthropic/claude-3.5-sonnet")
+        monkeypatch.setenv("OPENROUTER_MODEL_FINANCE", "anthropic/claude-sonnet-4.5")
         monkeypatch.setenv("OPENROUTER_MODEL_SUPERVISOR", "openai/gpt-4o-mini")
 
         mock_response = MagicMock()
@@ -60,7 +60,7 @@ class TestAIModelRouter:
             result = router.route(role="finance", prompt="what is profit")
             assert result == "Profit this month: HKD 5000."
             call_json = mock_post.call_args[1]["json"]
-            assert call_json["model"] == "anthropic/claude-3.5-sonnet"
+            assert call_json["model"] == "anthropic/claude-sonnet-4.5"
 
     def test_route_timeout_raises(self, monkeypatch) -> None:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
