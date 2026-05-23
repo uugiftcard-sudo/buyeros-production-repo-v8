@@ -9,14 +9,51 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 ## [Unreleased]
 
 ### Added
-- **scrapers**: Full multi-platform scraping CLI scaffold with 7 platform scrapers (LinkedIn, B2B Contact Finder, Trip.com, Amazon, eBay, Loyalty Checker, UK Supermarket)
-- **scrapers**: `config.yaml` for centralized configuration management
-- **scrapers**: Docker + Docker Compose setup with multi-stage Dockerfile
-- **scrapers**: `pyproject.toml` with Click, Pydantic, Rich, and pytest
-- **scrapers**: GitHub Actions CI workflow (`ci.yml`) and scheduled run workflow (`scheduled.yml`)
-- **scrapers**: Makefile with `install`, `test`, `lint`, `docker-build`, `docker-run` targets
-- **scrapers**: `import_exports.sh` — AI conversation export organizer (Claude, ChatGPT, Gemini, Perplexity, Other-AI)
-- **scrapers**: Standalone scraper scripts (`amazon_scraper.py`, `ebay_scraper.py`, `linkedin_scraper.py`, `loyalty_checker.py`, `trip_scraper.py`, `uk_supermarket_scraper.py`, `b2b_contact_finder.py`)
+- **CLOTH**: Multi-market (UK / HK / CN) support — three independent storefronts with market-specific copy, branding, and currency conversion
+- **CLOTH**: `src/types/market.ts` — Market types, `MARKET_CONFIGS` (exchange rates, currency symbols, locales), `convertPrice()`, `formatPrice()`
+- **CLOTH**: `src/hooks/useMarket.tsx` — `MarketProvider` + `useMarket()` hook; persists active market to localStorage, updates browser URL path
+- **CLOTH**: `src/pages/UKHome.tsx` — full British English landing page with GBP pricing (¥CNY × 0.11), EN trust copy, Same-Day UK Delivery messaging
+- **CLOTH**: `src/pages/HKHome.tsx` — full Traditional Chinese landing page with HKD pricing (¥CNY × 1.32), bilingual branding
+- **CLOTH**: `src/pages/Home.tsx` (CN) — updated to use CN market; all three home pages share CSS via `Home.module.css`
+- **CLOTH**: `src/components/Header.tsx` — market selector dropdown (UK🇬🇧 / HK🇭🇰 / CN🇨🇳) with animated dropdown; nav/search/copy adapts per market
+- **CLOTH**: `src/components/Footer.tsx` — market-aware footer with per-region links, brand lists, legal copy, and social icons
+- **CLOTH**: `src/components/ProductCard.tsx` — prices auto-formatted to active market currency; condition labels in EN for UK
+- **CLOTH**: `src/pages/ProductDetail.tsx` — market-aware: condition labels, trust items, form placeholders, phone regex patterns, CTA copy
+- **CLOTH**: `src/pages/ProductList.tsx` — market-aware filter labels, pagination copy, API calls include `market` param
+- **CLOTH**: `src/pages/Cart.tsx` — market-aware checkout form, currency display, empty states, phone validation
+- **CLOTH**: `src/pages/Orders.tsx` — market-aware order list with status labels and locale date formatting
+- **CLOTH**: `src/pages/Admin.tsx` — all API calls updated to include `market` param
+- **CLOTH**: `src/api/client.ts` — all API methods now require `market: Market` as first arg; `displayPrice()` helper exported for cross-component use
+- **CLOTH/api**: `src/models/store.ts` — added `market` field to products (UK/HK/CN/ALL); `filterProductsByMarket()` helper; 6 new UK-only + 3 new HK-only seed products added
+- **CLOTH/api**: `src/models/types.ts` — added `MarketScope` type and optional `market` field to `Product` interface
+- **CLOTH/api**: `src/routes/products.ts` — `GET /api/products` now reads `market` query param to filter by market scope
+- **scrapers**: 5 new test files covering config, jobs, async_base, cache, metrics, and observability — 57 new tests (94 total, all passing)
+- **scrapers**: `src/scrapers/async_base.py` — AsyncBaseScraper with semaphore concurrency, Prometheus metrics, exponential backoff
+- **scrapers**: `src/metrics_app.py` — Prometheus ASGI mount for `/metrics` endpoint
+- **scrapers**: `src/cache.py` — Redis-backed cache layer with graceful degradation (no-op on Redis unavailable)
+- **scrapers**: `src/observability.py` — structlog + Sentry observability bootstrap
+- **BuyerOS/admin**: 月結管理 page (`app/periods/page.tsx`) — period lifecycle management with open/close, SQL helpers, step-by-step guide
+- **BuyerOS/admin**: 通訊記錄 page (`app/communications/page.tsx`) — communications CRM with channel/direction/tag filters, archive, new entry form
+- **BuyerOS/admin**: Financials SVG P&L chart — 6-month revenue vs expenses bar chart
+- **BuyerOS/admin**: Sidebar — added 運營 section with 通訊記錄 link; fixed `useRouter` import in `orders/new`
+- **XAU/server**: Real price feed (`server/services/priceService.js`) — Finnhub primary → GoldAPI fallback → mock, EventEmitter polling, graceful SIGTERM shutdown
+
+### Fixed
+- **scrapers**: `dashboard.py` line 153 — `{port}` not interpolated in f-string (displayed literally instead of showing port number)
+- **scrapers**: `config.py` — added `__getattr__` so `from src.config import settings` works (was only accessible via `get_settings()`)
+- **scrapers**: `models/vinted.py` — `ItemCondition`, `ItemStatus`, `Gender` updated from deprecated `str, Enum` to `StrEnum`; added missing `Enum` import
+- **scrapers**: `scrapers/aliexpress.py` — import sort order fixed (third-party `random` before first-party `src.config`)
+- **scrapers**: auto-fixed 6 lint errors (unused imports in tests), updated `pyproject.toml` ruff config to modern `[tool.ruff.lint]` format, verified 37/37 tests pass and lint is clean
+- **CLOTH**: fixed 3 TypeScript errors — `client.ts` Error.cause (ES2020 compat), `Home.tsx` PaginatedResponse unwrapping (`.data`), `ProductDetail.tsx` null guard in closure — type check clean ✅
+- **CLOTH**: `ProductDetail.tsx` — added `if (!product) return` guard in `handleBuy` to prevent null access when product loads async
+
+### Verified
+- **scrapers**: CI tools verified — `ruff check` clean (0 warnings), `pytest` 94 passed (all modules, incl. new)
+- **XAU**: demo server live at `http://localhost:4173/`, all 4 key pages confirmed 200 (index, obs-scene, live-engine, quiz, member-dashboard)
+- **CLOTH**: project structure verified — all dirs present (api, web, scripts, agent-tasks, packages, services, apps), README complete and accurate
+
+### Updated
+- **BuyerOS**: `ARCHITECTURE.md` v1.1.1 — confirmed Deno runtime, Supabase Auth, Next.js admin UI, Edge Functions list; updated confirmation checklist
 
 ---
 

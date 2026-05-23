@@ -289,37 +289,46 @@ CREATE OR REPLACE FUNCTION backfill_journal_entries(
 )
 RETURNS TABLE (source_type TEXT, posted_count BIGINT, skipped_count BIGINT) AS $$
 DECLARE
-    posted INT := 0;
-    skipped INT := 0;
+    rec RECORD;
 BEGIN
     -- Backfill transactions
     IF p_source_type IS NULL OR p_source_type = 'transaction' THEN
-        FOR posted, skipped IN
-            SELECT COUNT(a.entry_id)::BIGINT, COUNT(NULLIF(a.entry_id, NULL))::BIGINT
-            FROM (
-                SELECT apply_journal_rule('transaction', id) AS entry_id
-                FROM transactions
-                WHERE created_at > '2024-01-01'
-                LIMIT 10000  -- safety: process in batches if large table
-            ) s
-        LOOP END LOOP;
+        FOR rec IN
+            SELECT apply_journal_rule('transaction', id) AS entry_id
+            FROM transactions
+            WHERE created_at > '2024-01-01'
+            ORDER BY created_at
+            LIMIT 10000  -- safety: process in batches if large table
+        LOOP
+            IF rec.entry_id IS NOT NULL THEN
+                posted := posted + 1;
+            ELSE
+                skipped := skipped + 1;
+            END IF;
+        END LOOP;
 
-        RETURN QUERY SELECT 'transaction'::TEXT, posted, skipped;
+        RETURN QUERY SELECT 'transaction'::TEXT, posted::BIGINT, skipped::BIGINT;
+        posted := 0;
+        skipped := 0;
     END IF;
 
     -- Backfill refunds
     IF p_source_type IS NULL OR p_source_type = 'refund' THEN
-        FOR posted, skipped IN
-            SELECT COUNT(a.entry_id)::BIGINT, COUNT(NULLIF(a.entry_id, NULL))::BIGINT
-            FROM (
-                SELECT apply_journal_rule('refund', id) AS entry_id
-                FROM refunds
-                WHERE created_at > '2024-01-01'
-                LIMIT 10000
-            ) s
-        LOOP END LOOP;
+        FOR rec IN
+            SELECT apply_journal_rule('refund', id) AS entry_id
+            FROM refunds
+            WHERE created_at > '2024-01-01'
+            ORDER BY created_at
+            LIMIT 10000
+        LOOP
+            IF rec.entry_id IS NOT NULL THEN
+                posted := posted + 1;
+            ELSE
+                skipped := skipped + 1;
+            END IF;
+        END LOOP;
 
-        RETURN QUERY SELECT 'refund'::TEXT, posted, skipped;
+        RETURN QUERY SELECT 'refund'::TEXT, posted::BIGINT, skipped::BIGINT;
     END IF;
 END;
 $$ LANGUAGE plpgsql;

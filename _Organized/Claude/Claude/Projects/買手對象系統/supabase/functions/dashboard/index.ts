@@ -31,8 +31,16 @@ Deno.serve(async (req: Request) => {
       case 'summary': return await getSummary();
       case 'buyers': return await getBuyersDashboard();
       case 'financials': return await getFinancials(url);
-      default:
+      default: {
+        // Support /dashboard/buyers/:id — extract id from pathParts[pathParts.length - 2]
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        const secondLast = pathParts[pathParts.length - 2];
+        if (secondLast === 'buyers') {
+          const id = pathParts[pathParts.length - 1];
+          return await getBuyerById(id);
+        }
         return errorResponse('NOT_FOUND', `Unknown resource: ${resource}`, 404);
+      }
     }
   } catch (err) {
     console.error('dashboard API error:', err);
@@ -91,6 +99,7 @@ async function getSummary() {
 }
 
 // ─── GET /functions/v1/dashboard/buyers ────────────────────────────────────────
+// Also handles GET /functions/v1/dashboard/buyers/:id
 
 async function getBuyersDashboard() {
   const { data, error } = await supabase
@@ -98,9 +107,11 @@ async function getBuyersDashboard() {
     .select(`
       id,
       display_name,
+      phone,
       status,
       rating_avg,
       rating_count,
+      commission_rate,
       created_at,
       orders:orders(count),
       settlements:settlements(
@@ -113,6 +124,30 @@ async function getBuyersDashboard() {
   if (error) return errorResponse('DB_ERROR', 'Failed to fetch buyers', 500, error);
 
   return jsonResponse(data ?? []);
+}
+
+async function getBuyerById(id: string) {
+  const { data, error } = await supabase
+    .from('buyers')
+    .select(`
+      *,
+      orders:orders(
+        id, order_number, status, total_amount_cents, created_at,
+        customer:customers(display_name)
+      ),
+      settlements:settlements(
+        id, settlement_number, status, total_sales_cents,
+        commission_amount_cents, period_start, period_end, created_at
+      )
+    `)
+    .eq('id', id)
+    .single();
+
+  if (error || !data) {
+    return errorResponse('NOT_FOUND', 'Buyer not found', 404);
+  }
+
+  return jsonResponse(data);
 }
 
 // ─── GET /functions/v1/dashboard/financials ────────────────────────────────────

@@ -1,14 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { formatCents } from '@/lib/api';
 import Sidebar from '@/components/Sidebar';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+import { supabase } from '@/lib/supabase';
 
 export default function FinancialsPage() {
   const [trialBalance, setTrialBalance] = useState<Record<string, unknown>[]>([]);
@@ -119,6 +114,98 @@ export default function FinancialsPage() {
               </tbody>
             </table>
           )}
+        </div>
+
+        {/* P&L Bar Chart */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">📊 月度收支趨勢圖</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>最近 6 期</span>
+          </div>
+          {(() => {
+            // Mock 6-month data for visualization (replace with real API data when available)
+            const mockMonths = ['2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05'];
+            const mockRevenue = [1250000, 1480000, 1100000, 1650000, 1320000, 980000];
+            const mockExpenses = [820000, 950000, 740000, 1080000, 880000, 650000];
+            const maxVal = Math.max(...mockRevenue, ...mockExpenses);
+
+            const chartH = 200;
+            const chartW = 600;
+            const barGroupW = chartW / mockMonths.length;
+            const barW = barGroupW * 0.35;
+            const labelH = 28;
+            const scale = (chartH - labelH) / maxVal;
+
+            return (
+              <div style={{ overflowX: 'auto' }}>
+                <svg
+                  viewBox={`0 0 ${chartW} ${chartH}`}
+                  style={{ width: '100%', maxWidth: chartW, height: 'auto', display: 'block', fontFamily: 'monospace' }}
+                >
+                  {/* Grid lines */}
+                  {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => {
+                    const y = chartH - labelH - frac * (chartH - labelH);
+                    const val = Math.round(maxVal * frac / 10000) * 10000;
+                    return (
+                      <g key={i}>
+                        <line x1={0} y1={y} x2={chartW} y2={y} stroke="#e5e7eb" strokeWidth={1} />
+                        <text x={chartW - 4} y={y - 3} textAnchor="end" fontSize={9} fill="#9ca3af">
+                          HK${(val / 100).toFixed(0)}k
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {/* Bars */}
+                  {mockMonths.map((month, i) => {
+                    const groupX = i * barGroupW + barGroupW * 0.15;
+                    const revH = mockRevenue[i] * scale;
+                    const expH = mockExpenses[i] * scale;
+                    const revY = chartH - labelH - revH;
+                    const expY = chartH - labelH - expH;
+                    const label = month.slice(5) + '月';
+
+                    return (
+                      <g key={month}>
+                        {/* Revenue bar */}
+                        <rect
+                          x={groupX} y={revY}
+                          width={barW} height={revH}
+                          fill="#10b981" rx={2}
+                        />
+                        {/* Expense bar */}
+                        <rect
+                          x={groupX + barW + 4} y={expY}
+                          width={barW} height={expH}
+                          fill="#f87171" rx={2}
+                        />
+                        {/* Month label */}
+                        <text
+                          x={groupX + barW + 2} y={chartH - 8}
+                          textAnchor="middle" fontSize={10} fill="#6b7280"
+                        >
+                          {label}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+                <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.8rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ width: 12, height: 12, background: '#10b981', borderRadius: 2, display: 'inline-block' }}></span>
+                    收入 (Revenue)
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ width: 12, height: 12, background: '#f87171', borderRadius: 2, display: 'inline-block' }}></span>
+                    支出 (Expenses)
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
+                  💡 圖表使用示例數據。Supabase 中執行 <code style={{ background: '#f3f4f6', padding: '0.1rem 0.3rem' }}>SELECT * FROM v_pnl_summary ORDER BY period DESC LIMIT 6</code> 以獲取真實數據。
+                </p>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Monthly P&L Detail */}

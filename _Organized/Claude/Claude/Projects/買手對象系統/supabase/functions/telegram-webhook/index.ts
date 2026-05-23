@@ -456,11 +456,11 @@ async function answerCallback(callbackId: string) {
 
 function getMainMenuKeyboard() {
   return {
-    inline_keyboard: [
-      [{ text: '📦 我的訂單', callback_data: 'menu:myorders' }],
-      [{ text: '💰 結算餘額', callback_data: 'menu:balance' }],
-      [{ text: '📝 新下單', callback_data: 'menu:neworder' }],
-    ],
+    inline_keyboard: [[
+      { text: '📦 我的訂單', callback_data: 'menu:myorders' },
+      { text: '💰 結算餘額', callback_data: 'menu:balance' },
+      { text: '📝 新下單', callback_data: 'menu:neworder' },
+    ]],
   };
 }
 

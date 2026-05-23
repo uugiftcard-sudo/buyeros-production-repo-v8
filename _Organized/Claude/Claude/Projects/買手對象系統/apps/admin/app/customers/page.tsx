@@ -1,9 +1,83 @@
 'use client';
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useEffect, useState } from 'react';
-import { getCustomers, formatDate } from '@/lib/api';
+import { getCustomers, createCustomer, updateCustomer, formatDate } from '@/lib/api';
 import Sidebar from '@/components/Sidebar';
 import type { Customer } from '@/lib/api';
+
+type ModalMode = 'create' | 'edit';
+
+function CustomerModal({
+  mode,
+  customer,
+  onSave,
+  onClose,
+}: {
+  mode: ModalMode;
+  customer?: Customer;
+  onSave: (data: Partial<Customer>) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [displayName, setDisplayName] = useState(customer?.display_name ?? '');
+  const [phone, setPhone] = useState(customer?.phone ?? '');
+  const [email, setEmail] = useState(customer?.email ?? '');
+  const [notes, setNotes] = useState(customer?.notes ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = async () => {
+    if (!displayName.trim()) { setError('姓名不可為空'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      await onSave({ display_name: displayName.trim(), phone: phone.trim() || null, email: email.trim() || null, notes: notes.trim() || null });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '儲存失敗');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+    }}>
+      <div className="card" style={{ width: '400px', maxWidth: '90vw' }}>
+        <div className="card-header">
+          <span className="card-title">{mode === 'create' ? '➕ 新建客戶' : '✏️ 編輯客戶'}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
+        </div>
+        <div style={{ display: 'grid', gap: '1rem', padding: '1rem 0' }}>
+          <div className="form-group">
+            <label className="form-label">姓名 *</label>
+            <input className="form-input" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="客戶姓名" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">電話</label>
+            <input className="form-input" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+852 9xxx xxxx" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">電郵</label>
+            <input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@example.com" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">備註</label>
+            <textarea className="form-textarea" value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="客戶偏好或特殊需求..." />
+          </div>
+          {error && <div style={{ color: 'var(--color-danger)', fontSize: '0.875rem' }}>{error}</div>}
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          <button className="btn btn-outline" onClick={onClose}>取消</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? '儲存中...' : '儲存'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -11,6 +85,8 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
+  const [modalMode, setModalMode] = useState<ModalMode | null>(null);
+  const [editTarget, setEditTarget] = useState<Customer | undefined>(undefined);
 
   const fetchCustomers = async (pageNum: number, searchTerm: string) => {
     setLoading(true);
@@ -22,7 +98,7 @@ export default function CustomersPage() {
 
   useEffect(() => {
     fetchCustomers(page, search);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -30,6 +106,22 @@ export default function CustomersPage() {
     setPage(1);
     fetchCustomers(1, search);
   };
+
+  const handleSave = async (formData: Partial<Customer>) => {
+    if (modalMode === 'create') {
+      const { data, error } = await createCustomer(formData);
+      if (error) throw new Error(error.message);
+      if (data) setCustomers(prev => [data, ...prev]);
+    } else if (editTarget) {
+      const { data, error } = await updateCustomer(editTarget.id, formData);
+      if (error) throw new Error(error.message);
+      if (data) setCustomers(prev => prev.map(c => c.id === editTarget.id ? { ...c, ...data } : c));
+    }
+  };
+
+  const handleEdit = (c: Customer) => { setEditTarget(c); setModalMode('edit'); };
+  const handleCreate = () => { setEditTarget(undefined); setModalMode('create'); };
+  const closeModal = () => { setModalMode(null); setEditTarget(undefined); };
 
   return (
     <div className="app-shell">
@@ -52,9 +144,7 @@ export default function CustomersPage() {
             />
             <button type="submit" className="btn btn-outline">搜尋</button>
           </form>
-          <button className="btn btn-primary" onClick={() => alert('新客戶功能：使用 Telegram Bot 或 Supabase Studio 新增')}>
-            + 新客戶
-          </button>
+          <button className="btn btn-primary" onClick={handleCreate}>+ 新客戶</button>
         </div>
 
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -92,7 +182,7 @@ export default function CustomersPage() {
                     <td>{c.recent_orders?.length ?? 0} 單</td>
                     <td>{formatDate(c.created_at)}</td>
                     <td>
-                      <button className="btn btn-outline btn-sm">編輯</button>
+                      <button className="btn btn-outline btn-sm" onClick={() => handleEdit(c)}>編輯</button>
                     </td>
                   </tr>
                 ))}
@@ -111,6 +201,15 @@ export default function CustomersPage() {
           </div>
         )}
       </main>
+
+      {modalMode && (
+        <CustomerModal
+          mode={modalMode}
+          customer={editTarget}
+          onSave={handleSave}
+          onClose={closeModal}
+        />
+      )}
     </div>
   );
 }

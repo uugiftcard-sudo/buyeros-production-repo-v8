@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useEffect, useState } from 'react';
 import { getRefunds, updateRefund, formatCents, formatDate } from '@/lib/api';
 import Sidebar from '@/components/Sidebar';
@@ -32,7 +34,10 @@ export default function RefundsPage() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchRefunds(page); }, [page, statusFilter]);
+  useEffect(() => {
+    fetchRefunds(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, statusFilter]);
 
   const handleAction = async (id: string, newStatus: string) => {
     const { data } = await updateRefund(id, { status: newStatus });

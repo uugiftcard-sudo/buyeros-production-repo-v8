@@ -300,5 +300,20 @@ export async function generateSettlementNumber(
     nextSeq = parseInt(seqStr, 10) + 1;
   }
 
-  return `${prefix}${nextSeq.toString().padStart(2, '0')}`;
+  return `${prefix}${nextSeq.toString().padStart(6, '0')}`;
+}
+
+/**
+ * Validate communication channel
+ */
+export function isValidChannel(channel: string): channel is
+  | 'telegram' | 'whatsapp' | 'email' | 'phone' | 'sms' | 'web' | 'in_person' {
+  return ['telegram', 'whatsapp', 'email', 'phone', 'sms', 'web', 'in_person'].includes(channel);
+}
+
+/**
+ * Validate communication direction
+ */
+export function isValidDirection(direction: string): direction is 'inbound' | 'outbound' {
+  return direction === 'inbound' || direction === 'outbound';
 }

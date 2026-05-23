@@ -26,7 +26,6 @@ const ITEM_STATUS_OPTIONS = [
 
 export default function OrderDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params.id as string;
 
   const [order, setOrder] = useState<Order | null>(null);

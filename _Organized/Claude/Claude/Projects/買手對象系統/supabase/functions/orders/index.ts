@@ -26,6 +26,42 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// ─── Order State Machine ───────────────────────────────────────────────────────
+// Valid transitions: from_status → [allowed next statuses]
+const ORDER_TRANSITIONS: Record<string, string[]> = {
+  pending:        ['assigned', 'cancelled'],
+  assigned:       ['in_procurement', 'cancelled'],
+  in_procurement: ['received', 'cancelled'],
+  received:       ['delivered'],
+  delivered:      ['completed'],
+  completed:      [],
+  cancelled:      [],
+};
+
+type OrderStatus = keyof typeof ORDER_TRANSITIONS;
+
+function getValidNextStatuses(currentStatus: string): string[] {
+  return ORDER_TRANSITIONS[currentStatus] ?? [];
+}
+
+function isValidTransition(currentStatus: string, nextStatus: string): boolean {
+  const allowed = ORDER_TRANSITIONS[currentStatus];
+  if (!allowed) return false;
+  return allowed.includes(nextStatus);
+}
+
+function getTransitionError(
+  currentStatus: string,
+  nextStatus: string
+): string {
+  const allowed = getValidNextStatuses(currentStatus);
+  if (allowed.length === 0) {
+    return `Order is '${currentStatus}' — no further transitions allowed.`;
+  }
+  return `Cannot transition from '${currentStatus}' to '${nextStatus}'. ` +
+    `Allowed next statuses: [${allowed.join(', ')}].`;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204 });
@@ -216,8 +252,61 @@ async function createOrder(body: Record<string, unknown>) {
 async function updateOrder(id: string, body: Record<string, unknown>) {
   if (!isValidUUID(id)) return errorResponse('INVALID_ID', 'Invalid order ID', 400);
 
+  // Fetch current order
+  const { data: existing, error: fetchError } = await supabase
+    .from('orders')
+    .select('id, status, assigned_buyer_id, deposit_paid_cents, delivery_proof_url')
+    .eq('id', id)
+    .single();
+
+  if (fetchError || !existing) {
+    return errorResponse('NOT_FOUND', 'Order not found', 404);
+  }
+
+  const nextStatus = body.status as string | undefined;
+
+  // ── State machine validation ──────────────────────────────────────────────
+  if (nextStatus !== undefined && nextStatus !== existing.status) {
+    if (!isValidTransition(existing.status, nextStatus)) {
+      return errorResponse(
+        'INVALID_STATUS_TRANSITION',
+        getTransitionError(existing.status, nextStatus),
+        400
+      );
+    }
+
+    // Guard: assigning → must have a buyer
+    if (nextStatus === 'assigned' && !body.assigned_buyer_id) {
+      return errorResponse(
+        'MISSING_BUYER',
+        'Transitioning to "assigned" requires assigned_buyer_id',
+        400
+      );
+    }
+
+    // Guard: delivered → delivery_proof_url required
+    if (nextStatus === 'delivered' && !body.delivery_proof_url) {
+      return errorResponse(
+        'MISSING_DELIVERY_PROOF',
+        'Transitioning to "delivered" requires delivery_proof_url',
+        400
+      );
+    }
+
+    // Guard: completed → deposit must be paid
+    if (nextStatus === 'completed' && existing.deposit_paid_cents <= 0) {
+      return errorResponse(
+        'NO_DEPOSIT_PAID',
+        'Cannot complete order without any deposit payment',
+        400
+      );
+    }
+  }
+  // ── End state machine validation ─────────────────────────────────────────
+
   const allowedFields = [
     'status',
+    'assigned_buyer_id',
     'total_amount_cents',
     'deposit_paid_cents',
     'balance_due_cents',
@@ -230,6 +319,11 @@ async function updateOrder(id: string, body: Record<string, unknown>) {
   const updates: Record<string, unknown> = {};
   for (const field of allowedFields) {
     if (body[field] !== undefined) updates[field] = body[field];
+  }
+
+  // When transitioning to assigned, also set assigned_at
+  if (nextStatus === 'assigned' && body.assigned_buyer_id) {
+    updates['assigned_at'] = new Date().toISOString();
   }
 
   if (Object.keys(updates).length === 0) {
@@ -258,6 +352,22 @@ async function assignBuyer(orderId: string, body: Record<string, unknown>) {
 
   if (!isValidUUID(String(body.buyer_id))) {
     return errorResponse('INVALID_ID', 'Invalid buyer_id format', 400);
+  }
+
+  // Fetch order to validate state machine
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('id, status')
+    .eq('id', orderId)
+    .single();
+
+  if (orderError || !order) return errorResponse('NOT_FOUND', 'Order not found', 404);
+  if (!isValidTransition(order.status, 'assigned')) {
+    return errorResponse(
+      'INVALID_STATUS_TRANSITION',
+      `Cannot assign buyer to an order with status '${order.status}'. Only 'pending' orders can be assigned.`,
+      400
+    );
   }
 
   // 確認買手存在且狀態為 active

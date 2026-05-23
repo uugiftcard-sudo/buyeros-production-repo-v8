@@ -59,23 +59,31 @@ npx supabase db dump --schema public > supabase/migrations/0001_actual_verified.
 
 ### P2.3 Admin Web UI
 
-- [ ] 完成 `apps/admin` 的 `npm install` + `npm run dev`
-- [ ] **新增頁面**：
-  - [ ] `app/orders/[id]/page.tsx` — 訂單詳情（含 items、transactions）
-  - [ ] `app/orders/new/page.tsx` — 新建訂單表單
-  - [ ] `app/buyers/page.tsx` — 買手管理頁面
-  - [ ] `app/transactions/page.tsx` — 交易記錄頁面
-  - [ ] `app/refunds/page.tsx` — 退款管理頁面
-  - [ ] `app/periods/page.tsx` — 月結管理頁面
-- [ ] **新增功能**：
-  - [ ] 新建訂單時的 buyer assignment UI
-  - [ ] 退款審批 UI（approve/reject/processing/completed）
-  - [ ] 買手結算管理（查看、審批結算單）
-  - [ ] 客戶新建表單
+- [x] 完成 `apps/admin` 的 `npm install` + `npm run dev`
+- [x] **修復 bug**：`app/orders/[id]/page.tsx` — `useRouter` 引入（真實 TS error）
+- [x] **新增頁面**：
+  - [x] `app/orders/[id]/page.tsx` — 訂單詳情（含 items、transactions）
+  - [x] `app/orders/new/page.tsx` — 新建訂單表單
+  - [x] `app/buyers/page.tsx` — 買手管理頁面
+  - [x] `app/transactions/page.tsx` — 交易記錄頁面
+  - [x] `app/refunds/page.tsx` — 退款管理頁面
+  - [x] `app/periods/page.tsx` — 月結管理頁面
+  - [x] `app/buyers/[id]/page.tsx` — 買手詳情頁面（**新建**）
+- [x] **新增功能**：
+  - [x] 買手詳情頁面（含銀行資料、佣金率顯示）
+  - [x] 客戶新建/編輯表單（Modal，非 alert）
+  - [x] `lib/api.ts` 新增 `getBuyers` / `getBuyer` 導出
+  - [x] 訂單列表買手列 JSX 語法修復（`<td>` 包裹問題）
 - [ ] **完善 financials 頁面**：
   - [ ] 圖表化顯示 P&L（月度趨勢）
   - [ ] 圖表化顯示 Trial Balance
   - [ ] 圖表化顯示收入/支出分布
+- [x] **代碼質量修復**：
+  - [x] `supabase/functions/_shared/index.ts` — `generateSettlementNumber` 墊位改為 6 位
+  - [x] `apps/admin/lib/supabase.ts` — `financials`/`periods` 使用 shared client
+  - [x] `supabase/migrations/0001_initial_reconstructed.sql` — `accounting_periods` 表結構修復（`period` 欄位、opened_by TEXT）
+  - [x] `supabase/migrations/0001_initial_reconstructed.sql` — `buyers` 表新增 `commission_rate` 欄位
+  - [x] `supabase/functions/dashboard/index.ts` — 新增 `commission_rate` 欄位至買手查詢
 
 ---
 
@@ -183,6 +191,14 @@ SELECT * FROM backfill_journal_entries();
 | RLS policy placeholder | 🟡 中 | ⏳ 待實現 | 確認 auth 方式後更新 |
 | 會計層未被真實 DB 驗證 | 🟡 中 | ⏳ 待部署 | 部署後驗證視圖 |
 | Telegram Webhook URL 未設定 | 🟡 中 | ⏳ 待設定 | BotFather setWebhook |
+| `generateSettlementNumber` 墊位 2 位 | 🟢 低 | ✅ 已修復 | padStart(6, '0') |
+| `accounting_periods` 表結構與前端不符 | 🟡 中 | ✅ 已修復 | 新增 `period` 欄位，opened_by 改為 TEXT |
+| `buyers.commission_rate` 欄位缺失 | 🟡 中 | ✅ 已修復 | 新增至 migration |
+| 訂單列表買手列 JSX 錯誤 | 🔴 高 | ✅ 已修復 | `<td>` 正確包裹 |
+| `financials`/`periods` 重複創建 client | 🟢 低 | ✅ 已修復 | 改用 `lib/supabase.ts` |
+| `lib/api.ts` 缺少 `getBuyers`/`getBuyer` | 🟡 中 | ✅ 已修復 | 新增導出 |
+| 買手頁面「查看」按鈕無功能 | 🟡 中 | ✅ 已修復 | Link to `/buyers/[id]` |
+| 客戶頁面新建/編輯為 alert | 🟡 中 | ✅ 已修復 | Modal 表單 |
 
 ---
 

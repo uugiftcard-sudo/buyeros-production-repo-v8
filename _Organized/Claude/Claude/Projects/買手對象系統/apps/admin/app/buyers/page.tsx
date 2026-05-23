@@ -1,28 +1,40 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { formatDate } from '@/lib/api';
+import Link from 'next/link';
+import { formatDate, getBuyers, type Buyer } from '@/lib/api';
 import Sidebar from '@/components/Sidebar';
-
-interface Buyer {
-  id: string;
-  display_name: string;
-  phone: string | null;
-  status: string;
-  rating_avg: number;
-  rating_count: number;
-  commission_rate: number | null;
-  created_at: string;
-  notes: string | null;
-}
 
 const STATUS_OPTIONS = [
   { value: '', label: '全部狀態' },
-  { value: 'active', label: '✅ 啟用中' },
-  { value: 'inactive', label: '❌ 停用' },
-  { value: 'pending_kyc', label: '⏳ 待 KYC' },
-  { value: 'suspended', label: '⚠️ 停權' },
+  { value: 'active', label: '啟用中' },
+  { value: 'inactive', label: '停用' },
+  { value: 'pending_kyc', label: '待 KYC' },
+  { value: 'suspended', label: '停權' },
 ];
+
+function BuyerStatCard({
+  label, value, accent,
+}: { label: string; value: string | number; accent?: string }) {
+  return (
+    <div className="stat-card" style={{ ['--stat-accent' as string]: accent ?? '#4f46e5' }}>
+      <div className="stat-label">{label}</div>
+      <div className="stat-value">{value}</div>
+    </div>
+  );
+}
+
+function statusBadgeClass(status: string) {
+  if (status === 'active') return 'badge-completed';
+  if (status === 'inactive') return 'badge-cancelled';
+  if (status === 'pending_kyc') return 'badge-pending';
+  if (status === 'suspended') return 'badge-failed';
+  return 'badge-pending';
+}
+
+function statusLabel(status: string) {
+  return STATUS_OPTIONS.find(o => o.value === status)?.label ?? status;
+}
 
 export default function BuyersPage() {
   const [buyers, setBuyers] = useState<Buyer[]>([]);
@@ -32,31 +44,19 @@ export default function BuyersPage() {
   const fetchBuyers = async () => {
     setLoading(true);
     try {
-      const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/dashboard/buyers`);
-      const res = await fetch(url.toString(), {
-        headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        },
-      });
-      const json = await res.json();
-      if (!res.ok) return;
-      setBuyers(json.data ?? []);
-    } catch {
-      // 靜默失敗，頁面保持空列表
-    } finally {
-      setLoading(false);
-    }
+      const result = await getBuyers();
+      setBuyers(result.data ?? []);
+    } catch { /* silent */ }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchBuyers(); }, []);
 
-  const filtered = statusFilter
-    ? buyers.filter(b => b.status === statusFilter)
-    : buyers;
-
-  const avgRating = buyers.length > 0
-    ? (buyers.reduce((sum, b) => sum + (b.rating_avg ?? 0), 0) / buyers.filter(b => b.rating_avg).length).toFixed(1)
+  const filtered = statusFilter ? buyers.filter(b => b.status === statusFilter) : buyers;
+  const activeCount = buyers.filter(b => b.status === 'active').length;
+  const pendingKyc = buyers.filter(b => b.status === 'pending_kyc').length;
+  const avgRating = buyers.filter(b => b.rating_avg).length > 0
+    ? (buyers.reduce((s, b) => s + (b.rating_avg ?? 0), 0) / buyers.filter(b => b.rating_avg).length).toFixed(1)
     : '—';
 
   return (
@@ -64,32 +64,21 @@ export default function BuyersPage() {
       <Sidebar />
       <main className="main-content">
         <div className="page-header">
-          <h1 className="page-title">🛒 買手管理</h1>
-          <p className="page-subtitle">買手資料、評分與結算狀態</p>
+          <div>
+            <h1 className="page-title">🛒 買手管理</h1>
+            <p className="page-subtitle">買手資料、評分與結算狀態</p>
+          </div>
+          <div className="page-header-right">
+            <button className="btn btn-primary btn-sm">+ 新增買手</button>
+          </div>
         </div>
 
         {/* Stats */}
         <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-label">總買手</div>
-            <div className="stat-value">{buyers.length}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">啟用中</div>
-            <div className="stat-value" style={{ color: 'var(--color-success)' }}>
-              {buyers.filter(b => b.status === 'active').length}
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">平均評分</div>
-            <div className="stat-value">{avgRating} ⭐</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">待 KYC</div>
-            <div className="stat-value" style={{ color: 'var(--color-warning)' }}>
-              {buyers.filter(b => b.status === 'pending_kyc').length}
-            </div>
-          </div>
+          <BuyerStatCard label="總買手" value={buyers.length} accent="#4f46e5" />
+          <BuyerStatCard label="啟用中" value={activeCount} accent="#059669" />
+          <BuyerStatCard label="平均評分" value={`${avgRating} ⭐`} accent="#d97706" />
+          <BuyerStatCard label="待 KYC" value={pendingKyc} accent="#dc2626" />
         </div>
 
         {/* Filter */}
@@ -98,20 +87,23 @@ export default function BuyersPage() {
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
             className="form-select"
-            style={{ width: 'auto', minWidth: '150px' }}
           >
             {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
+          <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+            {filtered.length} 結果
+          </span>
         </div>
 
         {/* Table */}
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="table-wrap">
           {loading ? (
             <div className="loading">載入中...</div>
           ) : filtered.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">🛒</div>
-              <p>暫無買手記錄</p>
+              <h3>暫無買手記錄</h3>
+              <p>新增第一位買手以開始使用</p>
             </div>
           ) : (
             <table className="data-table">
@@ -129,22 +121,37 @@ export default function BuyersPage() {
               <tbody>
                 {filtered.map(b => (
                   <tr key={b.id}>
-                    <td style={{ fontWeight: 600 }}>{b.display_name}</td>
-                    <td>{b.phone ?? '—'}</td>
                     <td>
-                      <span className={`badge badge-${b.status === 'active' ? 'completed' : b.status === 'inactive' ? 'cancelled' : 'pending'}`}>
-                        {STATUS_OPTIONS.find(o => o.value === b.status)?.label ?? b.status}
+                      <Link href={`/buyers/${b.id}`} style={{ fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}
+                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--primary)')}
+                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text)')}
+                      >
+                        {b.display_name}
+                      </Link>
+                    </td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{b.phone ?? '—'}</td>
+                    <td>
+                      <span className={`badge ${statusBadgeClass(b.status)}`}>
+                        {statusLabel(b.status)}
                       </span>
                     </td>
                     <td>
                       {b.rating_avg ? (
-                        <span>⭐ {b.rating_avg.toFixed(1)} <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>({b.rating_count})</span></span>
-                      ) : '—'}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <span>⭐</span>
+                          <span style={{ fontWeight: 600 }}>{b.rating_avg.toFixed(1)}</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.775rem' }}>({b.rating_count})</span>
+                        </span>
+                      ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                     </td>
-                    <td style={{ fontFamily: 'monospace' }}>{b.commission_rate ? `${(b.commission_rate * 100).toFixed(1)}%` : '—'}</td>
-                    <td>{formatDate(b.created_at)}</td>
                     <td>
-                      <button className="btn btn-outline btn-sm">查看</button>
+                      <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: 550 }}>
+                        {b.commission_rate != null ? `${(b.commission_rate * 100).toFixed(1)}%` : '—'}
+                      </span>
+                    </td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{formatDate(b.created_at)}</td>
+                    <td>
+                      <Link href={`/buyers/${b.id}`} className="btn btn-secondary btn-sm">查看</Link>
                     </td>
                   </tr>
                 ))}

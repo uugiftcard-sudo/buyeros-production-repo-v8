@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS buyers (
     -- rating
     rating_avg NUMERIC(3,2) DEFAULT 0,
     rating_count INT DEFAULT 0,
+    commission_rate NUMERIC(5,4) DEFAULT 0.05, -- e.g. 0.0500 = 5%, used for settlement calculations
     -- source
     referred_by UUID REFERENCES buyers(id),
     notes TEXT
@@ -231,12 +232,16 @@ CREATE TABLE IF NOT EXISTS journal_lines (
 -- Accounting Period (會計期間)
 CREATE TABLE IF NOT EXISTS accounting_periods (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    period_name TEXT UNIQUE NOT NULL, -- e.g. "2026-05"
+    period TEXT UNIQUE NOT NULL, -- e.g. "2026-05" (matching the frontend's period field)
+    period_name TEXT, -- friendly name e.g. "May 2026"
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
     status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed', 'archived')),
+    opened_at TIMESTAMPTZ DEFAULT NOW(),
     closed_at TIMESTAMPTZ,
-    closed_by UUID
+    opened_by TEXT,
+    closed_by TEXT,
+    notes TEXT
 );
 
 

@@ -1,8 +1,8 @@
 # BuyerOS（買手對象系統）— 系統架構文檔
 
-> 版本：1.1.0
+> 版本：1.1.1
 > 生成：2026-05-23
-> 狀態：P2 會計層已完成 ⚠️ 待驗證真實 schema
+> 狀態：P2 會計層已完成 ⚠️ 待驗證真實 schema（需在 Supabase Studio 執行 recon/supabase-audit.sql）
 
 ---
 
@@ -83,7 +83,7 @@
 | VPS | DigitalOcean | ✅ 確認 |
 | CI/CD | GitHub Actions | ✅ backup-system 使用中 |
 | Secret Vault | Bitwarden / 1Password | ✅ SECRETS-CHECKLIST.md |
-| Server Runtime | Node.js / Deno / Python | ⚠️ 未確認 |
+| Server Runtime | **Deno** (Edge Functions) | ✅ 已在 customers/index.ts 確認 |
 
 ---
 
@@ -241,31 +241,16 @@ Telegram User ──→ Bot ──→ verify telegram_user_id ──→ Supabase
 
 ## 8. 待確認清單（Confirmation Required）
 
-> 請在 Supabase Studio 執行 `recon/supabase-audit.sql` 並把結果交給 AI 填寫。
+> ⚠️ 請在 Supabase Studio 執行 `recon/supabase-audit.sql` 並把結果交給 AI 填寫。
+> ✅ 已確認的項目已標記。
 
 - [ ] 24 張 table 的完整名單
 - [ ] 每張 table 的 column 列表
 - [ ] FK 關係圖
-- [ ] RLS policy 狀態（Section D）
+- [ ] RLS policy 狀態（Section D）— **⚠️ 高優先級**
 - [ ] Trigger 列表（Section E）
-- [ ] Edge Functions 列表（Section F）
-- [ ] Auth 方式（Supabase Auth 或 Telegram OAuth？）
+- [ ] Auth 方式 — ✅ 已確認：Supabase Auth (JWT / service_role_key)
 - [ ] Bot code 的位置
-- [ ] Admin web UI 是否存在
-- [ ] 會計層（journal_entries）是否已實現
-
----
-
-## 9. 緊急 Gap（立即行動）
-
-| Gap | 嚴重度 | Action |
-|-----|--------|--------|
-| Schema 沒有本地 source | **災難級** | ✅ 已建立 `supabase/migrations/` |
-| RLS 未確認 | **高** | Run `recon/supabase-audit.sql`，Section D |
-| Audit log 不存在 | **高** | ✅ schema 已包含 placeholder |
-| 會計層未實現 | **高** | ✅ schema 已包含框架，需 Priority 2 |
-
----
-
-*最後更新：2026-05-23*
-*Doc version: 1.0.0 — PLACEHOLDER*
+- [ ] Admin web UI — ✅ 已確認：`apps/admin/` 存在 (Next.js)
+- [ ] 會計層（journal_entries）— ✅ schema 已實現，需驗證運行狀態
+- [ ] Edge Functions 完整列表 — ✅ 已確認：Deno, customers/orders/transactions/refunds/dashboard/telegram-webhook
