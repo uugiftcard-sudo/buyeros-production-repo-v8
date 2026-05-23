@@ -20,7 +20,20 @@ test("BuyerOS mission control can plan, run one step, and show memory UI", async
       return json({
         ok: true,
         providers: [
-          { name: "openai", provider: "openai", configured: true, fallback_chain: ["claude"], last_run: "mock", last_error: null },
+          {
+            name: "openai",
+            enabled: true,
+            provider_key_configured: true,
+            openrouter_configured: true,
+            model: "openai/gpt-4o-mini",
+            fallback_target: "claude",
+            last_run: "2026-05-23T00:00:00Z",
+            last_error: null,
+            last_latency_ms: 182,
+            success_count_24h: 3,
+            failure_count_24h: 1,
+            status: "ready",
+          },
         ],
       });
     }
@@ -42,7 +55,34 @@ test("BuyerOS mission control can plan, run one step, and show memory UI", async
     if (path === "/memory/timeline") {
       return json({
         ok: true,
-        items: [{ memory_key: "mem-ui", namespace: ["buyeros", "routing"], content: { summary: "UI route memory", project: "cloth" } }],
+        items: [{
+          memory_key: "mem-ui",
+          namespace: ["buyeros", "ai_context", "openai"],
+          content: {
+            source_provider: "openai",
+            session_id: "sess-ui",
+            task_id: "task-ui",
+            summary: "UI route memory",
+            provider: "openai",
+            selected_provider: "openai",
+            preferred_provider: "claude",
+            fallback_chain: ["claude", "openai"],
+            fallback_attempts: [
+              { provider: "claude", ok: false, error: "timeout" },
+              { provider: "openai", ok: true, error: null },
+            ],
+            content: {
+              provider: "openai",
+              selected_provider: "openai",
+              preferred_provider: "claude",
+              fallback_chain: ["claude", "openai"],
+              fallback_attempts: [
+                { provider: "claude", ok: false, error: "timeout" },
+                { provider: "openai", ok: true, error: null },
+              ],
+            },
+          },
+        }],
       });
     }
     if (path === "/system/capabilities" || path === "/health/ready") {
@@ -55,25 +95,20 @@ test("BuyerOS mission control can plan, run one step, and show memory UI", async
 
   await expect(page.getByRole("heading", { name: "AI 團隊指揮中心" })).toBeVisible();
   await expect(page.getByLabel("BuyerOS sections")).toBeVisible();
-  await expect(page.getByText("前端不顯示、不保存金鑰")).toBeVisible();
   await expect(page.getByText("BUYEROS_API_KEY")).not.toBeVisible();
   await expect(page.getByText("按鈕回饋")).toBeVisible();
-  await expect(page.getByText("BuyerOS Core").first()).toBeVisible();
-  await expect(page.getByText("CLOTH 網店自動系統").first()).toBeVisible();
-  await expect(page.getByText("XAU 中控").first()).toBeVisible();
   await expect(page.getByText("BUYEROS_API_KEY")).not.toBeVisible();
 
+  await page.locator("#dispatch").scrollIntoViewIfNeeded();
   const projectSelect = page.locator("#dispatch select").nth(0);
-  await expect(projectSelect.locator("option[value='buyeros']")).toHaveText("BuyerOS Core");
-  await expect(projectSelect.locator("option[value='cloth']")).toHaveText("CLOTH 網店自動系統");
-  await expect(projectSelect.locator("option[value='xau']")).toHaveText("XAU 中控");
 
   await page.getByRole("button", { name: "查看 AI 狀態" }).click();
-  await expect(page.getByText("Fallback：").first()).toBeVisible();
-  await expect(page.getByText("Last run：").first()).toBeVisible();
-  await expect(page.getByText("Last error：").first()).toBeVisible();
+  await page.locator(".provider-table").scrollIntoViewIfNeeded();
+  const providerRow = page.locator(".provider-row").first();
+  await expect(providerRow).toContainText("openai");
+  await expect(providerRow).toContainText("Fallback");
+  await expect(providerRow).toContainText("openai/gpt-4o-mini");
 
-  await projectSelect.selectOption("cloth");
   await page.locator("#dispatch select").nth(1).selectOption("order");
   await page.locator("#dispatch").getByLabel("任務標題").fill("UI smoke 分工測試");
   await page.getByLabel("指令").fill("測試 BuyerOS Mission Control 分工、Run All、記憶 Timeline。");

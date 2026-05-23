@@ -144,7 +144,7 @@ class TestProviderRegistry:
         monkeypatch.setenv("OPENROUTER_MODEL_CLAUDE", "anthropic/claude-3.5-sonnet")
         memory = MemoryStore()
         hub = ContextHub(memory)
-        registry = ProviderRegistry()
+        registry = ProviderRegistry(context_hub=hub)
         registry.register(ClaudeProviderAdapter(context_hub=hub))
         registry.register(OpenAIProviderAdapter(context_hub=hub))
 
@@ -157,6 +157,46 @@ class TestProviderRegistry:
             assert "openrouter_configured" in p
             assert "enabled" in p
             assert "model" in p
+            assert "fallback_target" in p
+            assert "last_run" in p
+            assert "last_error" in p
+            assert "last_latency_ms" in p
+            assert "success_count_24h" in p
+            assert "failure_count_24h" in p
+            assert p["status"] in {"ready", "not_configured", "degraded"}
+
+    def test_status_marks_unconfigured_provider(self, monkeypatch) -> None:
+        monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        memory = MemoryStore()
+        hub = ContextHub(memory)
+        registry = ProviderRegistry(context_hub=hub)
+        registry.register(OpenAIProviderAdapter(context_hub=hub))
+
+        status = registry.status()
+        assert status[0]["status"] == "not_configured"
+        assert status[0]["fallback_target"] is None or isinstance(status[0]["fallback_target"], str)
+
+    def test_status_uses_runtime_summary(self, monkeypatch) -> None:
+        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
+        memory = MemoryStore()
+        hub = ContextHub(memory)
+        registry = ProviderRegistry(context_hub=hub)
+
+        class StubProvider(BaseProviderAdapter):
+            name = "claude"
+
+            def run(self, prompt: str, context=None):  # type: ignore[override]
+                return {"provider": self.name, "ok": False, "reply": "boom", "error": "timeout"}
+
+        registry.register(StubProvider(context_hub=hub))
+        registry.run(prompt="fix code bug", session_id="status-runtime")
+
+        status = registry.status()[0]
+        assert status["status"] == "degraded"
+        assert status["last_run"] is not None
+        assert status["last_error"] == "timeout"
+        assert status["failure_count_24h"] >= 1
 
     def test_choose_provider_respects_preferred(self, monkeypatch) -> None:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
@@ -265,6 +305,8 @@ class TestProviderRegistry:
         with patch("requests.post", return_value=mock_response):
             result = registry.run(prompt="refund transaction 123", session_id="sess-1")
             assert result["provider"] == "claude"
+            assert result["selected_provider"] == "claude"
+            assert result["latency_ms"] is not None
             # Context should be written
             stored = hub.search_context(source_provider="claude", session_id="sess-1")
             assert len(stored) >= 1

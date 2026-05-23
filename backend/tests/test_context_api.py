@@ -59,6 +59,11 @@ def test_providers_and_audit_search_require_key_when_configured(monkeypatch) -> 
     providers = client.get("/providers", headers={"Authorization": "Bearer secret"})
     assert providers.status_code == 200
     assert providers.json()["providers"]
+    first = providers.json()["providers"][0]
+    assert "fallback_target" in first
+    assert "status" in first
+    assert "last_run" in first
+    assert "last_error" in first
 
     client.post(
         "/context/write",
@@ -80,6 +85,8 @@ def test_ready_endpoint_reports_status() -> None:
     assert body["ok"] is True
     assert "memory" in body
     assert "providers" in body
+    assert "status" in body["providers"][0]
+    assert "success_count_24h" in body["providers"][0]
 
 
 def test_system_capabilities_requires_key_when_configured(monkeypatch) -> None:

@@ -129,7 +129,7 @@ def create_app() -> FastAPI:
     )
     finance_agent = FinanceAgent(memory_store=memory_store, tool_registry=tool_registry, ai_router=ai_router)
     supervisor = SupervisorAgent(memory_store=memory_store, ops_agent=ops_agent, finance_agent=finance_agent)
-    provider_registry = ProviderRegistry()
+    provider_registry = ProviderRegistry(context_hub=context_hub)
     for provider in [
         ClaudeProviderAdapter(context_hub=context_hub),
         CursorProviderAdapter(context_hub=context_hub),

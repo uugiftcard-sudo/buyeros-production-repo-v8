@@ -159,6 +159,10 @@ class TestProvidersEndpoint:
             assert "name" in provider
             assert "enabled" in provider
             assert "model" in provider
+            assert "fallback_target" in provider
+            assert "status" in provider
+            assert "success_count_24h" in provider
+            assert "failure_count_24h" in provider
 
 
 class TestAuditSearchEndpoint:
@@ -264,3 +268,5 @@ class TestHealthReadyEndpoint:
         assert "providers" in body
         assert "telegram_configured" in body
         assert "api_key_required" in body
+        assert "status" in body["providers"][0]
+        assert "last_latency_ms" in body["providers"][0]
