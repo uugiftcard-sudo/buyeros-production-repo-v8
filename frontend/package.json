@@ -9,7 +9,7 @@
     "ui:smoke": "playwright test"
   },
   "dependencies": {
-    "next": "^16.2.6",
+    "next": "^15.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
@@ -19,7 +19,7 @@
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.4",
-    "eslint-config-next": "^16.2.6",
+    "eslint-config-next": "^15.2.0",
     "typescript": "^5.4.0"
   },
   "overrides": {
