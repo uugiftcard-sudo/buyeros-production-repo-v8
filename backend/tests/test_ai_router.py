@@ -62,7 +62,7 @@ class TestAIModelRouter:
             call_json = mock_post.call_args[1]["json"]
             assert call_json["model"] == "anthropic/claude-sonnet-4.5"
 
-    def test_route_timeout_raises(self, monkeypatch) -> None:
+    def test_route_timeout_returns_error_after_retries(self, monkeypatch) -> None:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
         monkeypatch.setenv("OPENROUTER_MODEL_SUPERVISOR", "openai/gpt-4o-mini")
 
@@ -71,20 +71,21 @@ class TestAIModelRouter:
 
         with patch("requests.post", return_value=mock_response):
             router = AIModelRouter()
-            with pytest.raises(requests.Timeout):
-                router.route(role="supervisor", prompt="hello")
+            result = router.route(role="supervisor", prompt="hello")
+            assert "error" in result.lower() or "timeout" in result.lower()
 
-    def test_route_http_error_raises(self, monkeypatch) -> None:
+    def test_route_http_429_returns_error_after_retries(self, monkeypatch) -> None:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
         monkeypatch.setenv("OPENROUTER_MODEL_SUPERVISOR", "openai/gpt-4o-mini")
 
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = requests.HTTPError("429 Rate limited")
+        mock_response.status_code = 429
 
         with patch("requests.post", return_value=mock_response):
             router = AIModelRouter()
-            with pytest.raises(requests.HTTPError):
-                router.route(role="supervisor", prompt="hello")
+            result = router.route(role="supervisor", prompt="hello")
+            assert "error" in result.lower() or "circuit" in result.lower()
 
     def test_route_generic_prompt_uses_supervisor_model(self, monkeypatch) -> None:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
