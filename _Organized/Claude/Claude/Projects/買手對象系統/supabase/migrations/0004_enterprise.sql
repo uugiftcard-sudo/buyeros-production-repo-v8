@@ -95,30 +95,7 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS source_channel TEXT DEFAULT 'telegra
 ALTER TABLE buyers ADD COLUMN IF NOT EXISTS team_id UUID REFERENCES buyer_teams(id);
 ALTER TABLE buyers ADD COLUMN IF NOT EXISTS admin_notes TEXT;
 
--- audit_log: ensure exists with full schema
-CREATE TABLE IF NOT EXISTS audit_log (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    table_name TEXT NOT NULL,
-    row_id UUID NOT NULL,
-    action TEXT NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE')),
-    old_data JSONB,
-    new_data JSONB,
-    changed_by UUID,
-    changed_by_role TEXT, -- 'owner', 'admin', 'manager', 'supervisor', 'staff', 'buyer', 'customer', 'system'
-    changed_by_name TEXT, -- human-readable name for audit trail
-    ip_address INET,
-    tg_message_id BIGINT,
-    reason TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_log_table_row ON audit_log(table_name, row_id);
-CREATE INDEX IF NOT EXISTS idx_audit_log_changed_by ON audit_log(changed_by);
-
-ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "audit_log_admin_read" ON audit_log FOR SELECT USING (TRUE);
-CREATE POLICY "audit_log_admin_write" ON audit_log FOR INSERT WITH CHECK (TRUE);
+-- audit_log: ensure exists with full schema (table definition in 0003, do not recreate here)
 
 -- ─── VIEWS ─────────────────────────────────────────────────────
 

@@ -70,6 +70,11 @@ interface TelegramUpdate {
   };
 }
 
+interface TelegramInlineKeyboardButton {
+  text: string;
+  callback_data: string;
+}
+
 async function handleUpdate(update: TelegramUpdate) {
   // Callback Query（如 inline keyboard 按鈕）
   if (update.callback_query) {
@@ -129,6 +134,95 @@ async function handleMessage(msg: TelegramUpdate['message']) {
       await showAllOrders(chatId);
       break;
 
+    case '/refund': {
+      const parts = (text ?? '').trim().split(/\s+/);
+      const orderId = parts[1];
+
+      if (!orderId) {
+        await sendMessage(chatId,
+          '📋 用法：/refund <order_id>\n' +
+          '例：/refund abc123\n\n' +
+          '或直接回覆此訊息，說明需要退款的訂單和原因，工作人員將跟進處理。'
+        );
+        return;
+      }
+
+      // 驗證 order_id 格式（UUID 或 order number）
+      const { data: order } = await supabase
+        .from('orders')
+        .select('id, order_number, status, customer:customers(telegram_user_id, display_name)')
+        .eq('order_number', orderId)
+        .maybeSingle();
+
+      if (!order) {
+        // 嘗試用 UUID 查詢
+        const { data: orderById } = await supabase
+          .from('orders')
+          .select('id, order_number, status, customer:customers(telegram_user_id, display_name)')
+          .eq('id', orderId)
+          .maybeSingle();
+        if (!orderById) {
+          await sendMessage(chatId, `❌ 找不到訂單：${orderId}`);
+          return;
+        }
+        await processRefundRequest(chatId, orderById);
+        return;
+      }
+
+      await processRefundRequest(chatId, order);
+      break;
+    }
+
+    case '/admin_refunds': {
+      if (!isAdmin) {
+        await sendMessage(chatId, '❌ 僅限管理員使用此命令。');
+        return;
+      }
+
+      const { data: refunds, error } = await supabase
+        .from('refunds')
+        .select(`
+          id, refund_number, amount_cents, reason, reason_detail, status, created_at,
+          customer:customers(id, display_name, telegram_user_id),
+          order:orders(id, order_number)
+        `)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true })
+        .limit(10);
+
+      if (error) {
+        await sendMessage(chatId, `❌ 查詢失敗：${error.message}`);
+        return;
+      }
+
+      if (!refunds || refunds.length === 0) {
+        await sendMessage(chatId, '✅ 目前沒有待審批的退款。');
+        return;
+      }
+
+      const lines = [`📋 待審批退款（${refunds.length} 筆）：\n`];
+      const keyboard: TelegramInlineKeyboardButton[][] = [];
+
+      for (const r of refunds) {
+        const customerName = r.customer?.display_name ?? '未知客戶';
+        const orderNum = r.order?.order_number ?? '—';
+        const amount = `HK$${(r.amount_cents / 100).toFixed(2)}`;
+        lines.push(`🔹 ${r.refund_number}`);
+        lines.push(`   客戶：${customerName} | 訂單：${orderNum}`);
+        lines.push(`   金額：${amount} | 原因：${r.reason ?? '無'}\n`);
+
+        keyboard.push([
+          { text: `✅批准 ${r.refund_number}`, callback_data: `apr_refund:${r.id}` },
+          { text: `❌拒絕`, callback_data: `rjt_refund:${r.id}` },
+        ]);
+      }
+
+      await sendMessage(chatId, lines.join('\n'), {
+        reply_markup: { inline_keyboard: keyboard },
+      });
+      break;
+    }
+
     case '/neworder':
       await sendMessage(chatId, '📝 請告訴我們您想採購的商品：\n格式：\n商品名稱：\n數量：\n預算（可選）：');
       break;
@@ -162,6 +256,50 @@ async function handleCallbackQuery(cb: TelegramUpdate['callback_query']) {
     case 'status_filter':
       await showOrdersByStatus(chatId, params[0]);
       break;
+
+    case 'apr_refund': {
+      const refundId = params[0];
+      const { data: refund } = await supabase
+        .from('refunds').select('id, refund_number, customer:customers(telegram_user_id)').eq('id', refundId).single();
+
+      await supabase.from('refunds').update({
+        status: 'approved',
+        approved_by: null,
+        approved_at: new Date().toISOString(),
+      }).eq('id', refundId);
+
+      await sendMessage(chatId, `✅ 退款已批准：${refund?.refund_number ?? refundId}`);
+
+      if (refund?.customer?.telegram_user_id) {
+        await sendMessage(refund.customer.telegram_user_id,
+          `📋 退款更新通知\n` +
+          `退款編號：${refund.refund_number}\n` +
+          `狀態：✅ 已批准\n\n` +
+          `工作人員將儘快處理退款，謝謝。`
+        );
+      }
+      break;
+    }
+
+    case 'rjt_refund': {
+      const refundId = params[0];
+      const { data: refund } = await supabase
+        .from('refunds').select('id, refund_number, customer:customers(telegram_user_id)').eq('id', refundId).single();
+
+      await supabase.from('refunds').update({ status: 'rejected' }).eq('id', refundId);
+
+      await sendMessage(chatId, `❌ 退款已拒絕：${refund?.refund_number ?? refundId}`);
+
+      if (refund?.customer?.telegram_user_id) {
+        await sendMessage(refund.customer.telegram_user_id,
+          `📋 退款更新通知\n` +
+          `退款編號：${refund.refund_number}\n` +
+          `狀態：❌ 已拒絕\n\n` +
+          `如有疑問，請聯絡工作人員。`
+        );
+      }
+      break;
+    }
   }
 
   // 回答 callback（消除 loading 狀態）
@@ -408,6 +546,22 @@ async function handleNewOrderRequest(chatId: number, tgId: number, text: string)
     await sendMessage(chatId,
       `✅ 已收到您的訂單！\n\n📋 訂單號：${orderNumber}\n📝 商品：${productName}\n\n我們的買手稍後會聯繫您確認價格和採購事宜。`);
   }
+}
+
+async function processRefundRequest(chatId: number, order: any) {
+  if (!['confirmed', 'in_procurement'].includes(order.status)) {
+    await sendMessage(chatId,
+      `⚠️ 訂單 ${order.order_number} 目前狀態為「${order.status}」，\n` +
+      '不符合退款條件（需要已確認或採購中狀態）。'
+    );
+    return;
+  }
+
+  await sendMessage(chatId,
+    `📋 收到退款申請：${order.order_number}\n\n` +
+    '工作人員將在 24 小時內處理。\n' +
+    '如需加快處理，請回覆此訊息說明原因。'
+  );
 }
 
 async function handlePhoto(msg: TelegramUpdate['message']) {

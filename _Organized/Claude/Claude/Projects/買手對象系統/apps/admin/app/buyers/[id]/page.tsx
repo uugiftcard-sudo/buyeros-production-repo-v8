@@ -3,8 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { getSupabaseClient } from '@/lib/supabase';
 import { formatDate } from '@/lib/api';
 import Sidebar from '@/components/Sidebar';
+
+const supabase = getSupabaseClient();
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 
 interface BuyerDetail {
   id: string;
@@ -35,6 +39,8 @@ export default function BuyerDetailPage() {
   const [buyer, setBuyer] = useState<BuyerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [kycDocs, setKycDocs] = useState<any[]>([]);
+  const [ratings, setRatings] = useState<any[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -59,6 +65,40 @@ export default function BuyerDetailPage() {
     };
     fetchBuyer();
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    const fetchExtras = async () => {
+      const [docResult, ratingResult] = await Promise.all([
+        supabase.from('buyer_documents').select('*').eq('buyer_id', id).order('created_at', { ascending: false }),
+        supabase.from('ratings').select('*, customer:customers(display_name)').eq('buyer_id', id).order('created_at', { ascending: false }).limit(10),
+      ]);
+      if (docResult.data) setKycDocs(docResult.data);
+      if (ratingResult.data) setRatings(ratingResult.data);
+    };
+    fetchExtras();
+  }, [id]);
+
+  const handleKycAction = async (buyerId: string, docId: string, status: string) => {
+    const reason = status === 'rejected' ? prompt('請輸入拒絕原因：') : null;
+    const { error } = await supabase.from('buyer_documents').update({
+      status,
+      reviewed_at: new Date().toISOString(),
+      review_notes: reason,
+    }).eq('id', docId);
+    if (error) { alert('操作失敗：' + error.message); return; }
+    if (status === 'approved') {
+      const { data: allDocs } = await supabase.from('buyer_documents').select('status').eq('buyer_id', buyerId);
+      const allApproved = allDocs?.every(d => d.status === 'approved');
+      if (allApproved) {
+        await supabase.from('buyers').update({ status: 'active' }).eq('id', buyerId);
+        setBuyer(prev => prev ? {...prev, status: 'active'} : prev);
+      }
+    }
+    const { data: updatedDocs } = await supabase.from('buyer_documents').select('*').eq('buyer_id', buyerId).order('created_at', { ascending: false });
+    if (updatedDocs) setKycDocs(updatedDocs);
+    alert(`文件已${status === 'approved' ? '批准' : '拒絕'}`);
+  };
 
   if (loading) return (
     <div className="app-shell"><Sidebar /><main className="main-content"><div className="loading">載入中...</div></main></div>
@@ -138,6 +178,57 @@ export default function BuyerDetailPage() {
                 <div style={{ fontWeight: 500, fontFamily: 'monospace' }}>{buyer.bank_account ? '****' + buyer.bank_account.slice(-4) : '—'}</div>
               </div>
             </div>
+          </div>
+
+          {/* KYC Card */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">🪪 KYC 文件</span>
+              {buyer.status === 'pending_kyc' && (
+                <span className="badge badge-pending">待審批</span>
+              )}
+            </div>
+            {kycDocs.length === 0 ? (
+              <p style={{fontSize:'0.875rem', color:'var(--color-text-muted)'}}>暫無文件</p>
+            ) : (
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'0.75rem'}}>
+                {kycDocs.map(doc => (
+                  <div key={doc.id} style={{border:'1px solid var(--color-border)', borderRadius:'0.375rem', padding:'0.75rem', fontSize:'0.8rem'}}>
+                    <div style={{fontWeight:600}}>{doc.document_type}</div>
+                    <div style={{color:'var(--color-text-muted)', marginTop:'0.25rem'}}>{doc.status ?? 'submitted'}</div>
+                    {doc.storage_path && (
+                      <a href={`${SUPABASE_URL}/storage/v1/object/public/${doc.storage_path}`}
+                         target="_blank" rel="noreferrer" className="btn btn-sm btn-outline" style={{marginTop:'0.5rem', display:'inline-block'}}>
+                        👁 查看
+                      </a>
+                    )}
+                    {buyer.status === 'pending_kyc' && (
+                      <div style={{display:'flex', gap:'0.5rem', marginTop:'0.5rem'}}>
+                        <button className="btn btn-sm" style={{background:'var(--color-success)', color:'#fff'}} onClick={() => handleKycAction(id, doc.id, 'approved')}>✅ 批准</button>
+                        <button className="btn btn-sm" style={{background:'var(--color-danger)', color:'#fff'}} onClick={() => handleKycAction(id, doc.id, 'rejected')}>❌ 拒絕</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Ratings Card */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">⭐ 最近評分</span></div>
+            {ratings.length === 0 ? (
+              <p style={{fontSize:'0.875rem', color:'var(--color-text-muted)'}}>暫無評分</p>
+            ) : (
+              <div style={{display:'flex', flexDirection:'column', gap:'0.5rem'}}>
+                {ratings.map(r => (
+                  <div key={r.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0.5rem 0', borderBottom:'1px solid var(--color-border)', fontSize:'0.875rem'}}>
+                    <span>{r.customer?.display_name ?? '匿名'}</span>
+                    <span>⭐ {r.score}/5{r.rating_category ? ` · ${r.rating_category}` : ''}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="card">

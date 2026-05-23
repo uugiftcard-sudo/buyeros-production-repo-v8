@@ -6,12 +6,15 @@ import Sidebar from '@/components/Sidebar';
 
 interface AccountingPeriod {
   period: string;
+  period_name?: string;
   status: 'open' | 'closed';
   opened_at: string | null;
   closed_at: string | null;
   opened_by: string | null;
   closed_by: string | null;
   notes: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 const EXAMPLE_PERIODS: AccountingPeriod[] = [
@@ -34,6 +37,42 @@ export default function PeriodsPage() {
   const [closing, setClosing] = useState(false);
   const [tab, setTab] = useState<'list' | 'detail'>('list');
   const [periodFilter, setPeriodFilter] = useState('all');
+
+  const currentYear = new Date().getFullYear();
+  const [newYear, setNewYear] = useState(String(currentYear));
+  const [newMonth, setNewMonth] = useState(String(new Date().getMonth() + 1).padStart(2, '0'));
+
+  const handleCreatePeriod = async () => {
+    const period = `${newYear}-${newMonth}`;
+    if (periods.find(p => p.period === period)) { alert('該期間已存在'); return; }
+    const lastDay = new Date(parseInt(newYear), parseInt(newMonth), 0).getDate();
+    const { error } = await supabase.from('accounting_periods').insert({
+      period,
+      period_name: period,
+      start_date: `${period}-01`,
+      end_date: `${period}-${lastDay}`,
+      status: 'open',
+      opened_at: new Date().toISOString(),
+      opened_by: null,
+    });
+    if (error) { alert('建立失敗：' + error.message); return; }
+    setPeriods(prev => [{
+      period, period_name: period, start_date: `${period}-01`,
+      end_date: `${period}-${lastDay}`, status: 'open' as const,
+      opened_at: new Date().toISOString(), closed_at: null,
+      opened_by: null, closed_by: null, notes: null,
+    }, ...prev]);
+    alert(`期間 ${formatPeriodLabel(period)} 已建立`);
+  };
+
+  const handleReopenPeriod = async (period: string) => {
+    if (!confirm(`確定要重新開放 ${formatPeriodLabel(period)}？`)) return;
+    const { error } = await supabase.from('accounting_periods')
+      .update({ status: 'open', closed_at: null, closed_by: null })
+      .eq('period', period);
+    if (error) { alert('失敗：' + error.message); return; }
+    setPeriods(prev => prev.map(p => p.period === period ? {...p, status: 'open' as const, closed_at: null, closed_by: null} : p));
+  };
 
   useEffect(() => {
     const fetchPeriods = async () => {
@@ -69,9 +108,6 @@ export default function PeriodsPage() {
       setClosing(false);
     }
   };
-
-  const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: 3 }, (_, i) => String(currentYear - i));
 
   const filteredPeriods = periods.filter(p => {
     if (periodFilter === 'open') return p.status === 'open';
@@ -244,13 +280,16 @@ export default function PeriodsPage() {
                         </button>
                       )}
                       {p.status === 'closed' && (
-                        <button
-                          className="btn btn-sm btn-outline"
-                          style={{ fontSize: '0.75rem' }}
-                          onClick={() => { setSelectedPeriod(p.period); setTab('detail'); }}
-                        >
-                          📊 查看報表
-                        </button>
+                        <>
+                          <button className="btn btn-sm btn-outline" style={{fontSize:'0.75rem'}} onClick={() => handleReopenPeriod(p.period)}>🔓 重新開帳</button>
+                          <button
+                            className="btn btn-sm btn-outline"
+                            style={{ fontSize: '0.75rem' }}
+                            onClick={() => { setSelectedPeriod(p.period); setTab('detail'); }}
+                          >
+                            📊 查看報表
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -351,17 +390,17 @@ export default function PeriodsPage() {
             <select
               className="form-select"
               style={{ width: 'auto', minWidth: '120px' }}
-              defaultValue=""
-              id="new-period-year"
+              value={newYear}
+              onChange={e => setNewYear(e.target.value)}
             >
               <option value="" disabled>年份</option>
-              {yearOptions.map(y => <option key={y} value={y}>{y}年</option>)}
+              {Array.from({ length: 3 }, (_, i) => String(currentYear - i)).map(y => <option key={y} value={y}>{y}年</option>)}
             </select>
             <select
               className="form-select"
               style={{ width: 'auto', minWidth: '100px' }}
-              defaultValue=""
-              id="new-period-month"
+              value={newMonth}
+              onChange={e => setNewMonth(e.target.value)}
             >
               <option value="" disabled>月份</option>
               {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(m => (
@@ -370,24 +409,7 @@ export default function PeriodsPage() {
             </select>
             <button
               className="btn btn-outline"
-              onClick={() => {
-                const year = (document.getElementById('new-period-year') as HTMLSelectElement).value;
-                const month = (document.getElementById('new-period-month') as HTMLSelectElement).value;
-                if (!year || !month) { alert('請選擇年份和月份'); return; }
-                const period = `${year}-${month}`;
-                if (periods.find(p => p.period === period)) { alert('該期間已存在'); return; }
-                const newP: AccountingPeriod = {
-                  period,
-                  status: 'open',
-                  opened_at: new Date().toISOString(),
-                  closed_at: null,
-                  opened_by: 'admin',
-                  closed_by: null,
-                  notes: null,
-                };
-                setPeriods(prev => [newP, ...prev]);
-                alert(`期間 ${formatPeriodLabel(period)} 已創建`);
-              }}
+              onClick={handleCreatePeriod}
             >
               開啟期間
             </button>

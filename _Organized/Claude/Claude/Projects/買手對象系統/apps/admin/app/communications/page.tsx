@@ -133,6 +133,21 @@ export default function CommunicationsPage() {
     buyer_id: null,
   });
 
+  const [buyers, setBuyers] = useState<Array<{id: string; display_name: string}>>([]);
+  const [customers, setCustomers] = useState<Array<{id: string; display_name: string}>>([]);
+
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      const [b, c] = await Promise.all([
+        supabase.from('buyers').select('id, display_name').eq('status', 'active').order('display_name'),
+        supabase.from('customers').select('id, display_name').eq('status', 'active').order('display_name'),
+      ]);
+      if (b.data) setBuyers(b.data);
+      if (c.data) setCustomers(c.data);
+    };
+    fetchDropdownData();
+  }, []);
+
   const fetchCommunications = async (pageNum: number) => {
     setLoading(true);
     const { data, error } = await supabase
@@ -317,6 +332,39 @@ export default function CommunicationsPage() {
                 >
                   <option value="inbound">📥 來電/訊</option>
                   <option value="outbound">📤 去電/訊</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">方向 *</label>
+                <select
+                  className="form-select"
+                  value={newForm.direction}
+                  onChange={e => setNewForm(p => ({ ...p, direction: e.target.value as Direction }))}
+                >
+                  <option value="inbound">📥 來電/訊</option>
+                  <option value="outbound">📤 去電/訊</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">買手</label>
+                <select
+                  className="form-select"
+                  value={newForm.buyer_id ?? ''}
+                  onChange={e => setNewForm(p => ({ ...p, buyer_id: e.target.value || null }))}
+                >
+                  <option value="">— 無 —</option>
+                  {buyers.map(b => <option key={b.id} value={b.id}>{b.display_name}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">客戶</label>
+                <select
+                  className="form-select"
+                  value={newForm.customer_id ?? ''}
+                  onChange={e => setNewForm(p => ({ ...p, customer_id: e.target.value || null }))}
+                >
+                  <option value="">— 無 —</option>
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.display_name}</option>)}
                 </select>
               </div>
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
