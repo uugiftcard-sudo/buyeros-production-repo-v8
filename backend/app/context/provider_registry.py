@@ -340,7 +340,7 @@ class ProviderRegistry:
         return chain[1] if len(chain) > 1 else None
 
     def _runtime_summary(self, provider_name: str) -> Dict[str, Any]:
-        summary = {
+        summary: Dict[str, Any] = {
             "last_run": None,
             "last_error": None,
             "last_latency_ms": None,
