@@ -78,6 +78,13 @@ type ProviderStatus = {
   provider_key_configured?: boolean;
   model_env?: string;
   model?: string;
+  fallback_target?: string | null;
+  last_run?: string | null;
+  last_error?: string | null;
+  last_latency_ms?: number | null;
+  success_count_24h?: number;
+  failure_count_24h?: number;
+  status?: "ready" | "not_configured" | "degraded";
 };
 
 type TimelineContent = {
@@ -100,9 +107,12 @@ type TimelineContent = {
   status?: string;
   title?: string;
   result?: string;
+  reply?: string;
   provider?: string;
   error?: string;
   ok?: boolean;
+  selected_provider?: string | null;
+  latency_ms?: number | null;
   fallback_chain?: string[];
   fallback_attempts?: { provider?: string; ok?: boolean; error?: string }[];
 };
@@ -268,6 +278,23 @@ function normalizeProjectCard(entry: MemoryEntry<ProjectCard>): MemoryEntry<Proj
 
 function normalizeProjectId(value?: string): keyof typeof projectProfiles {
   return projectAliases[(value || "").trim()] || "buyeros";
+}
+
+function nestedTimelineRuntime(content?: TimelineContent): TimelineContent | null {
+  if (!content) return null;
+  if (content.content && typeof content.content === "object" && !Array.isArray(content.content)) {
+    return content.content as TimelineContent;
+  }
+  return null;
+}
+
+function summarizeFallback(content?: TimelineContent): string | null {
+  const runtime = nestedTimelineRuntime(content) || content;
+  const attempts = runtime?.fallback_attempts || [];
+  if (!attempts.length) return null;
+  return attempts
+    .map((attempt) => `${attempt.provider || "unknown"}${attempt.ok ? " 成功" : attempt.error ? ` 失敗(${attempt.error})` : " 失敗"}`)
+    .join(" -> ");
 }
 
 export default function DashboardPage() {
@@ -603,24 +630,20 @@ export default function DashboardPage() {
   });
   const pendingTasks = normalizedTasks.filter((item) => !["completed"].includes((item.content || {}).status || "")).length;
   const completedTasks = normalizedTasks.filter((item) => (item.content || {}).status === "completed").length;
-  const providerRuntime = teamStatus.reduce<Record<string, { lastRun?: string; lastError?: string }>>((acc, item) => {
-    const matches = timeline.filter((entry) => {
-      const content = entry.content || {};
-      return content.source_provider === item.name || content.provider === item.name;
-    });
-    const lastRun = matches[0]?.created_at;
-    const lastError = matches.find((entry) => {
-      const content = entry.content || {};
-      return content.error || content.ok === false || content.fallback_attempts?.some((attempt) => attempt.error);
-    });
-    acc[item.name] = {
-      lastRun,
-      lastError: lastError?.content?.error || lastError?.content?.fallback_attempts?.find((attempt) => attempt.error)?.error,
-    };
-    return acc;
-  }, {});
   const routingEvents = timeline
-    .map((entry) => entry.content)
+    .map((entry) => {
+      const content = entry.content || {};
+      const runtime = nestedTimelineRuntime(content);
+      if (runtime && (runtime.fallback_chain || runtime.fallback_attempts || runtime.selected_provider)) {
+        return {
+          ...runtime,
+          source_provider: content.source_provider || runtime.source_provider,
+          session_id: content.session_id || runtime.session_id,
+          task_id: content.task_id || runtime.task_id,
+        };
+      }
+      return content;
+    })
     .filter((content): content is TimelineContent => Boolean(content && (content.type === "routing" || content.fallback_chain || content.route === "provider")));
 
   return (
@@ -779,18 +802,15 @@ export default function DashboardPage() {
                   <div>
                     <strong>{providerItem.name}</strong>
                     <span>{providerUseCases[providerItem.name] || "多 AI 任務處理"}</span>
-                    <span>Fallback：{providerFallbackChains[providerItem.name] || "OpenAI"}</span>
-                    <span>
-                      Last run：{(() => {
-                        const lastRun = providerRuntime[providerItem.name]?.lastRun;
-                        return lastRun ? new Date(lastRun).toLocaleString("zh-TW") : "尚無紀錄";
-                      })()}
-                    </span>
-                    <span>Last error：{providerRuntime[providerItem.name]?.lastError || "無"}</span>
+                    <span>Fallback：{providerItem.fallback_target || providerFallbackChains[providerItem.name] || "無"}</span>
+                    <span>最近執行：{providerItem.last_run ? new Date(providerItem.last_run).toLocaleString("zh-TW") : "尚無執行紀錄"}</span>
+                    <span>最近錯誤：{providerItem.last_error || "無"}</span>
+                    <span>最近 latency：{providerItem.last_latency_ms != null ? `${providerItem.last_latency_ms} ms` : "尚無紀錄"}</span>
+                    <span>24h 成功 / 失敗：{providerItem.success_count_24h || 0} / {providerItem.failure_count_24h || 0}</span>
                   </div>
                   <div className="provider-badges">
-                    <span className={`task-status ${providerItem.provider_key_configured || providerItem.openrouter_configured ? "status-completed" : "status-blocked"}`}>
-                      {providerItem.provider_key_configured || providerItem.openrouter_configured ? "configured" : "missing key"}
+                    <span className={`task-status ${providerItem.status === "ready" ? "status-completed" : providerItem.status === "degraded" ? "status-running" : "status-blocked"}`}>
+                      {providerItem.status === "ready" ? "已設定" : providerItem.status === "degraded" ? "降級中" : "未設定 API 金鑰"}
                     </span>
                     <span className="task-status status-queued">{providerItem.model || "model pending"}</span>
                   </div>
@@ -945,9 +965,11 @@ export default function DashboardPage() {
             {timeline.length ? (
               timeline.slice(0, 12).map((entry, index) => {
                 const content = entry.content || {};
-                const source = content.source_provider || content.provider || entry.created_by || "system";
-                const summary = content.summary || content.title || content.result || JSON.stringify(content.content || content).slice(0, 140);
+                const runtime = nestedTimelineRuntime(content);
+                const source = content.source_provider || runtime?.provider || content.provider || entry.created_by || "system";
+                const summary = content.summary || runtime?.reply || content.title || content.result || JSON.stringify(content.content || content).slice(0, 140);
                 const namespace = (entry.namespace || []).join(" / ");
+                const fallbackSummary = summarizeFallback(content);
                 return (
                   <article className="timeline-card" key={`${entry.memory_key || "entry"}-${index}`}>
                     <div className="timeline-top">
@@ -959,7 +981,9 @@ export default function DashboardPage() {
                       <span>{namespace || "namespace pending"}</span>
                       {content.session_id ? <span>session：{content.session_id}</span> : null}
                       {content.task_id ? <span>task：{content.task_id}</span> : null}
+                      {runtime?.selected_provider ? <span>selected：{runtime.selected_provider}</span> : null}
                     </div>
+                    {fallbackSummary ? <p>{fallbackSummary}</p> : null}
                     <button
                       type="button"
                       className="secondary slim"

@@ -33,6 +33,8 @@ def test_coding_task_falls_back_from_claude_to_cursor() -> None:
     result = registry.run(prompt="fix repo bug", session_id="fallback-code")
 
     assert result["provider"] == "cursor"
+    assert result["selected_provider"] == "cursor"
+    assert result["latency_ms"] is not None
     assert result["fallback_exhausted"] is False
     assert result["fallback_chain"][:3] == ["claude", "cursor", "openai"]
     assert result["fallback_attempts"][0]["provider"] == "claude"
@@ -51,6 +53,7 @@ def test_research_task_falls_back_from_perplexity_to_grok() -> None:
     result = registry.run(prompt="search latest news", session_id="fallback-research")
 
     assert result["provider"] == "grok"
+    assert result["selected_provider"] == "grok"
     assert result["fallback_exhausted"] is False
     assert result["fallback_chain"][:3] == ["perplexity", "grok", "openai"]
 
@@ -66,6 +69,7 @@ def test_batch_task_falls_back_from_deepseek_to_minimax() -> None:
     result = registry.run(prompt="batch process these rows", session_id="fallback-batch")
 
     assert result["provider"] == "minimax"
+    assert result["selected_provider"] == "minimax"
     assert result["fallback_chain"][:3] == ["deepseek", "minimax", "openai"]
 
 
@@ -97,5 +101,6 @@ def test_provider_exception_returns_structured_failure() -> None:
 
     assert result["provider"] == "claude"
     assert result["ok"] is False
+    assert result["selected_provider"] is None
     assert result["fallback_exhausted"] is True
     assert result["fallback_attempts"][0]["error"] == "network exploded"
