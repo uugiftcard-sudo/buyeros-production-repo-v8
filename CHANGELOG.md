@@ -27,6 +27,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 - **CLOTH/api**: `src/models/store.ts` — added `market` field to products (UK/HK/CN/ALL); `filterProductsByMarket()` helper; 6 new UK-only + 3 new HK-only seed products added
 - **CLOTH/api**: `src/models/types.ts` — added `MarketScope` type and optional `market` field to `Product` interface
 - **CLOTH/api**: `src/routes/products.ts` — `GET /api/products` now reads `market` query param to filter by market scope
+- **CLOTH/agent**: 8 agent skills (sourcing, listing, fulfillment, community, content, video, risk, report) with full SKILL.md documentation
+- **CLOTH/agent**: `agent-tasks/` — dispatcher, engine, task-factory, listing-executor, fulfillment-agent, risk-agent, etc.
+- **CLOTH/scrapers**: `scripts/scrapers/` — Depop, Vestiaire Collective, XiaohongShu scrapers
+- **XAU/quiz**: `features/quiz/quiz.html` + `quiz.js` — 5-question trading type assessment (追单/扛单/仓位失控/短线/稳健型)
+- **XAU/members**: `features/member/dashboard.html` + `member.js` — member learning path, wardrobe unlock, stats, CTAs
+- **XAU/scheduler**: `stream/live-24h-scheduler.js` — 8-session UTC scheduler with market event calendar, holiday list, multi-language routing (CN/EN/HK)
+- **XAU/analytics**: `stream/stream-analytics.html` — live session analytics with viewer/engagement charts
+- **XAU/OBS**: `stream/obs-control-panel.html` — full broadcast control panel with scene switching, avatar, TTS, script generation, analytics
+- **XAU/OBS**: `stream/live-24h-engine.js` — API-driven live engine with `/api/ai/script` integration, multi-lang support
+- **XAU/OBS**: `stream/script-rotator-v2.js` — auto-refresh script rotator polling `/api/ai/script` every 60s
+- **BuyerOS/integration**: `backend/app/services/xau_integration.py` — typed client for XAU `/api/ai/script`, `/api/news/latest`, `/api/news/alerts`
+- **BuyerOS/integration**: `backend/app/services/cloth_integration.py` — typed client for CLOTH `/api/live/readiness`, `/api/live/selling-plan`
+- **BuyerOS/integration**: `TaskDispatcherService._route_for` updated to route xau/cloth project tasks to respective integrations
+- **BuyerOS/integration**: `workflows/main.py` wires XAU/CLOTH integrations via `XAU_BASE_URL`/`CLOTH_BASE_URL` env vars
 - **scrapers**: 5 new test files covering config, jobs, async_base, cache, metrics, and observability — 57 new tests (94 total, all passing)
 - **scrapers**: `src/scrapers/async_base.py` — AsyncBaseScraper with semaphore concurrency, Prometheus metrics, exponential backoff
 - **scrapers**: `src/metrics_app.py` — Prometheus ASGI mount for `/metrics` endpoint
