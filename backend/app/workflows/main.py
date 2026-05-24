@@ -94,6 +94,8 @@ from ..services.project_registry_service import ProjectRegistryService
 from ..services.reporting_service import ReportingService
 from ..services.task_board_service import TaskBoardService
 from ..services.task_dispatcher_service import TaskDispatcherService
+from ..services.xau_integration import XAUIntegration
+from ..services.cloth_integration import CLOTHIntegration
 from ..workflows.buyeros_graph import BuyerOSGraphWorkflow
 
 logger = logging.getLogger(__name__)
@@ -459,6 +461,22 @@ def create_app() -> FastAPI:
     ]:
         provider_registry.register(provider)
 
+    # Initialize XAU and CLOTH integrations if configured
+    xau_integration = None
+    cloth_integration = None
+    xau_base_url = os.environ.get("XAU_BASE_URL", "")
+    cloth_base_url = os.environ.get("CLOTH_BASE_URL", "")
+
+    if xau_base_url:
+        from ..services.xau_integration import XAUConfig
+        xau_integration = XAUIntegration(XAUConfig(base_url=xau_base_url))
+        logger.info("XAU integration initialized", extra={"xau_base_url": xau_base_url})
+
+    if cloth_base_url:
+        from ..services.cloth_integration import CLOTHConfig
+        cloth_integration = CLOTHIntegration(CLOTHConfig(base_url=cloth_base_url))
+        logger.info("CLOTH integration initialized", extra={"cloth_base_url": cloth_base_url})
+
     dispatcher_service = TaskDispatcherService(
         memory_store=memory_store,
         task_board=task_board_service,
@@ -467,6 +485,8 @@ def create_app() -> FastAPI:
         context_hub=context_hub,
         ops_agent=ops_agent,
         finance_agent=finance_agent,
+        xau_integration=xau_integration,
+        cloth_integration=cloth_integration,
     )
     workflow = BuyerOSGraphWorkflow(
         memory_store=memory_store,

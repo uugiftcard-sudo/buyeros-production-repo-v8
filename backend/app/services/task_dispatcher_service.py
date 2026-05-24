@@ -8,7 +8,7 @@ context and writes results back; no open-ended multi-agent loops.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from uuid import uuid4
 
 from ..context.context_hub import ContextHub
@@ -18,6 +18,10 @@ from ..agents.finance_agent import FinanceAgent
 from ..memory_store import MemoryStore
 from .project_registry_service import ProjectRegistryService
 from .task_board_service import TaskBoardService
+
+if TYPE_CHECKING:
+    from .xau_integration import XAUIntegration
+    from .cloth_integration import CLOTHIntegration
 
 
 class TaskDispatcherService:
@@ -31,6 +35,8 @@ class TaskDispatcherService:
         context_hub: ContextHub,
         ops_agent: OpsAgent,
         finance_agent: FinanceAgent,
+        xau_integration: Optional["XAUIntegration"] = None,
+        cloth_integration: Optional["CLOTHIntegration"] = None,
     ) -> None:
         self.memory = memory_store
         self.task_board = task_board
@@ -39,6 +45,8 @@ class TaskDispatcherService:
         self.context_hub = context_hub
         self.ops_agent = ops_agent
         self.finance_agent = finance_agent
+        self.xau = xau_integration
+        self.cloth = cloth_integration
 
     def _task_level_preferred_provider(self, *, task_type: str, prompt: str) -> Optional[str]:
         """Deterministic task-level routing for provider work.
@@ -56,15 +64,26 @@ class TaskDispatcherService:
             return "perplexity"
         return None
 
-    def _route_for(self, *, task_type: str, prompt: str) -> str:
-        """Return routing target: ops | finance | provider.
+    def _route_for(self, *, task_type: str, prompt: str, project: Optional[str] = None) -> str:
+        """Return routing target: ops | finance | xau | cloth | provider.
 
         Dispatcher routing is explicit and deterministic; it never starts a
-        group chat loop. Business intents go to local agents; everything else
+        group chat loop. Business intents go to local agents; xau/cloth project
+        tasks go to their respective integration services; everything else
         goes through ProviderRegistry with fallback.
         """
         t = (task_type or "").lower().strip()
         lower = (prompt or "").lower()
+        proj = (project or "").lower()
+
+        # xau project: route to XAU integration for gold trading live scripts
+        if proj == "xau" or t in {"live_stream", "gold_script", "news", "signal"}:
+            return "xau"
+
+        # commerce/cloth project: route to CLOTH integration for live-selling plans
+        if proj == "commerce" or t in {"live_selling", "selling_plan"}:
+            return "cloth"
+
         if t in {"ops", "refund", "order", "inventory", "support"} or any(k in lower for k in ["refund", "退款", "order", "ocr", "文字識別"]):
             return "ops"
         if t in {"finance", "payout", "profit", "shop_finance"} or any(k in lower for k in ["profit", "盈利", "payout", "出糧", "結算"]):
@@ -177,7 +196,11 @@ class TaskDispatcherService:
         )
         agent_prompt = str(subtask.get("prompt") or "")
         dispatch_prompt = f"[project={subtask_project} task_type={subtask.get('task_type')} subtask={subtask_id}]\n{agent_prompt}"
-        route = self._route_for(task_type=str(subtask.get("task_type") or ""), prompt=str(subtask.get("prompt") or ""))
+        route = self._route_for(
+            task_type=str(subtask.get("task_type") or ""),
+            prompt=str(subtask.get("prompt") or ""),
+            project=subtask_project,
+        )
         effective_session = session_id or f"subtask-{subtask_id}"
 
         if route == "ops":
@@ -207,6 +230,83 @@ class TaskDispatcherService:
             self._update_subtask(subtask_id=subtask_id, status="completed", output=reply, provider="finance_agent")
             self.task_board.run_task(task_id=task_id, result=f"[{subtask_id}] {reply}", provider="finance_agent")
             return {"ok": True, "result": {"ok": True, "provider": "finance_agent", "reply": reply}, "subtask_id": subtask_id}
+
+        if route == "xau":
+            if not self.xau:
+                self._update_subtask(subtask_id=subtask_id, status="blocked", output="XAU integration not configured", provider="xau")
+                self.task_board.update_status(task_id=task_id, status="blocked", note="xau integration unavailable")
+                return {"ok": False, "error": "xau_not_configured", "subtask_id": subtask_id}
+
+            script_result = self.xau.generate_script(
+                bias_type="wait",
+                topic=str(subtask.get("prompt", ""))[:100],
+                account_style="educational",
+            )
+            if script_result.ok and script_result.data:
+                reply = f"[XAU script] {script_result.data.script}"
+                self.context_hub.write_context(
+                    source_provider="xau_integration",
+                    content={
+                        "reply": reply,
+                        "route": "xau",
+                        "subtask_id": subtask_id,
+                        "task_id": task_id,
+                        "project": subtask_project,
+                        "script_segments": {
+                            "hook": script_result.data.segments.hook,
+                            "story": script_result.data.segments.story,
+                            "interaction": script_result.data.segments.interaction,
+                            "cta": script_result.data.segments.cta,
+                            "risk": script_result.data.segments.risk,
+                        },
+                    },
+                    session_id=effective_session,
+                    task_id=task_id,
+                    summary=reply[:200],
+                    created_by="dispatcher",
+                )
+                self._update_subtask(subtask_id=subtask_id, status="completed", output=reply, provider="xau_integration")
+                self.task_board.run_task(task_id=task_id, result=reply[:500], provider="xau_integration")
+                return {"ok": True, "result": {"ok": True, "provider": "xau_integration", "reply": reply}, "subtask_id": subtask_id}
+            else:
+                err = script_result.error or "XAU script generation failed"
+                self._update_subtask(subtask_id=subtask_id, status="blocked", output=err, provider="xau_integration")
+                self.task_board.update_status(task_id=task_id, status="blocked", note=f"xau failed: {err}")
+                return {"ok": False, "error": err, "subtask_id": subtask_id}
+
+        if route == "cloth":
+            if not self.cloth:
+                self._update_subtask(subtask_id=subtask_id, status="blocked", output="CLOTH integration not configured", provider="cloth")
+                self.task_board.update_status(task_id=task_id, status="blocked", note="cloth integration unavailable")
+                return {"ok": False, "error": "cloth_not_configured", "subtask_id": subtask_id}
+
+            plan_result = self.cloth.generate_selling_plan(account_style="educational")
+            if plan_result.ok and plan_result.data:
+                plan = plan_result.data
+                reply = f"[CLOTH selling plan] Product: {plan.productTitle}. Net profit est: HKD {plan.financeCheck.estimatedNetProfit if plan.financeCheck else '?'}"
+                self.context_hub.write_context(
+                    source_provider="cloth_integration",
+                    content={
+                        "reply": reply,
+                        "route": "cloth",
+                        "subtask_id": subtask_id,
+                        "task_id": task_id,
+                        "project": subtask_project,
+                        "selling_plan": plan.to_dict(),
+                    },
+                    session_id=effective_session,
+                    task_id=task_id,
+                    summary=reply[:200],
+                    created_by="dispatcher",
+                )
+                self._update_subtask(subtask_id=subtask_id, status="completed", output=reply, provider="cloth_integration")
+                self.task_board.run_task(task_id=task_id, result=reply[:500], provider="cloth_integration")
+                return {"ok": True, "result": {"ok": True, "provider": "cloth_integration", "reply": reply}, "subtask_id": subtask_id}
+            else:
+                err = plan_result.error or "CLOTH plan generation failed"
+                self._update_subtask(subtask_id=subtask_id, status="blocked", output=err, provider="cloth_integration")
+                self.task_board.update_status(task_id=task_id, status="blocked", note=f"cloth failed: {err}")
+                return {"ok": False, "error": err, "subtask_id": subtask_id}
 
         # Provider route: explicit task-level preferred provider + fallback chain.
         task_level_preferred = self._task_level_preferred_provider(
