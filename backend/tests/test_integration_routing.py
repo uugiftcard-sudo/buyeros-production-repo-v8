@@ -10,19 +10,15 @@ from app.memory_store import MemoryStore
 from app.services.task_board_service import TaskBoardService
 from app.services.task_dispatcher_service import TaskDispatcherService
 from app.services.xau_integration import (
-    XAUIntegration,
     XAUConfig,
     ScriptResult,
     ScriptSegments,
-    XAUIntegrationResult,
 )
 from app.services.cloth_integration import (
-    CLOTHIntegration,
     CLOTHConfig,
     LiveSellingPlan,
     FinanceCheck,
     InventoryCheck,
-    CLOTHIntegrationResult,
 )
 from app.workflows.main import create_app
 
