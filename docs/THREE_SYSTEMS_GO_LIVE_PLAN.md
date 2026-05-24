@@ -10,12 +10,15 @@ docs/FOUR_SYSTEMS_GO_LIVE_PLAN.md
 
 The current canonical systems are:
 
-- `report`
+- `buyer_ai`
 - `commerce`
 - `xau`
-- `ai_team`
 
 Compatibility aliases:
 
-- `buyeros -> ai_team`
+- `buyeros -> buyer_ai`
+- `ai_team -> buyer_ai`
+- `buyer_report -> buyer_ai`
+- `report -> buyer_ai`
 - `cloth -> commerce`
+- `shop -> commerce`

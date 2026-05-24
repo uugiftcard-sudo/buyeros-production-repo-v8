@@ -14,9 +14,18 @@ from typing import Any, Optional
 
 from ..registry import ToolRegistry
 from ..memory_store import MemoryStore
+from ..trace import trace_ctx
 
 
 logger = logging.getLogger(__name__)
+
+
+def _log_trace(level: int, msg: str, **kwargs: Any) -> None:
+    """Log with trace context fields merged in."""
+    ctx = trace_ctx()
+    extra = {k: v for k, v in ctx.items() if v is not None}
+    extra.update(kwargs)
+    logger.log(level, msg, extra=extra)
 
 
 class OpsAgent:
@@ -70,7 +79,7 @@ class OpsAgent:
             try:
                 return self.ai_router.route(role="ops", prompt=text)
             except Exception as exc:
-                logger.error("AI router error: %s", exc)
+                _log_trace(logging.ERROR, "ai_router.error", exc=str(exc))
 
         return (
             "已收到，請提供更多資訊，例如：\n"
@@ -96,7 +105,7 @@ class OpsAgent:
         self.memory.save_memory(
             ["buyeros", "refunds"],
             txn_id,
-            {"result": result, "provider": "ops_agent", "project_id": "cloth", "project": "cloth"},
+            {"result": result, "provider": "ops_agent", "project_id": "buyer_ai", "project": "buyer_ai"},
             created_by="ops_agent",
         )
         return result

@@ -10,8 +10,8 @@ test("BuyerOS mission control can plan, run one step, and show memory UI", async
       return json({
         ok: true,
         items: [
-          { memory_key: "buyeros", content: { project_id: "buyeros", name: "BuyerOS Core" } },
-          { memory_key: "cloth", content: { project_id: "cloth", name: "CLOTH 網店自動系統" } },
+          { memory_key: "buyer_ai", content: { project_id: "buyer_ai", name: "買手 AI 中樞" } },
+          { memory_key: "commerce", content: { project_id: "commerce", name: "網店自動系統" } },
           { memory_key: "xau", content: { project_id: "xau", name: "XAU 中控" } }
         ],
       });
@@ -41,7 +41,7 @@ test("BuyerOS mission control can plan, run one step, and show memory UI", async
       return json({ ok: true, lanes: {}, items: [] });
     }
     if (path === "/tasks/dispatch_plan") {
-      return json({ ok: true, task_id: "task-ui", plan: { project: "cloth", steps: [{ subtask_id: "sub-ui" }] } });
+      return json({ ok: true, task_id: "task-ui", plan: { project: "commerce", steps: [{ subtask_id: "sub-ui" }] } });
     }
     if (path === "/tasks/task-ui/subtasks") {
       return json({
@@ -143,7 +143,7 @@ test("BuyerOS mission control can plan, run one step, and show memory UI", async
   await expect(page.getByText(/RTO 12s/)).toBeVisible();
 
   await page.locator("#projects").scrollIntoViewIfNeeded();
-  await page.locator("#projects .project-switch").filter({ hasText: "CLOTH 網店" }).click();
-  await page.getByRole("button", { name: "收單全流程" }).click();
-  await expect(page.getByText("CLOTH 收單流程").first()).toBeVisible();
+  await page.locator("#projects .project-switch").filter({ hasText: "買手 AI 中樞" }).click();
+  await page.getByRole("button", { name: "買手收單全流程" }).click();
+  await expect(page.getByText("買手 AI 收單流程").first()).toBeVisible();
 });

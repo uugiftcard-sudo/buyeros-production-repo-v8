@@ -50,7 +50,9 @@ class TaskDispatcherService:
         lower = (prompt or "").lower()
         if t in {"code", "coding", "dev"} or any(k in lower for k in ["code", "coding", "repo", "bug", "stack trace", "cursor", "claude"]):
             return "claude"
-        if t in {"research", "news"} or any(k in lower for k in ["research", "news", "search", "perplexity", "grok"]):
+        if t in {"research", "news", "live_selling", "live_stream"} or any(
+            k in lower for k in ["research", "news", "search", "perplexity", "grok", "live", "直播", "虛擬主播", "带货", "帶貨"]
+        ):
             return "perplexity"
         return None
 
@@ -63,9 +65,9 @@ class TaskDispatcherService:
         """
         t = (task_type or "").lower().strip()
         lower = (prompt or "").lower()
-        if t in {"ops", "refund", "order"} or any(k in lower for k in ["refund", "退款", "order", "ocr", "文字識別"]):
+        if t in {"ops", "refund", "order", "inventory", "support"} or any(k in lower for k in ["refund", "退款", "order", "ocr", "文字識別"]):
             return "ops"
-        if t in {"finance", "payout", "profit"} or any(k in lower for k in ["profit", "盈利", "payout", "出糧", "結算"]):
+        if t in {"finance", "payout", "profit", "shop_finance"} or any(k in lower for k in ["profit", "盈利", "payout", "出糧", "結算"]):
             return "finance"
         return "provider"
 
@@ -365,6 +367,12 @@ class TaskDispatcherService:
             base = [
                 ("execute", "Run finance workflow", "Execute requested finance computation (profit/payout) and write results to shared memory."),
                 ("verify", "Verify and summarize", "Verify memory was written and summarize next operator action (if any)."),
+            ]
+        elif t in {"live_selling", "live_stream"}:
+            base = [
+                ("collect", "Collect live context", "Read shared memory for product, audience, inventory, finance, news, and current live-room state."),
+                ("plan", "Plan live run-of-show", "Produce an AI virtual host rundown with hook, story beats, interaction prompts, CTA, and risk/compliance notes."),
+                ("verify", "Verify readiness", "Check missing integrations and write a safe go/no-go summary. Do not create fake viewers, fake comments, or undisclosed impersonation."),
             ]
         elif t in {"research", "news"}:
             base = [

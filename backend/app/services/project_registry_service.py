@@ -1,8 +1,8 @@
 """Project registry for BuyerOS / AIOS.
 
 BuyerOS canonical projects are:
-- buyeros: AI OS core
-- cloth: e-commerce operations
+- buyer_ai: AI OS core plus buyer reports and sourcing intelligence
+- commerce: e-commerce operations
 - xau: campaign/promotion workspace
 """
 
@@ -17,18 +17,21 @@ from .canonical_workspace import CANONICAL_WORKSPACES, normalize_workspace
 
 class ProjectRegistryService:
     PROJECT_ALIASES = {
-        "buyeros": "buyeros",
-        "ai_team": "buyeros",
-        "ai-team": "buyeros",
-        "ai_solo_team": "buyeros",
-        "ai-solo-team": "buyeros",
-        "cloth": "cloth",
-        "report": "cloth",
-        "commerce": "cloth",
-        "reporting": "cloth",
-        "orders": "cloth",
-        "order": "cloth",
-        "shop": "cloth",
+        "buyer_ai": "buyer_ai",
+        "buyeros": "buyer_ai",
+        "ai_team": "buyer_ai",
+        "ai-team": "buyer_ai",
+        "ai_solo_team": "buyer_ai",
+        "ai-solo-team": "buyer_ai",
+        "buyer_report": "buyer_ai",
+        "buyer-report": "buyer_ai",
+        "report": "buyer_ai",
+        "reporting": "buyer_ai",
+        "commerce": "commerce",
+        "cloth": "commerce",
+        "orders": "commerce",
+        "order": "commerce",
+        "shop": "commerce",
         "xau": "xau",
         "promo": "xau",
         "xau_promo": "xau",
@@ -39,25 +42,25 @@ class ProjectRegistryService:
     }
     DEFAULT_PROJECTS: List[Dict[str, Any]] = [
         {
-            "project_id": "buyeros",
-            "name": "BuyerOS Core",
-            "kind": "core",
+            "project_id": "buyer_ai",
+            "name": "買手 AI 中樞",
+            "kind": "buyer_ai",
             "source": {"repo": "buyeros-production-repo-v8"},
-            "notes": "日報 / 週報 / CSV export / 毛利、退款、異常摘要",
+            "notes": "BuyerOS / AI Team / Context Hub / Telegram / 買手 Report / 採購 ROI",
         },
         {
-            "project_id": "cloth",
-            "name": "CLOTH 網店自動系統",
+            "project_id": "commerce",
+            "name": "網店自動系統",
             "kind": "commerce_ops",
             "source": {"path": "/Users/rubykan/Documents/CLOTH"},
-            "notes": "退款 / OCR 入帳 / 對帳 / 差異告警 / retry queue",
+            "notes": "AI 虛擬主播帶貨 / 訂單 / 庫存 / 客服 / 網店收支報表 / Shopify / TikTok / 資料同步",
         },
         {
             "project_id": "xau",
             "name": "XAU 中控",
             "kind": "promo",
             "source": {"path": "/Users/rubykan/Documents/XAU", "github": "uugiftcard-sudo/XAU"},
-            "notes": "Promo / 內容 / 交易教育 / 活動頁 / funnel",
+            "notes": "AI 直播 / 虛擬主播 / promo / campaign / conversion / metrics / funnel",
         },
     ]
 
@@ -68,7 +71,7 @@ class ProjectRegistryService:
     def normalize_project_id(cls, project_id: str | None) -> str:
         raw = (project_id or "").strip()
         if not raw:
-            return "buyeros"
+            return "buyer_ai"
         canonical = set(CANONICAL_WORKSPACES)
         return normalize_workspace(cls.PROJECT_ALIASES.get(raw, raw if raw in canonical else raw))
 
