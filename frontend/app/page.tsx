@@ -343,6 +343,7 @@ export default function DashboardPage() {
   const [capabilities, setCapabilities] = useState<Record<string, unknown> | null>(null);
   const [uiTheme, setUiTheme] = useState<UiTheme>("ops");
   const [mounted, setMounted] = useState(false);
+  const [pendingActions, setPendingActions] = useState<Record<string, number>>({});
   const [actionEvents, setActionEvents] = useState<ActionEvent[]>([
     { id: "init", label: "系統已載入", status: "等待操作", createdAt: "2026-01-01T00:00:00.000Z" }
   ]);
@@ -387,6 +388,23 @@ export default function DashboardPage() {
     ].slice(0, 6));
   }
 
+  function markPendingAction(label: string, delta: 1 | -1) {
+    setPendingActions((current) => {
+      const nextValue = Math.max(0, (current[label] || 0) + delta);
+      const next = { ...current };
+      if (nextValue === 0) {
+        delete next[label];
+      } else {
+        next[label] = nextValue;
+      }
+      return next;
+    });
+  }
+
+  function actionBusy(label: string) {
+    return Boolean(pendingActions[label]);
+  }
+
   async function callApi(
     path: string,
     init: RequestInit = {},
@@ -397,6 +415,7 @@ export default function DashboardPage() {
     if (!muteAction) {
       recordAction(label, "執行中");
     }
+    markPendingAction(label, 1);
     setLoading(true);
     try {
       const response = await fetch(`${normalizedProxyUrl}${path}`, {
@@ -437,6 +456,7 @@ export default function DashboardPage() {
       recordAction(label, "失敗");
       return data;
     } finally {
+      markPendingAction(label, -1);
       setLoading(false);
     }
   }
@@ -1195,12 +1215,13 @@ export default function DashboardPage() {
 	                    <p className="empty-state">目前沒有任務。你可以從「建立任務」新增。</p>
 	                  ) : (
 	                    <>
-	                    {visibleLaneTasks.map((item) => {
-	                      const task = item.content;
-	                      if (!task) return null;
-	                      const taskId = task.task_id || item.memory_key || "";
-                      return (
-                        <div className="task-card" key={taskId}>
+                    {visibleLaneTasks.map((item, index) => {
+                      const task = item.content;
+                      if (!task) return null;
+                      const taskId = task.task_id || item.memory_key || "";
+                      const taskKey = `${lane.id}-${taskId || "task"}-${task.updated_at || index}`;
+	                      return (
+	                        <div className="task-card" key={taskKey}>
                           <div className="task-card-top">
                             <strong>{task.title}</strong>
                             <span className={`task-status status-${task.status}`}>{task.status}</span>
@@ -1264,35 +1285,35 @@ export default function DashboardPage() {
 	            <div className="quick-actions" aria-label="工作區快捷操作">
 	              {project === "buyer_ai" ? (
 	                <>
-                    <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("provider_check")}>
-                      {loading ? "檢查中..." : "檢查 Provider"}
+                    <button type="button" className="secondary slim" disabled={actionBusy("AI 團隊狀態")} onClick={() => runWorkspaceAction("provider_check")}>
+                      {actionBusy("AI 團隊狀態") ? "檢查中..." : "檢查 Provider"}
                     </button>
-                    <button type="button" className="secondary slim" disabled={loading} onClick={loadCapabilities}>
-                      {loading ? "載入中..." : "查看能力缺口"}
+                    <button type="button" className="secondary slim" disabled={actionBusy("能力矩陣")} onClick={loadCapabilities}>
+                      {actionBusy("能力矩陣") ? "載入中..." : "查看能力缺口"}
                     </button>
-	                  <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("daily_report")}>
-                    {loading ? "產生中..." : "買手日報"}
+	                  <button type="button" className="secondary slim" disabled={actionBusy("買手日報")} onClick={() => runWorkspaceAction("daily_report")}>
+                    {actionBusy("買手日報") ? "產生中..." : "買手日報"}
                   </button>
-                  <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("close_cycle")}>
-                    {loading ? "執行中..." : "買手收單全流程"}
+                  <button type="button" className="secondary slim" disabled={actionBusy("買手 AI 收單流程")} onClick={() => runWorkspaceAction("close_cycle")}>
+                    {actionBusy("買手 AI 收單流程") ? "執行中..." : "買手收單全流程"}
                   </button>
-                  <button type="button" className="secondary slim" disabled={loading} onClick={() => callApi("/reports/history", {}, "買手報表歷史")}>
-                    {loading ? "載入中..." : "買手報表歷史"}
+                  <button type="button" className="secondary slim" disabled={actionBusy("買手報表歷史")} onClick={() => callApi("/reports/history", {}, "買手報表歷史")}>
+                    {actionBusy("買手報表歷史") ? "載入中..." : "買手報表歷史"}
                   </button>
-	                  <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("ocr")}>
-                    {loading ? "測試中..." : "OCR 入帳測試"}
+	                  <button type="button" className="secondary slim" disabled={actionBusy("OCR 入帳測試")} onClick={() => runWorkspaceAction("ocr")}>
+                    {actionBusy("OCR 入帳測試") ? "測試中..." : "OCR 入帳測試"}
                   </button>
-                  <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("reconcile")}>
-                    {loading ? "檢查中..." : "對帳檢查"}
+                  <button type="button" className="secondary slim" disabled={actionBusy("對帳檢查")} onClick={() => runWorkspaceAction("reconcile")}>
+                    {actionBusy("對帳檢查") ? "檢查中..." : "對帳檢查"}
                   </button>
-                  <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("alerts")}>
-                    {loading ? "檢查中..." : "告警檢查"}
+                  <button type="button" className="secondary slim" disabled={actionBusy("異常告警檢查")} onClick={() => runWorkspaceAction("alerts")}>
+                    {actionBusy("異常告警檢查") ? "檢查中..." : "告警檢查"}
                   </button>
-                  <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("approval")}>
-                    {loading ? "建立中..." : "人工覆核"}
+                  <button type="button" className="secondary slim" disabled={actionBusy("人工覆核")} onClick={() => runWorkspaceAction("approval")}>
+                    {actionBusy("人工覆核") ? "建立中..." : "人工覆核"}
                   </button>
-                  <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("retry")}>
-                    {loading ? "記錄中..." : "重試記錄"}
+                  <button type="button" className="secondary slim" disabled={actionBusy("重試記錄")} onClick={() => runWorkspaceAction("retry")}>
+                    {actionBusy("重試記錄") ? "記錄中..." : "重試記錄"}
                   </button>
 	                </>
 	              ) : null}

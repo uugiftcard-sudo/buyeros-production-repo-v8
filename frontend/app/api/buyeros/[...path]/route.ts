@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 type RouteContext = {
   params: Promise<{ path?: string[] }>;
@@ -13,6 +15,29 @@ const fallbackBackendUrls = [
 
 const uniqOrderedBackendUrls = Array.from(new Set(fallbackBackendUrls.filter((value) => Boolean(value))));
 
+function readEnvValueFromFile(filePath: string, key: string): string | undefined {
+  try {
+    const text = readFileSync(filePath, "utf8");
+    const line = text
+      .split(/\r?\n/)
+      .find((entry) => entry.trim().startsWith(`${key}=`));
+    if (!line) return undefined;
+    const rawValue = line.slice(line.indexOf("=") + 1).trim();
+    return rawValue.replace(/^['"]|['"]$/g, "") || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function serverSideApiKey(): string | undefined {
+  return (
+    process.env.BUYEROS_API_KEY ||
+    readEnvValueFromFile(resolve(process.cwd(), "..", ".env.local"), "BUYEROS_API_KEY") ||
+    readEnvValueFromFile(resolve(process.cwd(), "..", ".env.production.local"), "BUYEROS_API_KEY") ||
+    readEnvValueFromFile(resolve(process.cwd(), "..", ".env"), "BUYEROS_API_KEY")
+  );
+}
+
 async function proxy(request: NextRequest, context: RouteContext) {
   const params = await context.params;
   const path = (params.path || []).join("/");
@@ -23,7 +48,7 @@ async function proxy(request: NextRequest, context: RouteContext) {
   }
   // Server-side secret injection only — the key NEVER leaves the server.
   // Remove URL param fallback after confirming production uses BUYEROS_API_KEY env var.
-  const envApiKey = process.env.BUYEROS_API_KEY;
+  const envApiKey = serverSideApiKey();
   const uiApiKey = request.headers.get("x-buyeros-api-key");
   const apiKey = envApiKey || uiApiKey;  // uiApiKey only in local dev (no env var set)
   if (apiKey) headers.set("authorization", `Bearer ${apiKey}`);
