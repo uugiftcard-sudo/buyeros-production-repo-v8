@@ -19,7 +19,7 @@ def test_command_center_p0_endpoints(monkeypatch) -> None:
     dispatch = client.post(
         "/tasks/dispatch",
         json={
-            "project": "buyeros",
+            "project": "buyer_ai",
             "task_type": "planning",
             "title": "P0 reset sanity",
             "prompt": "Summarize the next three steps for BuyerOS P0 reset.",
@@ -47,7 +47,7 @@ def test_command_center_p0_endpoints(monkeypatch) -> None:
     plan = client.post(
         "/tasks/dispatch_plan",
         json={
-            "project": "buyeros",
+            "project": "buyer_ai",
             "task_type": "code",
             "title": "plan test",
             "prompt": "Create a plan for refactor.",
@@ -111,7 +111,7 @@ def test_dispatcher_routing_ops_finance(monkeypatch) -> None:
     plan = client.post(
         "/tasks/dispatch_plan",
         json={
-            "project": "cloth",
+            "project": "buyer_ai",
             "task_type": "refund",
             "title": "refund test",
             "prompt": "退款 991",
@@ -132,7 +132,7 @@ def test_dispatcher_routing_ops_finance(monkeypatch) -> None:
     plan2 = client.post(
         "/tasks/dispatch_plan",
         json={
-            "project": "cloth",
+            "project": "buyer_ai",
             "task_type": "profit",
             "title": "finance test",
             "prompt": "profit for order 123",
@@ -156,7 +156,7 @@ def test_run_all_runs_until_done(monkeypatch) -> None:
     plan = client.post(
         "/tasks/dispatch_plan",
         json={
-            "project": "cloth",
+            "project": "buyer_ai",
             "task_type": "refund",
             "title": "run_all test",
             "prompt": "退款 991",
@@ -185,11 +185,62 @@ def test_run_all_runs_until_done(monkeypatch) -> None:
 
     timeline = client.post(
         "/memory/timeline",
-        json={"project_id": "cloth", "session_id": "sess-runall", "limit": 50},
+        json={"project_id": "buyer_ai", "session_id": "sess-runall", "limit": 50},
         headers=headers,
     )
     assert timeline.status_code == 200
     assert any((item.get("namespace") or []) == ["buyeros", "run_all"] for item in timeline.json()["items"])
+
+
+def test_dispatcher_live_selling_routes_to_provider_and_records_timeline(monkeypatch) -> None:
+    monkeypatch.setenv("BUYEROS_API_KEY", "secret")
+    client = TestClient(create_app())
+    headers = {"Authorization": "Bearer secret"}
+
+    dispatcher = client.app.state.dispatcher_service
+
+    def _fake_provider_run(**kwargs):
+        return {
+            "ok": True,
+            "provider": kwargs.get("preferred") or "perplexity",
+            "reply": "AI virtual host live-selling plan ready. No fake viewers or fake comments.",
+            "fallback_chain": ["perplexity", "grok", "openai"],
+            "fallback_attempts": [],
+            "fallback_exhausted": False,
+        }
+
+    monkeypatch.setattr(dispatcher.providers, "run", _fake_provider_run)
+
+    plan = client.post(
+        "/tasks/dispatch_plan",
+        json={
+            "project": "commerce",
+            "task_type": "live_selling",
+            "title": "AI live selling smoke",
+            "prompt": "Plan one AI virtual host livestream selling flow with inventory and finance checks.",
+            "max_steps": 3,
+            "session_id": "sess-live-selling",
+        },
+        headers=headers,
+    )
+    assert plan.status_code == 200
+    assert plan.json()["plan"]["project"] == "commerce"
+    assert [step["kind"] for step in plan.json()["plan"]["steps"]] == ["collect", "plan", "verify"]
+
+    task_id = plan.json()["task_id"]
+    run_all = client.post(f"/tasks/{task_id}/run_all", json={"session_id": "sess-live-selling"}, headers=headers)
+    assert run_all.status_code == 200
+    assert run_all.json()["status"] == "completed"
+
+    timeline = client.post(
+        "/memory/timeline",
+        json={"project_id": "commerce", "session_id": "sess-live-selling", "limit": 50},
+        headers=headers,
+    )
+    assert timeline.status_code == 200
+    namespaces = [item.get("namespace") for item in timeline.json()["items"]]
+    assert ["buyeros", "routing"] in namespaces
+    assert ["buyeros", "run_all"] in namespaces
 
 
 def test_list_subtasks_dedupes_latest_state() -> None:

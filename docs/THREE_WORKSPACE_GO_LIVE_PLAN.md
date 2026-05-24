@@ -1,9 +1,9 @@
 # Three Workspace Go-Live Plan (BuyerOS)
 
 核心對象：
-- `buyeros`（AI 團隊 / Context Hub）
-- `cloth`（CLOTH 網店流程）
-- `xau`（XAU 中控）
+- `buyer_ai`（BuyerOS / AI 團隊 / 買手 Report / 退款 / OCR / 對帳）
+- `commerce`（AI 直播帶貨 / 訂單 / 庫存 / 客服 / 網店收支報表）
+- `xau`（AI 直播 / XAU Promo / campaign / conversion / metrics）
 
 ## 目標
 - backend `/ping`、`/health/ready`、Provider、Context、Task 能通
@@ -26,4 +26,4 @@
 ## 验收結果
 - 有一筆 `退款 991` 後續 `991 點？` 能命中 context
 - 任務「Code / Refund / Promo」可成功生成 plan 並 Run All
-- 共享記憶 timeline 可按 workspace 檢索
+- 共享記憶 timeline 可按 canonical line 檢索

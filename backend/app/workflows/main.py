@@ -953,7 +953,7 @@ def create_app() -> FastAPI:
         for item in items:
             order_key = str(item.get("order_id") or item.get("id") or item.get("order_number") or "")
             if order_key:
-                memory_store.save_memory(["buyeros", "orders"], order_key, {"project_id": "cloth", **item}, created_by="orders_service")
+                memory_store.save_memory(["buyeros", "orders"], order_key, {"project_id": "commerce", **item}, created_by="orders_service")
         return {"ok": True, "items": items, "configured": orders_service.configured()}
 
     @app.get("/cloth/orders/{order_id}", dependencies=[Depends(require_api_key)], tags=["E-Commerce"])
@@ -962,7 +962,7 @@ def create_app() -> FastAPI:
         order = orders_service.get_order(order_id)
         ok = not bool(order.get("error"))
         if ok:
-            memory_store.save_memory(["buyeros", "orders"], order_id, {"project_id": "cloth", **order}, created_by="orders_service")
+            memory_store.save_memory(["buyeros", "orders"], order_id, {"project_id": "commerce", **order}, created_by="orders_service")
         return {"ok": ok, "order": order, "configured": orders_service.configured()}
 
     @app.post("/automation/daily-report", dependencies=[Depends(require_api_key)], tags=["Automation"])

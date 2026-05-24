@@ -1,17 +1,19 @@
-# BuyerOS 四個系統 Go-Live Plan
+# BuyerOS 三線 Go-Live Plan
 
 ## Canonical Systems
 
 | System | Canonical lane | Scope |
 | --- | --- | --- |
-| 買手 Report | `report` | 日報 / 週報 / CSV export / 毛利、退款、異常摘要 |
-| 網店自動系統 | `commerce` | 退款 / OCR 入帳 / 對帳 / 差異告警 / retry queue |
-| XAU Promo | `xau` | Campaign / conversion / metrics / UTM / revenue |
-| AI 一人公司 Team | `ai_team` | Context Hub / Provider fallback / Task Dispatcher / Memory Timeline |
+| 買手 AI 中樞 | `buyer_ai` | BuyerOS / AI Team / Context Hub / Telegram / 買手 Report / 退款 / OCR 入帳 / 對帳 / 採購 ROI |
+| 網店自動系統 | `commerce` | AI 虛擬主播帶貨 / 訂單 / 庫存 / 客服 / 網店收支報表 / Shopify / TikTok / 網店資料同步 |
+| XAU 系統 | `xau` | AI 直播 / 虛擬主播 / Campaign / conversion / metrics / UTM / revenue |
 
 Aliases are accepted only at the API boundary:
 
-- `buyeros -> ai_team`
+- `buyeros -> buyer_ai`
+- `ai_team -> buyer_ai`
+- `buyer_report -> buyer_ai`
+- `report -> buyer_ai`
 - `cloth -> commerce`
 - `shop -> commerce`
 - `promo -> xau`
@@ -46,14 +48,14 @@ bash infra/smoke_telegram_webhook.sh "$PUBLIC_BASE_URL" "$BUYEROS_API_KEY" "$TEL
 bash infra/go_live_audit.sh .env.production.local "$PUBLIC_BASE_URL" root@206.189.116.155 root@167.172.60.38
 ```
 
-`smoke_four_systems.sh` proves:
+`smoke_four_systems.sh` is kept for compatibility, but should prove three canonical lines:
 
-- `/projects` returns exactly `report / commerce / xau / ai_team`
-- `/tasks` contains all four canonical lanes
-- Report can create/history/export a daily report
-- Commerce can process `退款 991` then recall `991 點？`
-- XAU can create a campaign, record conversion, and return metrics
-- AI Team can create a dispatch plan, run all subtasks, and write routing/run_all timeline records
+- `/projects` returns exactly `buyer_ai / commerce / xau`
+- `/tasks` normalizes legacy aliases into the three canonical lanes
+- Buyer AI can create/history/export a buyer report and process `退款 991` then recall `991 點？`
+- Commerce can handle AI livestream selling flows, shop orders, inventory, support, shop revenue/expense reports, Shopify/TikTok sync
+- XAU can run AI livestream/campaign funnel tracking, create a campaign, record conversion, and return metrics
+- AI Team behavior is represented under `buyer_ai`: dispatch plan, run_all subtasks, routing/run_all timeline records
 
 `smoke_telegram_webhook.sh` proves the FastAPI webhook path without relying on
 Telegram delivery: webhook update -> workflow -> memory -> session recall.
@@ -94,13 +96,3 @@ Telegram delivery: webhook update -> workflow -> memory -> session recall.
    退款 991
    991 點？
    ```
-
-Expected: the second message recalls the persisted refund memory.
-
-## Current External Gates
-
-- Staging VPS must accept SSH before staging deploy can be verified.
-- Real Telegram webhook requires a Telegram-accepted bot token. The HTTPS
-  endpoint can be smoke-tested with `infra/smoke_telegram_webhook.sh`; if
-  `infra/set_telegram_webhook.sh` returns `Unauthorized`, refresh
-  `TELEGRAM_BOT_TOKEN` from BotFather and retry.
