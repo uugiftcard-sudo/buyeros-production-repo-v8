@@ -11,7 +11,7 @@ This module provides a typed client for calling CLOTH's AI live commerce APIs:
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -59,11 +59,11 @@ class LiveSellingPlan:
     accountStyle: str = "educational"
     hook: str = ""
     script: str = ""
-    interactionPrompts: List[str] = None
+    interactionPrompts: List[str] = field(default_factory=list)
     cta: str = ""
     inventoryCheck: Optional[InventoryCheck] = None
     financeCheck: Optional[FinanceCheck] = None
-    supportNotes: List[str] = None
+    supportNotes: List[str] = field(default_factory=list)
     safetyNote: str = ""
     createdAt: str = ""
 
