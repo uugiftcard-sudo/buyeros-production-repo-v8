@@ -54,7 +54,7 @@ class BusinessAutomationService:
             f"覆核 {len(approvals)}，重試 {len(retries)}。"
         )
         payload = {
-            "project_id": "cloth",
+            "project_id": "buyer_ai",
             "date": report_date,
             "summary": summary,
             "counts": {
@@ -76,7 +76,7 @@ class BusinessAutomationService:
         amount = self._extract_amount(text)
         status = "needs_review" if amount is None else "posted"
         payload = {
-            "project_id": "cloth",
+            "project_id": "buyer_ai",
             "entry_id": key,
             "source": source,
             "text": text,
@@ -91,7 +91,7 @@ class BusinessAutomationService:
         difference = round(actual_total - expected_total, 2)
         status = "matched" if difference == 0 else "mismatch"
         payload = {
-            "project_id": "cloth",
+            "project_id": "buyer_ai",
             "reference": reference,
             "expected_total": expected_total,
             "actual_total": actual_total,
@@ -109,7 +109,7 @@ class BusinessAutomationService:
         for index, item in enumerate(items, start=1):
             amount = float(item.get("amount", 0) or 0)
             if amount > threshold:
-                alert = {"project_id": "cloth", "index": index, **item, "threshold": threshold, "status": "open"}
+                alert = {"project_id": "buyer_ai", "index": index, **item, "threshold": threshold, "status": "open"}
                 alerts.append(alert)
                 self.memory.save_memory(
                     ["buyeros", "alerts"],
@@ -126,13 +126,13 @@ class BusinessAutomationService:
         ).to_dict()
 
     def request_approval(self, *, task_id: str, reason: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        content = {"project_id": "cloth", "task_id": task_id, "reason": reason, "payload": payload or {}, "status": "pending"}
+        content = {"project_id": "buyer_ai", "task_id": task_id, "reason": reason, "payload": payload or {}, "status": "pending"}
         self.memory.save_memory(["buyeros", "approvals"], task_id, content, created_by="business_automation")
         return AutomationResult(True, "approval", "pending", "已建立人工覆核任務。", content).to_dict()
 
     def record_retry(self, *, task_id: str, error: str, attempt: int) -> Dict[str, Any]:
         status = "retry_scheduled" if attempt < 3 else "failed"
-        content = {"project_id": "cloth", "task_id": task_id, "error": error, "attempt": attempt, "status": status}
+        content = {"project_id": "buyer_ai", "task_id": task_id, "error": error, "attempt": attempt, "status": status}
         self.memory.save_memory(["buyeros", "retries"], task_id, content, created_by="business_automation")
         return AutomationResult(True, "retry", status, f"任務 {task_id} {status}。", content).to_dict()
 
@@ -163,7 +163,7 @@ class BusinessAutomationService:
             order = self._get_order(order_id)
             if order and not order.get("error"):
                 order_total = self._extract_order_total(order)
-                self.memory.save_memory(["buyeros", "orders"], order_id, {"project_id": "cloth", **order}, created_by="business_automation")
+                self.memory.save_memory(["buyeros", "orders"], order_id, {"project_id": "buyer_ai", **order}, created_by="business_automation")
                 if order_total is not None:
                     expected_total = order_total
                 else:
@@ -240,7 +240,7 @@ class BusinessAutomationService:
 
         status = "needs_review" if approval or reconciliation["status"] == "mismatch" else "completed"
         payload = {
-            "project_id": "cloth",
+            "project_id": "buyer_ai",
             "cycle_id": cycle_id,
             "status": status,
             "reference": reference,
@@ -260,7 +260,7 @@ class BusinessAutomationService:
             "daily_report": report,
         }
         self.memory.save_memory(["buyeros", "close_cycles"], cycle_id, payload, created_by="business_automation")
-        return AutomationResult(True, "close_cycle", status, "CLOTH 收單流程已完成並寫入共同記憶。", payload).to_dict()
+        return AutomationResult(True, "close_cycle", status, "買手 AI 收單流程已完成並寫入共同記憶。", payload).to_dict()
 
     def _extract_amount(self, text: str) -> Optional[float]:
         """Extract monetary amount from text — supports HKD/USD/CNY with locale-aware patterns."""

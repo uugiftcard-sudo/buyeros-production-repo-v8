@@ -26,8 +26,8 @@ class ReportingService:
         report_id = f"{period}-{report_date}"
         data = {
             "report_id": report_id,
-            "project_id": "cloth",
-            "project": "cloth",
+            "project_id": "buyer_ai",
+            "project": "buyer_ai",
             "period": period,
             "date": report_date,
             "summary": f"{report_date} {period}：訂單 {len(orders)}，退款 {len(refunds)}，OCR {len(ocr_entries)}，告警 {len(alerts)}。",
