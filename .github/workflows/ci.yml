@@ -67,6 +67,22 @@ jobs:
     needs: [backend-test, backend-lint, backend-typecheck, docker-build]
     steps:
       - uses: actions/checkout@v4
+      - name: Create CI env file
+        run: |
+          cat > .env <<'EOF'
+          PUBLIC_BASE_URL=http://localhost:8000
+          BUYEROS_DOMAIN=localhost
+          BUYEROS_API_KEY=ci_buyer_os_key_0000000000000000
+          SUPABASE_URL=https://example.supabase.co
+          SUPABASE_KEY=ci_supabase_key_placeholder
+          TELEGRAM_BOT_TOKEN=0000000000:ci_telegram_token_placeholder
+          TELEGRAM_WEBHOOK_SECRET=ci_telegram_webhook_secret_0000000000000000
+          REDIS_URL=redis://redis:6379/0
+          OPENROUTER_API_KEY=ci_openrouter_key_placeholder
+          BUYEROS_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+          NEXTAUTH_URL=http://localhost:3000
+          NEXTAUTH_SECRET=ci_nextauth_secret_0000000000000000
+          EOF
       - run: docker compose up --detach
       - name: Wait for backend health
         run: |
