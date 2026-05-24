@@ -21,10 +21,13 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 import uuid
+from collections import defaultdict
+from contextvars import ContextVar
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -32,7 +35,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from sentry_sdk import init as sentry_init, capture_exception
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..memory_store import MemoryStore
 from ..agents.ops_agent import OpsAgent
@@ -104,34 +106,22 @@ logger = logging.getLogger(__name__)
 # accessible from anywhere in the call chain without passing it manually.
 # Thread-safe via contextvars.
 
-try:
-    from contextvars import ContextVar
-    _request_ctx: ContextVar[Optional[Dict[str, Any]]] = ContextVar("buyeros_request_ctx", default=None)
+_request_ctx: ContextVar[Optional[Dict[str, Any]]] = ContextVar("buyeros_request_ctx", default=None)
 
-    def get_request_ctx() -> Dict[str, Any]:
-        """Return current request context or empty dict."""
-        return _request_ctx.get() or {}
 
-    def set_request_ctx(**kwargs: Any) -> None:
-        ctx = _request_ctx.get() or {}
-        ctx.update(kwargs)
-        _request_ctx.set(ctx)
+def get_request_ctx() -> Dict[str, Any]:
+    """Return current request context or empty dict."""
+    return _request_ctx.get() or {}
 
-    def clear_request_ctx() -> None:
-        _request_ctx.set(None)
 
-except ImportError:  # Python < 3.7 fallback (dict, not thread-safe)
-    _request_ctx: Any = None
-    _fallback_ctx: Dict[str, Any] = {}
+def set_request_ctx(**kwargs: Any) -> None:
+    ctx = _request_ctx.get() or {}
+    ctx.update(kwargs)
+    _request_ctx.set(ctx)
 
-    def get_request_ctx() -> Dict[str, Any]:
-        return _fallback_ctx
 
-    def set_request_ctx(**kwargs: Any) -> None:
-        _fallback_ctx.update(kwargs)
-
-    def clear_request_ctx() -> None:
-        _fallback_ctx.clear()
+def clear_request_ctx() -> None:
+    _request_ctx.set(None)
 
 
 def get_trace_ctx() -> Dict[str, Any]:
@@ -146,13 +136,6 @@ def get_trace_ctx() -> Dict[str, Any]:
         "trace_id": ctx.get("trace_id"),
         "client_ip": ctx.get("client_ip"),
     }
-
-    def set_request_ctx(**kwargs: Any) -> None:
-        _fallback_ctx.update(kwargs)
-
-    def clear_request_ctx() -> None:
-        _fallback_ctx.clear()
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Debug mode flag
@@ -281,10 +264,6 @@ def _patch_logger() -> None:
 # Production should use Redis-based limiter (see /metrics endpoint for observability).
 # ─────────────────────────────────────────────────────────────────────────────
 
-import threading
-import time as _time
-from collections import defaultdict
-
 _window_lock = threading.Lock()
 _request_windows: dict[str, list[float]] = defaultdict(list)
 
@@ -302,7 +281,7 @@ def _ip_from_request(request: Request) -> str:
 
 def _check_rate_limit(ip: str, rpm: int, rps: int) -> tuple[bool, str]:
     """Return (allowed, retry_after_str). thread-safe sliding window."""
-    now = _time.time()
+    now = time.time()
     with _window_lock:
         _clean_window(ip, 60.0, now)
         _clean_window(ip, 1.0, now)
@@ -385,24 +364,6 @@ def create_app() -> FastAPI:
             set_trace(request_id=request_id, trace_id=trace_id, span_id=span_id, client_ip=client_ip)
         except ImportError:
             pass
-        body_bytes: bytes | None = None
-        if _is_debug() and request.method in ("POST", "PUT", "PATCH"):
-            body_bytes = await request.body()
-            async def reuse_body():
-                import asyncio
-                return await request.form() if request.method != "GET" else {}
-
-        # Build a request object for body replay
-        async def _call_next_with_body():
-            if body_bytes is not None:
-                from starlette.datastructures import UploadFile
-                from io import BytesIO
-                scope = dict(request.scope)
-                scope["body"] = body_bytes
-                from starlette.requests import Request as SRequest
-                new_request = SRequest(scope, receive=lambda: BytesIO(body_bytes).__dict__["_value"] if hasattr(BytesIO(body_bytes), "_value") else BytesIO(body_bytes))
-            return await call_next(request)
-
         response = await call_next(request)
         duration = time.perf_counter() - start
         endpoint = request.url.path

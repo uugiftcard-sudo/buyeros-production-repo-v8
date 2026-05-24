@@ -85,7 +85,7 @@ def _classify_intent(message: str) -> str:
         scores["finance"] += 1.0
 
     # Return highest-scoring intent (>= 1.0) or fall back to provider
-    best_intent = max(scores, key=scores.get)
+    best_intent = max(scores, key=lambda intent: scores[intent])
     if scores[best_intent] >= 1.0:
         return best_intent
     return "provider"

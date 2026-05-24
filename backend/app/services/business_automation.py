@@ -283,10 +283,15 @@ class BusinessAutomationService:
     def _extract_currency(self, text: str) -> str:
         """Detect currency from text."""
         import re
-        if re.search(r"(?:HKD|港幣)", text, re.IGNORECASE): return "HKD"
-        if re.search(r"(?:USD|US\\$)", text, re.IGNORECASE): return "USD"
-        if re.search(r"(?:CNY|RMB|人民幣)", text, re.IGNORECASE): return "CNY"
-        if re.search(r"[¥]", text): return "CNY"
+
+        if re.search(r"(?:HKD|港幣)", text, re.IGNORECASE):
+            return "HKD"
+        if re.search(r"(?:USD|US\\$)", text, re.IGNORECASE):
+            return "USD"
+        if re.search(r"(?:CNY|RMB|人民幣)", text, re.IGNORECASE):
+            return "CNY"
+        if re.search(r"[¥]", text):
+            return "CNY"
         return "HKD"  # default for CLOTH
 
     def _get_order(self, order_id: str) -> Optional[Dict[str, Any]]:
