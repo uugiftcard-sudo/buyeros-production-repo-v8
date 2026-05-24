@@ -105,6 +105,3 @@ class TestAIModelRouter:
             router.route(role="unknown_role", prompt="generic message")
             call_json = mock_post.call_args[1]["json"]
             assert call_json["model"] == "openai/gpt-4o-mini"
-
-
-import pytest  # noqa: E402

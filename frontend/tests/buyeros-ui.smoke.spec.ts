@@ -143,7 +143,7 @@ test("BuyerOS mission control can plan, run one step, and show memory UI", async
   await expect(page.getByText(/RTO 12s/)).toBeVisible();
 
   await page.locator("#projects").scrollIntoViewIfNeeded();
-  await page.locator("#projects .project-switch").filter({ hasText: "網店自動系統" }).click();
-  await page.getByRole("button", { name: "收單全流程" }).click();
-  await expect(page.getByText("網店收單流程").first()).toBeVisible();
+  await page.locator("#projects .project-switch").filter({ hasText: "買手 AI 中樞" }).click();
+  await page.getByRole("button", { name: "買手收單全流程" }).click();
+  await expect(page.getByText("買手 AI 收單流程").first()).toBeVisible();
 });
