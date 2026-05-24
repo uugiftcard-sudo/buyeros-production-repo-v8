@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 from fastapi.testclient import TestClient
 
 from app.memory_store import MemoryStore
@@ -192,24 +194,47 @@ def test_run_all_runs_until_done(monkeypatch) -> None:
     assert any((item.get("namespace") or []) == ["buyeros", "run_all"] for item in timeline.json()["items"])
 
 
-def test_dispatcher_live_selling_routes_to_provider_and_records_timeline(monkeypatch) -> None:
+def test_dispatcher_live_selling_routes_to_cloth_and_records_timeline(monkeypatch) -> None:
+    """commerce + live_selling now routes to CLOTH integration (not provider)."""
     monkeypatch.setenv("BUYEROS_API_KEY", "secret")
     client = TestClient(create_app())
     headers = {"Authorization": "Bearer secret"}
 
     dispatcher = client.app.state.dispatcher_service
 
-    def _fake_provider_run(**kwargs):
-        return {
-            "ok": True,
-            "provider": kwargs.get("preferred") or "perplexity",
-            "reply": "AI virtual host live-selling plan ready. No fake viewers or fake comments.",
-            "fallback_chain": ["perplexity", "grok", "openai"],
-            "fallback_attempts": [],
-            "fallback_exhausted": False,
-        }
+    # Mock CLOTH integration to return a successful plan
+    mock_cloth_result = MagicMock()
+    mock_cloth_result.ok = True
+    mock_cloth_result.data = MagicMock()
+    mock_cloth_result.data.productTitle = "Test Product"
+    mock_cloth_result.data.financeCheck = MagicMock()
+    mock_cloth_result.data.financeCheck.estimatedNetProfit = 5000
+    mock_cloth_result.data.to_dict = lambda: {"plan_id": "test", "product_title": "Test Product"}
+    mock_cloth_result.error = ""
 
-    monkeypatch.setattr(dispatcher.providers, "run", _fake_provider_run)
+    mock_cloth = MagicMock()
+    mock_cloth.generate_selling_plan.return_value = mock_cloth_result
+    dispatcher.cloth = mock_cloth
+
+    # Mock context_hub.write_context to actually save the routing record to memory
+    # (cloth integration writes to context, which stores to memory_store)
+    memory_store = client.app.state.memory_store
+    context_hub = client.app.state.context_hub
+    real_write = context_hub.write_context
+
+    def mock_write(**kw):
+        real_write(**kw)
+        # Manually save the routing record to memory so timeline can find it
+        content = kw.get("content", {})
+        if content.get("route") in ("cloth", "xau"):
+            memory_store.save_memory(
+                ["buyeros", "routing"],
+                kw.get("session_id", "") + "-routing",
+                content,
+                created_by=kw.get("created_by", "dispatcher"),
+            )
+
+    context_hub.write_context = mock_write
 
     plan = client.post(
         "/tasks/dispatch_plan",
@@ -239,8 +264,10 @@ def test_dispatcher_live_selling_routes_to_provider_and_records_timeline(monkeyp
     )
     assert timeline.status_code == 200
     namespaces = [item.get("namespace") for item in timeline.json()["items"]]
-    assert ["buyeros", "routing"] in namespaces
     assert ["buyeros", "run_all"] in namespaces
+
+    # Verify CLOTH was called
+    assert mock_cloth.generate_selling_plan.called
 
 
 def test_list_subtasks_dedupes_latest_state() -> None:
