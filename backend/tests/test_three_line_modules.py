@@ -75,21 +75,21 @@ def test_task_board_accepts_three_workspace_lanes_and_legacy_aliases() -> None:
     xau_alias = service.create_task(title="XAU alias", lane="xau-team", owner_provider="openai")
     cloth_alias = service.create_task(title="CLOTH alias", lane="cloth", owner_provider="openai")
 
-    assert report["task"]["lane"] == "cloth"
-    assert report["task"]["lane_label"] == "CLOTH 網店自動系統"
-    assert commerce["task"]["lane"] == "cloth"
-    assert commerce["task"]["lane_label"] == "CLOTH 網店自動系統"
+    assert report["task"]["lane"] == "buyer_ai"
+    assert report["task"]["lane_label"] == "買手 AI 中樞"
+    assert commerce["task"]["lane"] == "commerce"
+    assert commerce["task"]["lane_label"] == "網店自動系統"
     assert xau["task"]["lane"] == "xau"
     assert xau["task"]["lane_label"] == "XAU 中控"
-    assert buyeros["task"]["lane"] == "buyeros"
-    assert buyeros["task"]["lane_label"] == "BuyerOS Core"
-    assert buyeros_alias["task"]["lane"] == "buyeros"
-    assert buyeros_alias_dash["task"]["lane"] == "buyeros"
+    assert buyeros["task"]["lane"] == "buyer_ai"
+    assert buyeros["task"]["lane_label"] == "買手 AI 中樞"
+    assert buyeros_alias["task"]["lane"] == "buyer_ai"
+    assert buyeros_alias_dash["task"]["lane"] == "buyer_ai"
     assert xau_alias["task"]["lane"] == "xau"
-    assert cloth_alias["task"]["lane"] == "cloth"
-    assert service.list_tasks(lane="cloth")["items"][0]["content"]["lane"] == "cloth"
+    assert cloth_alias["task"]["lane"] == "commerce"
+    assert service.list_tasks(lane="cloth")["items"][0]["content"]["lane"] == "commerce"
     assert service.list_tasks(lane="xau")["items"][0]["content"]["lane"] == "xau"
-    assert service.list_tasks(lane="buyeros")["items"][0]["content"]["lane"] == "buyeros"
+    assert service.list_tasks(lane="buyeros")["items"][0]["content"]["lane"] == "buyer_ai"
 
 
 def test_project_registry_returns_three_canonical_projects_when_old_alias_projects_exist() -> None:
@@ -112,8 +112,8 @@ def test_project_registry_returns_three_canonical_projects_when_old_alias_projec
     project_ids = {(item.get("content") or {}).get("project_id") for item in projects}
     names = {(item.get("content") or {}).get("name") for item in projects}
 
-    assert project_ids == {"buyeros", "cloth", "xau"}
-    assert names == {"BuyerOS Core", "CLOTH 網店自動系統", "XAU 中控"}
+    assert project_ids == {"buyer_ai", "commerce", "xau"}
+    assert names == {"買手 AI 中樞", "網店自動系統", "XAU 中控"}
 
 
 def test_three_system_api_endpoints(monkeypatch) -> None:
@@ -136,7 +136,7 @@ def test_three_system_api_endpoints(monkeypatch) -> None:
         headers=headers,
     )
     metrics = client.get(f"/promo/metrics?campaign_id={campaign_id}", headers=headers)
-    task = client.post("/tasks", json={"title": "AI team task", "lane": "buyeros"}, headers=headers)
+    task = client.post("/tasks", json={"title": "AI team task", "lane": "buyer_ai"}, headers=headers)
     task_id = task.json()["task"]["task_id"]
     task_run = client.post(f"/tasks/{task_id}/run", json={"result": "completed", "provider": "openai"}, headers=headers)
     tasks = client.get("/tasks", headers=headers)
@@ -146,10 +146,10 @@ def test_three_system_api_endpoints(monkeypatch) -> None:
         assert response.status_code == 200
         assert response.json()["ok"] is True
 
-    assert task.json()["task"]["lane"] == "buyeros"
-    assert task.json()["task"]["lane_label"] == "BuyerOS Core"
+    assert task.json()["task"]["lane"] == "buyer_ai"
+    assert task.json()["task"]["lane_label"] == "買手 AI 中樞"
     project_ids = {(item.get("content") or {}).get("project_id") for item in projects.json()["items"]}
-    assert project_ids == {"buyeros", "cloth", "xau"}
+    assert project_ids == {"buyer_ai", "commerce", "xau"}
 
 
 def test_three_system_api_validates_payload(monkeypatch) -> None:

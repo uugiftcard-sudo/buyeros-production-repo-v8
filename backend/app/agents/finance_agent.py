@@ -15,8 +15,17 @@ from typing import Any, Optional
 from ..registry import ToolRegistry
 from ..memory_store import MemoryStore
 from ..services.finance_service import FinanceService
+from ..trace import trace_ctx
+
 
 logger = logging.getLogger(__name__)
+
+
+def _log_trace(level: int, msg: str, **kwargs: Any) -> None:
+    ctx = trace_ctx()
+    extra = {k: v for k, v in ctx.items() if v is not None}
+    extra.update(kwargs)
+    logger.log(level, msg, extra=extra)
 
 
 class FinanceAgent:
@@ -58,5 +67,5 @@ class FinanceAgent:
             try:
                 return self.ai_router.route(role="finance", prompt=text)
             except Exception as exc:
-                logger.error("AI router error: %s", exc)
+                _log_trace(logging.ERROR, "ai_router.error", exc=str(exc))
         return "已收到財務查詢，目前僅支援'profit'或'payout'指令。"

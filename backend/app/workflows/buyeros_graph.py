@@ -7,7 +7,9 @@ optional graph runtime is not available yet.
 
 from __future__ import annotations
 
+import logging
 import re
+import time
 from typing import Any, Optional
 
 from ..agents.finance_agent import FinanceAgent
@@ -17,6 +19,10 @@ from ..context.provider_registry import ProviderRegistry
 from ..memory_store import MemoryStore
 from ..runtime.session_store import RedisSessionStore
 from ..schemas.state import BuyerOSState
+from ..trace import trace_ctx
+
+logger = logging.getLogger(__name__)
+
 
 GRAPH_END: Any = None
 StateGraphClass: Any = None
@@ -27,6 +33,62 @@ try:  # pragma: no cover - exercised only when langgraph is installed
     StateGraphClass = _StateGraphClass
 except Exception:  # pragma: no cover - deterministic fallback is tested
     pass
+
+
+# ── Intent classification keywords ──────────────────────────────────────────────
+
+_INTENT_KEYWORDS: dict[str, list[str]] = {
+    "memory_lookup": ["查交易", "transaction #", "transaction id", "history", "記錄"],
+    "ops": [
+        "ocr", "文字識別", "receipt", "buyyer", "buyer", "客人", "顧客", "customer",
+        # Refund = ops action (process, look up, act on a refund)
+        "refund", "退款",
+        # Order-related actions
+        "order", "訂單", "查單", "查單",
+    ],
+    "finance": [
+        "profit", "盈利", "payout", "出糧", "結算", "commission", "傭金",
+        "revenue", "收入", "帳單", "invoice",
+    ],
+}
+
+
+def _classify_intent(message: str) -> str:
+    """Improved intent classification using weighted keyword matching.
+
+    Priority rules:
+      - "refund" / "退款" → ops (always, even with transaction ID)
+      - Numeric transaction IDs → memory_lookup (only when no strong keyword match)
+      - Finance keywords → finance
+      - OCR / buyer keywords → ops
+    """
+    lower = message.lower().strip()
+
+    # Hard-priority: refund = ops action (not memory lookup)
+    if any(kw in lower for kw in _INTENT_KEYWORDS["ops"]) and any(
+        kw in lower for kw in ["refund", "退款"]
+    ):
+        return "ops"
+
+    scores: dict[str, float] = {"memory_lookup": 0.0, "ops": 0.0, "finance": 0.0, "provider": 0.0}
+
+    for intent, keywords in _INTENT_KEYWORDS.items():
+        for kw in keywords:
+            scores[intent] += lower.count(kw.lower())
+
+    # Numeric transaction IDs imply memory lookup (but ops/finance win with keywords)
+    if re.search(r"\b\d{3,}\b", lower):
+        scores["memory_lookup"] += 1.5
+
+    # Finance + currency amount → finance
+    if re.search(r"hk\$?\d+|\$?\d+hkd", lower) and scores["finance"] > 0:
+        scores["finance"] += 1.0
+
+    # Return highest-scoring intent (>= 1.0) or fall back to provider
+    best_intent = max(scores, key=lambda intent: scores[intent])
+    if scores[best_intent] >= 1.0:
+        return best_intent
+    return "provider"
 
 
 class BuyerOSGraphWorkflow:
@@ -60,6 +122,18 @@ class BuyerOSGraphWorkflow:
         session_id: Optional[str] = None,
         task_id: Optional[str] = None,
     ) -> str:
+        start = time.perf_counter()
+        ctx = trace_ctx()
+        logger.info(
+            "workflow.start",
+            extra={
+                **ctx,
+                "user_id": user_id,
+                "channel": channel,
+                "message_preview": message[:80],
+            },
+        )
+
         state: BuyerOSState = {
             "message": message,
             "user_id": user_id,
@@ -71,6 +145,17 @@ class BuyerOSGraphWorkflow:
             "tool_results": [],
         }
         result = self.run(state)
+        elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
+        logger.info(
+            "workflow.done",
+            extra={
+                **ctx,
+                "intent": result.get("intent"),
+                "agent": result.get("agent"),
+                "elapsed_ms": elapsed_ms,
+            },
+        )
+
         if self.session_store:
             self.session_store.save_state(result.get("session_id"), dict(result))
         return result.get("reply", "BuyerOS 已收到。")
@@ -113,23 +198,22 @@ class BuyerOSGraphWorkflow:
 
     def _classify(self, state: BuyerOSState) -> BuyerOSState:
         message = state.get("message", "")
-        lower = message.lower().strip()
-        txn_match = re.search(r"\b(\d{3,})\b", lower)
+        intent = _classify_intent(message)
+        txn_match = re.search(r"\b(\d{3,})\b", message)
         state["transaction_id"] = txn_match.group(1) if txn_match else None
-        if state.get("transaction_id") and not any(
-            kw in lower for kw in ["refund", "退款", "order", "ocr", "profit", "盈利", "payout", "出糧", "結算"]
-        ):
-            state["intent"] = "memory_lookup"
-            state["agent"] = "memory"
-        elif any(kw in lower for kw in ["refund", "退款", "order", "ocr", "文字識別"]):
-            state["intent"] = "ops"
-            state["agent"] = "ops"
-        elif any(kw in lower for kw in ["profit", "盈利", "payout", "出糧", "結算"]):
-            state["intent"] = "finance"
-            state["agent"] = "finance"
-        else:
-            state["intent"] = "provider"
-            state["agent"] = "provider"
+        state["intent"] = intent
+        state["agent"] = {
+            "memory_lookup": "memory",
+            "ops": "ops",
+            "finance": "finance",
+            "provider": "provider",
+        }.get(intent, "provider")
+
+        ctx = trace_ctx()
+        logger.debug(
+            "workflow.classify",
+            extra={**ctx, "intent": intent, "transaction_id": state.get("transaction_id")},
+        )
         return state
 
     def _memory_lookup(self, state: BuyerOSState) -> BuyerOSState:
@@ -137,7 +221,9 @@ class BuyerOSGraphWorkflow:
         if not txn_id:
             state["reply"] = "請提供交易編號。"
             return state
-        entries = self.memory_store.search_memory(namespace_prefix=("buyeros", "refunds"), memory_key=txn_id, limit=1)
+        entries = self.memory_store.search_memory(
+            namespace_prefix=("buyeros", "refunds"), memory_key=txn_id, limit=1
+        )
         state["memory_hits"] = entries
         if entries:
             content = entries[0].get("content") or {}
@@ -147,7 +233,9 @@ class BuyerOSGraphWorkflow:
             state["memory_hits"] = context_hits
             if context_hits:
                 content = context_hits[0].get("content") or {}
-                state["reply"] = content.get("summary") or str(content.get("content")) or f"找到交易 {txn_id} 的共用 context。"
+                state["reply"] = (
+                    content.get("summary") or str(content.get("content")) or f"找到交易 {txn_id} 的共用 context。"
+                )
             else:
                 state["reply"] = f"沒有找到交易 {txn_id} 的記錄。"
         return state

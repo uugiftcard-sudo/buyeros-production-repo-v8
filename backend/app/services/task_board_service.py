@@ -14,27 +14,31 @@ class TaskBoardService:
     """Persist cross-provider tasks and lifecycle state."""
 
     LANES = {
-        "buyeros": "BuyerOS Core",
-        "cloth": "CLOTH 網店自動系統",
+        "buyer_ai": "買手 AI 中樞",
+        "commerce": "網店自動系統",
         "xau": "XAU 中控",
     }
     LANE_ALIASES = {
-        "buyeros": "buyeros",
-        "ai_team": "buyeros",
-        "ai-solo-team": "buyeros",
-        "ai_solo_team": "buyeros",
-        "report": "cloth",
-        "commerce": "cloth",
-        "reporting": "cloth",
-        "order": "cloth",
-        "orders": "cloth",
+        "buyer_ai": "buyer_ai",
+        "buyeros": "buyer_ai",
+        "ai_team": "buyer_ai",
+        "ai-solo-team": "buyer_ai",
+        "ai_solo_team": "buyer_ai",
+        "buyer_report": "buyer_ai",
+        "buyer-report": "buyer_ai",
+        "report": "buyer_ai",
+        "reporting": "buyer_ai",
+        "commerce": "commerce",
+        "cloth": "commerce",
+        "order": "commerce",
+        "orders": "commerce",
+        "shop": "commerce",
         "promo": "xau",
         "xau-team": "xau",
         "xau_team": "xau",
         "xaupromo": "xau",
         "xau-promo": "xau",
         "xau_promo": "xau",
-        "shop": "cloth",
     }
 
     def __init__(self, memory_store: MemoryStore) -> None:
@@ -62,7 +66,7 @@ class TaskBoardService:
         self,
         *,
         title: str,
-        lane: str = "buyeros",
+        lane: str = "buyer_ai",
         owner_provider: str = "openai",
         priority: str = "P1",
         payload: Optional[Dict[str, Any]] = None,
@@ -105,8 +109,8 @@ class TaskBoardService:
             content = {
                 "task_id": task_id,
                 "title": task_id,
-                "lane": "buyeros",
-                "lane_label": self.LANES["buyeros"],
+                "lane": "buyer_ai",
+                "lane_label": self.LANES["buyer_ai"],
                 "owner_provider": "openai",
                 "priority": "P1",
                 "created_at": datetime.now(timezone.utc).isoformat(),

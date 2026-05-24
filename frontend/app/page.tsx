@@ -179,26 +179,28 @@ const referencePatterns = [
 ];
 
 const taskLanes = [
-  { id: "buyeros", label: "BuyerOS Core" },
-  { id: "cloth", label: "CLOTH 網店" },
+  { id: "buyer_ai", label: "買手 AI 中樞" },
+  { id: "commerce", label: "網店自動系統" },
   { id: "xau", label: "XAU 中控" }
 ];
 
-type CanonicalProject = "buyeros" | "cloth" | "xau";
+type CanonicalProject = "buyer_ai" | "commerce" | "xau";
 
 const projectAliases: Record<string, CanonicalProject> = {
-  buyeros: "buyeros",
-  "ai-team": "buyeros",
-  ai_team: "buyeros",
-  ai_solo_team: "buyeros",
-  "ai-solo-team": "buyeros",
-  cloth: "cloth",
-  commerce: "cloth",
-  reporting: "cloth",
-  order: "cloth",
-  orders: "cloth",
-  shop: "cloth",
-  report: "cloth",
+  buyer_ai: "buyer_ai",
+  buyeros: "buyer_ai",
+  "ai-team": "buyer_ai",
+  ai_team: "buyer_ai",
+  ai_solo_team: "buyer_ai",
+  "ai-solo-team": "buyer_ai",
+  buyer_report: "buyer_ai",
+  report: "buyer_ai",
+  reporting: "buyer_ai",
+  commerce: "commerce",
+  cloth: "commerce",
+  order: "commerce",
+  orders: "commerce",
+  shop: "commerce",
   xau: "xau",
   xau_promo: "xau",
   "xau-team": "xau",
@@ -252,25 +254,25 @@ const providerFallbackChains: Record<string, string> = {
 };
 
 const projectProfiles = {
-  buyeros: {
-    title: "BuyerOS Core",
-    subtitle: "AI 團隊、Context Hub、任務派工、部署、共同記憶",
-    memory: "buyeros / ai_context / tasks / routing",
+  buyer_ai: {
+    title: "買手 AI 中樞",
+    subtitle: "AI 團隊、Context Hub、買手 Report、退款、OCR 入帳、共同記憶",
+    memory: "buyeros / ai_context / reports / refunds / ocr_entries / routing",
     sop: "Provider fallback、雙機部署、shared memory、smoke test",
     kind: "AI 主線"
   },
-  cloth: {
-    title: "CLOTH 網店",
-    subtitle: "網店 SOP、買手報告、訂單、OCR、對帳、退款",
-    memory: "buyeros / reports / finance / refunds / alerts / ocr_entries",
-    sop: "OCR 入帳、對帳、差異告警、人工覆核、日報",
+  commerce: {
+    title: "網店自動系統",
+    subtitle: "AI 虛擬主播帶貨、訂單、庫存、客服、收支報表",
+    memory: "buyeros / orders / buyers / inventory / support / finance",
+    sop: "AI 直播帶貨、商品腳本、訂單、庫存、客服、收支報表",
     kind: "網店專案"
   },
   xau: {
     title: "XAU 中控",
-    subtitle: "promo、內容、交易教育、活動頁、funnel",
+    subtitle: "AI 直播、虛擬主播、promo、campaign、conversion、metrics",
     memory: "buyeros / promo / campaigns / metrics",
-    sop: "XAUUSD dashboard、OBS、member funnel、活動追蹤",
+    sop: "XAU AI 直播、OBS、虛擬主播、member funnel、活動追蹤",
     kind: "推廣主線"
   }
 } as const;
@@ -282,7 +284,7 @@ function projectProfile(value?: string) {
 function normalizeProjectCard(entry: MemoryEntry<ProjectCard>): MemoryEntry<ProjectCard> {
   const content = (entry.content || {}) as Record<string, unknown>;
   const projectId = normalizeProjectId(
-    typeof content.project_id === "string" ? content.project_id : typeof entry.memory_key === "string" ? entry.memory_key : "buyeros"
+    typeof content.project_id === "string" ? content.project_id : typeof entry.memory_key === "string" ? entry.memory_key : "buyer_ai"
   );
   const profile = projectProfile(projectId);
   const existingNotes = typeof content.notes === "string" ? content.notes : undefined;
@@ -300,7 +302,7 @@ function normalizeProjectCard(entry: MemoryEntry<ProjectCard>): MemoryEntry<Proj
 }
 
 function normalizeProjectId(value?: string): keyof typeof projectProfiles {
-  return projectAliases[(value || "").trim()] || "buyeros";
+  return projectAliases[(value || "").trim()] || "buyer_ai";
 }
 
 function nestedTimelineRuntime(content?: TimelineContent): TimelineContent | null {
@@ -325,7 +327,7 @@ export default function DashboardPage() {
   const [result, setResult] = useState<ResultState>({ label: "尚未執行", data: null });
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState("sess-qa-1");
-  const [project, setProject] = useState<keyof typeof projectProfiles>("buyeros");
+  const [project, setProject] = useState<keyof typeof projectProfiles>("buyer_ai");
   const [taskType, setTaskType] = useState("code");
   const [provider, setProvider] = useState("openai");
   const [taskTitle, setTaskTitle] = useState("把 BuyerOS UI 改成 AI 團隊指揮中心");
@@ -352,11 +354,10 @@ export default function DashboardPage() {
     recordAction("系統已載入", "等待操作");
     const savedProxyUrl = window.localStorage.getItem("buyeros.api.proxyUrl");
     const savedApiKey = window.localStorage.getItem(apiKeyStorageKey);
-    const queryApiKey = new URLSearchParams(window.location.search).get("k");
     const savedTheme = window.localStorage.getItem("buyeros.ui.theme") as UiTheme | null;
     setApi({
       proxyUrl: savedProxyUrl || defaultProxyUrl,
-      apiKey: savedApiKey || queryApiKey || "",
+      apiKey: savedApiKey || "",  // In production (non-localhost), the proxy handles auth server-side
     });
     if (savedTheme && uiThemes.some((theme) => theme.id === savedTheme)) {
       setUiTheme(savedTheme);
@@ -463,7 +464,7 @@ export default function DashboardPage() {
       const latest = new Map<string, MemoryEntry<ProjectCard>>();
       (data as { items: MemoryEntry<ProjectCard>[] }).items.forEach((entry) => {
         const normalized = normalizeProjectCard(entry);
-        latest.set(normalized.memory_key || "buyeros", normalized);
+        latest.set(normalized.memory_key || "buyer_ai", normalized);
       });
       setProjectCards(taskLanes.map((lane) => latest.get(lane.id)).filter(Boolean) as MemoryEntry<ProjectCard>[]);
       recordAction("專案清單", "已同步三個 workspace");
@@ -611,7 +612,7 @@ export default function DashboardPage() {
 
   async function runWorkspaceAction(action: "daily_report" | "ocr" | "reconcile" | "alerts" | "approval" | "retry" | "close_cycle" | "promo_metrics" | "provider_check" | "ops_status") {
     if (action === "daily_report") {
-      await callApi("/automation/daily-report", { method: "POST", body: JSON.stringify({}) }, "CLOTH 日報");
+      await callApi("/automation/daily-report", { method: "POST", body: JSON.stringify({}) }, "買手日報");
       await searchTimeline();
       return;
     }
@@ -631,7 +632,7 @@ export default function DashboardPage() {
             retry_attempt: 1,
           }),
         },
-        "CLOTH 收單流程"
+        "買手 AI 收單流程"
       );
       await searchTimeline();
       return;
@@ -652,7 +653,7 @@ export default function DashboardPage() {
       return;
     }
     if (action === "approval") {
-      await callApi("/automation/approval", { method: "POST", body: JSON.stringify({ task_id: "ui-approval", reason: "UI 人工覆核測試", payload: { project_id: "cloth" } }) }, "人工覆核");
+      await callApi("/automation/approval", { method: "POST", body: JSON.stringify({ task_id: "ui-approval", reason: "UI 人工覆核測試", payload: { project_id: "buyer_ai" } }) }, "人工覆核");
       await searchTimeline();
       return;
     }
@@ -716,6 +717,14 @@ export default function DashboardPage() {
 
   return (
     <main className="app-shell" data-theme={uiTheme}>
+      {loading && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999,
+          height: 3, background: "linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899)",
+          animation: "buyeros-loading 1.2s ease-in-out infinite",
+        }} />
+      )}
+      <style>{`@keyframes buyeros-loading { 0%{opacity:.4} 50%{opacity:1} 100%{opacity:.4} }`}</style>
       <nav className="mission-rail" aria-label="BuyerOS sections">
         <a href="#overview" title="總覽"><strong>總</strong><span>總覽</span></a>
         <a href="#agents" title="AI 團隊"><strong>AI</strong><span>團隊</span></a>
@@ -800,7 +809,7 @@ export default function DashboardPage() {
             <input value={api.proxyUrl} onChange={(event) => updateApi("proxyUrl", event.target.value)} />
           </label>
           <div className="auto-auth">
-            授權由 Next.js Proxy 使用 server-side 環境變數處理；本機也可用 k=URL 參數臨時帶入。
+            <span style={{ color: "#4ade80" }}>●</span> 授權由 Next.js Proxy 使用 server-side 環境變數處理，API key 不會暴露於 URL。
           </div>
         </aside>
       </header>
@@ -944,8 +953,8 @@ export default function DashboardPage() {
               <label>
 	                專案
 	                <select value={project} onChange={(event) => setProject(normalizeProjectId(event.target.value))}>
-                  <option value="buyeros">BuyerOS Core</option>
-                  <option value="cloth">CLOTH 網店</option>
+                  <option value="buyer_ai">買手 AI 中樞</option>
+                  <option value="commerce">網店自動系統</option>
                   <option value="xau">XAU 中控</option>
                 </select>
 	              </label>
@@ -1246,14 +1255,14 @@ export default function DashboardPage() {
 	          <article className="config-notice">
 	            <strong>{activeProject.title} 狀態</strong>
 	            <p>
-	              {project === "buyeros"
-	                ? "BuyerOS Core 負責 Context Hub、Provider fallback、任務派工、部署與營運。"
-	                : project === "cloth"
-	                  ? "CLOTH 網店負責網店 SOP、買手報告、訂單、OCR 入帳、對帳、退款與差異告警。"
-	                  : "XAU 中控接 campaign / conversion / metrics；外部行情或內容來源未設定時顯示待接線。"}
+	              {project === "buyer_ai"
+	                ? "買手 AI 中樞負責 Context Hub、Provider fallback、Telegram、買手 Report、退款、OCR 入帳、對帳與採購 ROI。"
+	                : project === "commerce"
+	                  ? "網店自動系統主軸是 AI 虛擬主播帶貨，並負責訂單、庫存、客服、收支報表、Shopify / TikTok 連接與資料同步。"
+	                  : "XAU 中控主軸是 AI 直播與虛擬主播 funnel，接 campaign / conversion / metrics；外部行情或內容來源未設定時顯示待接線。"}
 	            </p>
 	            <div className="quick-actions" aria-label="工作區快捷操作">
-	              {project === "buyeros" ? (
+	              {project === "buyer_ai" ? (
 	                <>
                     <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("provider_check")}>
                       {loading ? "檢查中..." : "檢查 Provider"}
@@ -1261,23 +1270,15 @@ export default function DashboardPage() {
                     <button type="button" className="secondary slim" disabled={loading} onClick={loadCapabilities}>
                       {loading ? "載入中..." : "查看能力缺口"}
                     </button>
-	                </>
-	              ) : null}
-	              {project === "cloth" ? (
-	                <>
 	                  <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("daily_report")}>
-                    {loading ? "產生中..." : "產生日報"}
+                    {loading ? "產生中..." : "買手日報"}
                   </button>
                   <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("close_cycle")}>
-                    {loading ? "執行中..." : "收單全流程"}
+                    {loading ? "執行中..." : "買手收單全流程"}
                   </button>
-                  <button type="button" className="secondary slim" disabled={loading} onClick={() => callApi("/reports/history", {}, "報表歷史")}>
-                    {loading ? "載入中..." : "報表歷史"}
+                  <button type="button" className="secondary slim" disabled={loading} onClick={() => callApi("/reports/history", {}, "買手報表歷史")}>
+                    {loading ? "載入中..." : "買手報表歷史"}
                   </button>
-	                </>
-	              ) : null}
-	              {project === "cloth" ? (
-	                <>
 	                  <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("ocr")}>
                     {loading ? "測試中..." : "OCR 入帳測試"}
                   </button>
@@ -1292,6 +1293,28 @@ export default function DashboardPage() {
                   </button>
                   <button type="button" className="secondary slim" disabled={loading} onClick={() => runWorkspaceAction("retry")}>
                     {loading ? "記錄中..." : "重試記錄"}
+                  </button>
+	                </>
+	              ) : null}
+	              {project === "commerce" ? (
+	                <>
+	                  <button type="button" className="secondary slim" onClick={() => {
+                    if (loading) return;
+	                    setTaskType("research");
+	                    setTaskTitle("規劃網店 AI 直播帶貨任務");
+	                    setPrompt("請為網店自動系統規劃下一場 AI 虛擬主播帶貨：商品腳本、平台、CTA、訂單承接、客服與收支追蹤。");
+	                    recordAction("Commerce 快捷任務", "已填入 AI 直播帶貨任務表單");
+	                  }} disabled={loading}>
+                    {loading ? "更新中..." : "建立帶貨任務"}
+                  </button>
+                  <button type="button" className="secondary slim" onClick={() => {
+                    if (loading) return;
+	                    setTaskType("finance");
+	                    setTaskTitle("規劃網店收支報表任務");
+	                    setPrompt("請為 commerce 規劃網店收支報表：訂單收入、平台費、廣告費、庫存成本、退貨、淨利與異常告警。");
+	                    recordAction("Commerce 快捷任務", "已填入網店收支報表任務表單");
+	                  }} disabled={loading}>
+                    {loading ? "更新中..." : "建立收支任務"}
                   </button>
 	                </>
 	              ) : null}
