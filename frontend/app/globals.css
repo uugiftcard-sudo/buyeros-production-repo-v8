@@ -1326,9 +1326,50 @@ p {
   margin: 2px 0 0;
 }
 
+.ops-result-card {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.ops-result-card pre {
+  min-height: 120px;
+  max-height: 240px;
+}
+
 .sop-list {
   display: grid;
   gap: 10px;
+}
+
+.ops-link-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--primary);
+  border-radius: 7px;
+  background: linear-gradient(180deg, color-mix(in oklch, var(--primary) 92%, white), var(--primary-dark));
+  color: oklch(0.12 0.02 255);
+  padding: 0 14px;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.ops-link-button:hover {
+  background: var(--primary-dark);
+  box-shadow: 0 10px 24px oklch(0.35 0.1 190 / 0.2);
+  transform: translateY(-1px);
+}
+
+.ops-result-card iframe {
+  width: 100%;
+  min-height: 180px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: oklch(0.18 0.04 255);
 }
 
 .hint {
