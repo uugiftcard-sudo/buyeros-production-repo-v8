@@ -125,6 +125,6 @@ bash infra/rollback_vps.sh root@206.189.116.155
 
 ## Remaining risks
 
-- CLOTH v1 finance/inventory/support APIs currently use in-memory seed data; production needs persistent storage before real operations.
+- CLOTH v1 finance/inventory/support APIs: SQLite persistence layer deployed (better-sqlite3, api/src/db/index.ts). In-memory seed data replaced with persistent kv_collections table.
 - XAU real-time news requires `NEWS_API_URL` and optional `NEWS_API_KEY`; without them it returns a safe fallback alert instead of fake news.
 - AI virtual host features must be disclosed as AI presenter; do not create fake viewers, fake comments, or undisclosed human impersonation.
