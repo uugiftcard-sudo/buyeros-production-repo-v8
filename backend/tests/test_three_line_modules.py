@@ -225,6 +225,16 @@ def test_smoke_full_script_exists() -> None:
     assert "BUYEROS_API_KEY" in script
 
 
+def test_restore_test_script_exits_nonzero_on_failure_branches() -> None:
+    path = REPO_ROOT / "infra/restore_test.sh"
+
+    assert os.path.exists(path)
+    with open(path, "r", encoding="utf-8") as fh:
+        script = fh.read()
+    assert 'RESULT: FAIL - read back mismatch"\n    echo "$READ_BACK"\n    exit 1' in script
+    assert 'RESULT: FAIL - insert failed"\n  echo "$INSERT_RESULT"\n  exit 1' in script
+
+
 def test_run_ops_drill_syncs_summaries_even_when_failover_fails() -> None:
     path = REPO_ROOT / "infra/run_ops_drill.sh"
 
