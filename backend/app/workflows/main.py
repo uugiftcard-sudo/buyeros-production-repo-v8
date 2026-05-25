@@ -58,6 +58,7 @@ from ..context.adapters.openai import OpenAIProviderAdapter
 from ..context.adapters.openclaw import OpenClawProviderAdapter
 from ..context.adapters.openrouter import OpenRouterProviderAdapter
 from ..context.adapters.perplexity import PerplexityProviderAdapter
+from ..orchestration import OrchestrationStore, TraceConnectionManager, create_orchestration_router
 from ..schemas.state import (
     AgentRunRequest,
     AlertsRequest,
@@ -416,6 +417,8 @@ def create_app() -> FastAPI:
     ai_router = AIModelRouter()
     context_hub = ContextHub(memory_store)
     session_store = RedisSessionStore(os.getenv("REDIS_URL"))
+    orchestration_store = OrchestrationStore(os.getenv("REDIS_URL"))
+    orchestration_manager = TraceConnectionManager()
     audit_logger = AuditLogger(memory_store)
     reporting_service = ReportingService(memory_store)
     promo_service = PromoService(memory_store)
@@ -508,6 +511,8 @@ def create_app() -> FastAPI:
     app.state.workflow = workflow
     app.state.supervisor = supervisor
     app.state.session_store = session_store
+    app.state.orchestration_store = orchestration_store
+    app.state.orchestration_manager = orchestration_manager
     app.state.audit_logger = audit_logger
     app.state.tool_registry = tool_registry
     app.state.agent_registry = agent_registry
@@ -521,6 +526,16 @@ def create_app() -> FastAPI:
     app.state.ops_status_service = ops_status_service
     app.state.orders_service = orders_service
     app.state.buyers_service = buyers_service
+
+    @app.on_event("startup")
+    async def _startup_orchestration() -> None:
+        await orchestration_store.connect()
+
+    @app.on_event("shutdown")
+    async def _shutdown_orchestration() -> None:
+        await orchestration_store.close()
+
+    app.include_router(create_orchestration_router(orchestration_store, orchestration_manager))
 
     @app.post("/telegram/webhook")
     async def telegram_webhook(request: Request) -> JSONResponse:
@@ -789,6 +804,7 @@ def create_app() -> FastAPI:
             },
             "memory_store": memory_store.status(),
             "redis_store": session_store.status(),
+            "orchestration": orchestration_store.status(),
             "providers": provider_registry.status(),
         })
 
@@ -809,12 +825,14 @@ def create_app() -> FastAPI:
         """Readiness check for deployment probes and VPS smoke tests."""
         memory_status = memory_store.status()
         redis_status = session_store.status()
+        orchestration_status = orchestration_store.status()
         providers = provider_registry.status()
         router_status = ai_router.status() if "ai_router" in dir() else {}
         return {
             "ok": bool(memory_status.get("ok")),
             "memory": memory_status,
             "redis": redis_status,
+            "orchestration": orchestration_status,
             "providers": providers,
             "ai_router": router_status,
             "telegram_configured": bool(os.getenv("TELEGRAM_BOT_TOKEN")),
