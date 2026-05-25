@@ -83,8 +83,10 @@ if [[ -n "$INSERT_ID" ]]; then
   else
     echo "RESULT: FAIL - read back mismatch"
     echo "$READ_BACK"
+    exit 1
   fi
 else
   echo "RESULT: FAIL - insert failed"
   echo "$INSERT_RESULT"
+  exit 1
 fi
