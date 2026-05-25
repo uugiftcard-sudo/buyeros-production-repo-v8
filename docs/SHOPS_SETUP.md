@@ -13,6 +13,10 @@
 
 ## 1. 支付退款
 
+責任邊界：退款對帳、退款比對、OCR 入帳和 manual review 屬於
+`buyer_ai` 買手線。Shopify、Stripe、PayPal 或自定義網店 API 在這裡只提供
+支付/訂單/售後資料來源；`commerce` 不主責退款對帳。
+
 ### Stripe
 
 1. 在 [Stripe Dashboard](https://dashboard.stripe.com/apikeys) 取得 `sk_live_...` 或 `sk_test_...` key
