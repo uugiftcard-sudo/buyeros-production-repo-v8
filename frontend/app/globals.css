@@ -184,6 +184,23 @@ p {
   align-items: stretch;
 }
 
+.hero > *,
+.grid-two > *,
+.mission-strip > *,
+.command-grid > *,
+.system-map > *,
+.pattern-grid > *,
+.overview-metrics > *,
+.split > *,
+.task-board > *,
+.agent-grid > *,
+.theme-grid > *,
+.subtask-summary > *,
+.task-actions > *,
+.provider-row > * {
+  min-width: 0;
+}
+
 .hero-copy,
 .hero-panel,
 .panel,
@@ -1417,7 +1434,7 @@ pre {
   .hero,
   .mission-strip,
   .command-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .command-grid {
@@ -1432,7 +1449,7 @@ pre {
   }
 
   .grid-two {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .system-map {
@@ -1474,7 +1491,7 @@ pre {
   .subtask-summary,
   .task-actions,
   .provider-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .provider-badges,
