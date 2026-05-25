@@ -83,6 +83,25 @@ Verified gates:
 - primary VPS compose
 - staging SSH
 
+## Phase 6 DB restore smoke
+
+```bash
+cd /Users/rubykan/Downloads/buyeros-production-repo-v8
+SUPABASE_URL="$(grep '^SUPABASE_URL=' .env.production | cut -d= -f2-)" \
+SUPABASE_SERVICE_ROLE_KEY="$(grep '^SUPABASE_SERVICE_ROLE_KEY=' .env.production | cut -d= -f2-)" \
+bash infra/restore_test.sh
+```
+
+Latest result:
+
+```text
+agent_memory rows: 8819
+Insert OK
+Read back OK
+Test row cleaned up
+RESULT: PASS - DB restore smoke passed
+```
+
 ## Rollback
 
 Use the existing VPS rollback script against the target host and the last verified backup archive.
