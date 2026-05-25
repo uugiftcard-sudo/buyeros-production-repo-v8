@@ -43,6 +43,19 @@ cd /Users/rubykan/Downloads/buyeros-production-repo-v8
 ```
 
 ```bash
+cd /Users/rubykan/Downloads/buyeros-production-repo-v8
+/Users/rubykan/miniconda3/bin/python -m pytest backend/tests/test_integration_routing.py -v --tb=short
+# 14 passed, 4 warnings
+```
+
+Verified Phase 2 runtime contracts:
+
+- BuyerOS XAU client calls `GET /api/news/latest` and `POST /api/ai/script`
+- BuyerOS CLOTH client calls `GET /api/live/readiness` and `POST /api/live/selling-plan`
+- Dispatcher completes configured `xau` subtasks through `xau_integration`
+- Dispatcher completes configured `commerce` live-selling subtasks through `cloth_integration`
+
+```bash
 cd /Users/rubykan/Documents/XAU
 npm run test:server
 # 18 passed

@@ -1,6 +1,6 @@
 # Phase 2 Current State
 
-Last verified: 2026-05-24
+Last verified: 2026-05-25
 
 This file records the current state of the three-system Phase 2 work so parallel AI agents do not repeat completed tasks or touch the wrong branch.
 
@@ -92,23 +92,26 @@ api/src/middleware/response.ts console statement
 1. Phase 1 PR merge work is no longer pending for XAU, CLOTH PR #6, or BuyerOS PR #11.
 2. XAU server import crash from missing TTS route was fixed in PR #3 before merge.
 3. BuyerOS production branch had already passed go-live audit in the previous run.
+4. BuyerOS Phase 2 runtime contract coverage now proves:
+   - XAU typed client calls `GET /api/news/latest` and `POST /api/ai/script`
+   - CLOTH typed client calls `GET /api/live/readiness` and `POST /api/live/selling-plan`
+   - Dispatcher completes configured `xau` subtasks through `xau_integration`
+   - Dispatcher completes configured `commerce` live-selling subtasks through `cloth_integration`
 
 ## What Is Still Not Done
 
 1. CLOTH merged code is not confirmed on `main`.
 2. XAU local dirty live-stream/OBS/avatar/analytics work is not triaged into clean PRs.
-3. Three-system runtime integration is not fully proven end-to-end:
-   - BuyerOS dispatch to XAU API
-   - BuyerOS dispatch to CLOTH API
-   - XAU live script/news to live room/app
-   - Commerce product/inventory/finance to live-selling flow
+3. Cross-repo UI/runtime behavior outside BuyerOS still needs owner-specific verification:
+   - XAU live script/news rendering in live room/app
+   - Commerce product/inventory/finance behavior inside CLOTH live-selling UI
 4. Supabase/Edge Function items in the Cursor plan may still require human/project-level verification; do not assume they are complete from plan text.
 
 ## Recommended Next Sequence
 
 1. XAU: triage dirty files into safe PR groups.
 2. CLOTH: decide and execute merge path from `cursor/github-actions-workflows` to `main`.
-3. BuyerOS: add or verify integration smoke that calls XAU and CLOTH live endpoints.
+3. BuyerOS: keep `backend/tests/test_integration_routing.py` green for XAU/CLOTH runtime client and dispatcher contracts.
 4. Monitoring: record one fresh BuyerOS go-live audit after any new production deploy.
 
 ## Fast Verification Commands
@@ -131,6 +134,6 @@ git log --oneline origin/cursor/github-actions-workflows -3
 cd /Users/rubykan/Downloads/buyeros-production-repo-v8
 git fetch origin main
 git status --short
+/Users/rubykan/miniconda3/bin/python -m pytest backend/tests/test_integration_routing.py -v --tb=short
 ./infra/go_live_audit.sh .env.production.local https://buyeros.206.189.116.155.sslip.io root@206.189.116.155 root@167.172.60.38
 ```
-
