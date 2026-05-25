@@ -2,20 +2,25 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
+import httpx
 from fastapi.testclient import TestClient
 
+from app.context.context_hub import ContextHub
 from app.memory_store import MemoryStore
 from app.services.task_board_service import TaskBoardService
 from app.services.task_dispatcher_service import TaskDispatcherService
 from app.services.xau_integration import (
     XAUConfig,
+    XAUIntegration,
     ScriptResult,
     ScriptSegments,
 )
 from app.services.cloth_integration import (
     CLOTHConfig,
+    CLOTHIntegration,
     LiveSellingPlan,
     FinanceCheck,
     InventoryCheck,
@@ -163,6 +168,269 @@ def test_cloth_config_defaults() -> None:
     config = CLOTHConfig()
     assert config.base_url == "http://localhost:3001"
     assert config.timeout == 30.0
+
+
+def test_xau_runtime_client_contract() -> None:
+    """BuyerOS XAU client should call the agreed live-room runtime endpoints."""
+    seen_requests: list[tuple[str, str, dict[str, Any]]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = {}
+        if request.content:
+            body = httpx.Response(200, content=request.content).json()
+        seen_requests.append((request.method, request.url.path, body))
+
+        if request.method == "GET" and request.url.path == "/api/news/latest":
+            return httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "headline": "US session gold volatility watch",
+                            "impact": "medium",
+                        }
+                    ]
+                },
+            )
+
+        if request.method == "POST" and request.url.path == "/api/ai/script":
+            return httpx.Response(
+                200,
+                json={
+                    "script": "教育型黃金直播腳本",
+                    "segments": {
+                        "hook": "先看支撐",
+                        "story": "等待突破確認",
+                        "interaction": "留言 1/2/3",
+                        "cta": "訂閱風控提醒",
+                        "risk": "不追單",
+                        "style": "educational",
+                        "safety": "非投資建議",
+                    },
+                    "source": "fallback",
+                    "cached": False,
+                },
+            )
+
+        return httpx.Response(404, json={"error": "unexpected endpoint"})
+
+    integration = XAUIntegration(XAUConfig(base_url="https://xau.test"))
+    integration._client = httpx.Client(transport=httpx.MockTransport(handler), base_url="https://xau.test")
+
+    news_result = integration.get_latest_news()
+    script_result = integration.generate_script(
+        bias_type="wait",
+        topic="Phase 2 runtime smoke",
+        account_style="educational",
+    )
+
+    assert news_result.ok is True
+    assert news_result.data["items"][0]["headline"] == "US session gold volatility watch"
+    assert script_result.ok is True
+    assert script_result.data.script == "教育型黃金直播腳本"
+    assert script_result.data.segments.risk == "不追單"
+    assert ("GET", "/api/news/latest", {}) in seen_requests
+    assert (
+        "POST",
+        "/api/ai/script",
+        {
+            "biasType": "wait",
+            "momentum": 50,
+            "position": 50,
+            "risk": 50,
+            "forceRefresh": False,
+            "topic": "Phase 2 runtime smoke",
+            "accountStyle": "educational",
+        },
+    ) in seen_requests
+
+
+def test_cloth_runtime_client_contract() -> None:
+    """BuyerOS CLOTH client should call the agreed commerce live-selling endpoints."""
+    seen_requests: list[tuple[str, str, dict[str, Any]]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = {}
+        if request.content:
+            body = httpx.Response(200, content=request.content).json()
+        seen_requests.append((request.method, request.url.path, body))
+
+        if request.method == "GET" and request.url.path == "/api/live/readiness":
+            return httpx.Response(
+                200,
+                json={
+                    "ready": True,
+                    "sellableCount": 3,
+                    "checks": ["inventory", "finance", "support"],
+                    "safetyNote": "AI presenter disclosure required",
+                },
+            )
+
+        if request.method == "POST" and request.url.path == "/api/live/selling-plan":
+            return httpx.Response(
+                200,
+                json={
+                    "planId": "live-phase2",
+                    "productId": "prod-001",
+                    "productTitle": "Hermes Birkin 25",
+                    "accountStyle": "educational",
+                    "hook": "先講成色同來源",
+                    "script": "完整帶貨腳本",
+                    "interactionPrompts": ["留言想看細節", "問保養狀態"],
+                    "cta": "聯絡客服查詢",
+                    "inventoryCheck": {
+                        "status": "ready",
+                        "sku": "prod-001",
+                        "message": "可主推",
+                    },
+                    "financeCheck": {
+                        "expectedRevenue": 80000,
+                        "estimatedPlatformFee": 6400,
+                        "estimatedAdCost": 2400,
+                        "estimatedInventoryCost": 36000,
+                        "estimatedRefundReserve": 4000,
+                        "estimatedNetProfit": 31200,
+                    },
+                    "supportNotes": ["只承諾已驗證資料"],
+                    "safetyNote": "AI 虛擬主播身份需披露",
+                    "createdAt": "2026-05-25T00:00:00Z",
+                },
+            )
+
+        return httpx.Response(404, json={"error": "unexpected endpoint"})
+
+    integration = CLOTHIntegration(CLOTHConfig(base_url="https://cloth.test"))
+    integration._client = httpx.Client(transport=httpx.MockTransport(handler), base_url="https://cloth.test")
+
+    readiness = integration.check_readiness()
+    selling_plan = integration.generate_selling_plan(
+        product_id="prod-001",
+        account_style="educational",
+        cta="聯絡客服查詢",
+    )
+
+    assert readiness.ok is True
+    assert readiness.data.ready is True
+    assert readiness.data.sellableCount == 3
+    assert selling_plan.ok is True
+    assert selling_plan.data.productTitle == "Hermes Birkin 25"
+    assert selling_plan.data.financeCheck.estimatedNetProfit == 31200
+    assert ("GET", "/api/live/readiness", {}) in seen_requests
+    assert (
+        "POST",
+        "/api/live/selling-plan",
+        {
+            "accountStyle": "educational",
+            "productId": "prod-001",
+            "cta": "聯絡客服查詢",
+        },
+    ) in seen_requests
+
+
+def test_dispatcher_runs_xau_integration_when_configured() -> None:
+    """Dispatcher should complete xau subtasks through the configured XAU client."""
+    memory = MemoryStore()
+    service = TaskDispatcherService(
+        memory_store=memory,
+        task_board=TaskBoardService(memory),
+        projects=MagicMock(get_project=MagicMock(return_value={"project_id": "xau"})),
+        providers=MagicMock(),
+        context_hub=ContextHub(memory),
+        ops_agent=MagicMock(),
+        finance_agent=MagicMock(),
+        xau_integration=MagicMock(
+            generate_script=MagicMock(
+                return_value=MagicMock(
+                    ok=True,
+                    data=ScriptResult(
+                        script="XAU runtime script",
+                        segments=ScriptSegments(
+                            hook="hook",
+                            story="story",
+                            interaction="interaction",
+                            cta="cta",
+                            risk="risk",
+                        ),
+                        source="fallback",
+                        cached=False,
+                        bias_type="wait",
+                    ),
+                    error="",
+                )
+            )
+        ),
+    )
+    plan = service.create_plan(
+        project="xau",
+        task_type="live_stream",
+        title="XAU runtime integration",
+        prompt="Generate a safe education live script.",
+        preferred_provider=None,
+        session_id="phase2-xau",
+        max_steps=1,
+    )
+    subtask_id = plan["plan"]["steps"][0]["subtask_id"]
+
+    result = service.run_subtask(
+        task_id=plan["task_id"],
+        subtask_id=subtask_id,
+        preferred_provider=None,
+        session_id="phase2-xau",
+    )
+
+    assert result["ok"] is True
+    assert result["result"]["provider"] == "xau_integration"
+    assert "XAU runtime script" in result["result"]["reply"]
+
+
+def test_dispatcher_runs_cloth_integration_when_configured() -> None:
+    """Dispatcher should complete commerce subtasks through the configured CLOTH client."""
+    memory = MemoryStore()
+    service = TaskDispatcherService(
+        memory_store=memory,
+        task_board=TaskBoardService(memory),
+        projects=MagicMock(get_project=MagicMock(return_value={"project_id": "commerce"})),
+        providers=MagicMock(),
+        context_hub=ContextHub(memory),
+        ops_agent=MagicMock(),
+        finance_agent=MagicMock(),
+        cloth_integration=MagicMock(
+            generate_selling_plan=MagicMock(
+                return_value=MagicMock(
+                    ok=True,
+                    data=LiveSellingPlan(
+                        planId="plan-phase2",
+                        productId="prod-001",
+                        productTitle="Hermes Birkin 25",
+                        inventoryCheck=InventoryCheck(status="ready", sku="prod-001", message="ready"),
+                        financeCheck=FinanceCheck(estimatedNetProfit=31200),
+                    ),
+                    error="",
+                )
+            )
+        ),
+    )
+    plan = service.create_plan(
+        project="commerce",
+        task_type="live_selling",
+        title="CLOTH runtime integration",
+        prompt="Generate a safe AI virtual host selling plan.",
+        preferred_provider=None,
+        session_id="phase2-cloth",
+        max_steps=1,
+    )
+    subtask_id = plan["plan"]["steps"][0]["subtask_id"]
+
+    result = service.run_subtask(
+        task_id=plan["task_id"],
+        subtask_id=subtask_id,
+        preferred_provider=None,
+        session_id="phase2-cloth",
+    )
+
+    assert result["ok"] is True
+    assert result["result"]["provider"] == "cloth_integration"
+    assert "Hermes Birkin 25" in result["result"]["reply"]
 
 
 def test_dispatcher_xau_route_when_unconfigured(monkeypatch) -> None:

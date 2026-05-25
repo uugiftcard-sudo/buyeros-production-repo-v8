@@ -1,6 +1,6 @@
 # BuyerOS / XAU / CLOTH Go-Live Evidence
 
-Last updated: 2026-05-24
+Last updated: 2026-05-25
 
 ## Release posture
 
@@ -18,10 +18,42 @@ Do not deploy directly from a dirty local worktree.
 ## Latest local verification
 
 ```bash
+cd /Users/rubykan/Downloads/buyeros-production-repo-v8/backend
+/Users/rubykan/miniconda3/bin/python -m pytest tests/ -v --tb=short
+# 225 passed, 100 warnings
+```
+
+```bash
+cd /Users/rubykan/Downloads/buyeros-production-repo-v8/frontend
+/usr/local/bin/npm run lint
+/usr/local/bin/npm run build
+# lint/typecheck passed; Next.js production build passed
+```
+
+```bash
+cd /Users/rubykan/Downloads/buyeros-production-repo-v8
+/usr/local/bin/npx --yes supabase secrets list --project-ref jnzdklfjdjmhjrhntljp
+# Required secret names verified: OPENAI_API_KEY, ANTHROPIC_API_KEY, ELEVENLABS_API_KEY, HEYGEN_API_KEY
+```
+
+```bash
 cd /Users/rubykan/Downloads/buyeros-production-repo-v8
 ./.venv/bin/python -m pytest -q backend/tests/test_p0_command_center.py backend/tests/test_three_line_modules.py
 # 21 passed
 ```
+
+```bash
+cd /Users/rubykan/Downloads/buyeros-production-repo-v8
+/Users/rubykan/miniconda3/bin/python -m pytest backend/tests/test_integration_routing.py -v --tb=short
+# 14 passed, 4 warnings
+```
+
+Verified Phase 2 runtime contracts:
+
+- BuyerOS XAU client calls `GET /api/news/latest` and `POST /api/ai/script`
+- BuyerOS CLOTH client calls `GET /api/live/readiness` and `POST /api/live/selling-plan`
+- Dispatcher completes configured `xau` subtasks through `xau_integration`
+- Dispatcher completes configured `commerce` live-selling subtasks through `cloth_integration`
 
 ```bash
 cd /Users/rubykan/Documents/XAU
@@ -48,9 +80,40 @@ Required result before client handoff:
 Go-live audit OK.
 ```
 
-Known current blocker if this fails:
+Latest result:
 
-- Production may still be running an older canonical project set (`buyeros / cloth / xau`) while local code expects `buyer_ai / commerce / xau`.
+```text
+Go-live audit OK.
+```
+
+Verified gates:
+
+- env validation
+- HTTPS ping
+- four systems smoke
+- Telegram webhook mock smoke
+- Telegram bot token
+- primary VPS compose
+- staging SSH
+
+## Phase 6 DB restore smoke
+
+```bash
+cd /Users/rubykan/Downloads/buyeros-production-repo-v8
+SUPABASE_URL="$(grep '^SUPABASE_URL=' .env.production | cut -d= -f2-)" \
+SUPABASE_SERVICE_ROLE_KEY="$(grep '^SUPABASE_SERVICE_ROLE_KEY=' .env.production | cut -d= -f2-)" \
+bash infra/restore_test.sh
+```
+
+Latest result:
+
+```text
+agent_memory rows: 8819
+Insert OK
+Read back OK
+Test row cleaned up
+RESULT: PASS - DB restore smoke passed
+```
 
 ## Rollback
 
