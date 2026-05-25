@@ -1,6 +1,6 @@
 # Phase 2 Handoff For Cursor / Parallel AI
 
-Last verified: 2026-05-24
+Last verified: 2026-05-25
 
 Purpose: give the parallel AI a current execution map so it does not repeat merged PR work or mix unrelated dirty files.
 
@@ -17,6 +17,10 @@ These tasks are already done:
    - Fresh target-branch lint/build passed with 7 warnings and 0 errors.
 3. BuyerOS PR #11 is merged.
    - Merge commit: `992cde3`
+4. BuyerOS Phase 2 runtime integration contracts are covered in `backend/tests/test_integration_routing.py`.
+   - XAU client: `GET /api/news/latest`, `POST /api/ai/script`
+   - CLOTH client: `GET /api/live/readiness`, `POST /api/live/selling-plan`
+   - Dispatcher: configured `xau` and `commerce` routes complete through their integration clients
 
 ## Work Boundaries
 
@@ -83,6 +87,7 @@ Tasks:
 
 ```bash
 cd /Users/rubykan/Downloads/buyeros-production-repo-v8
+/Users/rubykan/miniconda3/bin/python -m pytest backend/tests/test_integration_routing.py -v --tb=short
 ./infra/go_live_audit.sh .env.production.local https://buyeros.206.189.116.155.sslip.io root@206.189.116.155 root@167.172.60.38
 ```
 
@@ -145,7 +150,7 @@ npm run check
 | --- | --- | --- |
 | XAU dirty tree is large and mixed | High risk of one oversized unstable PR | XAU agent |
 | CLOTH PR #6 base is not main | Production state ambiguous | CLOTH agent |
-| Real three-system runtime smoke not documented as passing after all merges | Integration risk | BuyerOS agent |
+| Cross-repo XAU/CLOTH UI runtime still needs owner-specific verification | Medium | XAU/CLOTH agents |
 | Supabase/Edge Function deployment status not verified in this pass | BuyerOS backend risk | BuyerOS/Supabase agent |
 
 ## Acceptance Checklist
@@ -156,7 +161,6 @@ Before calling Phase 2 stable:
 - [ ] XAU `origin/main` server tests pass.
 - [ ] CLOTH production target branch lint/check passes.
 - [ ] XAU dirty tree is split into reviewed PR groups.
-- [ ] BuyerOS can call XAU and CLOTH runtime APIs.
+- [x] BuyerOS can call XAU and CLOTH runtime APIs through typed clients and dispatcher contracts.
 - [ ] No fake engagement or fake social proof is introduced.
 - [ ] No `.env`, token, private key, log, pid, cache, or build artifact is committed.
-
