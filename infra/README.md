@@ -69,8 +69,13 @@ infra/run_staging_rollback_drill.sh \
 Rollback is performed only on staging. The rollback summary is synced to the
 primary release for `/ops/status` visibility.
 
-`smoke_api.sh` 會先驗證核心 API / context / dispatcher，然後自動驗證三個
-上線工作線：`buyeros`、`cloth`、`xau`。
+`smoke_api.sh` 會先驗證核心 API / context / dispatcher，然後自動驗證三條
+canonical 工作線：`buyer_ai`、`commerce`、`xau`。
+
+邊界：
+- `buyer_ai`：BuyerOS / AI Team / 買手 Report / refund reconciliation / OCR posting / manual review
+- `commerce`：webshop order / after-sales / payment / inventory / support / shop finance / live selling
+- `xau`：XAU AI live stream / news / script generation / OBS / promo / conversion / metrics
 
 一條命令全流程（後端 + UI）：
 

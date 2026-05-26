@@ -25,11 +25,22 @@
 - Memory timeline
 - Telegram webhook mock smoke
 - Next.js admin UI
-- Four systems smoke:
-  - `report`
+- Three canonical line smoke:
+  - `buyer_ai`
   - `commerce`
   - `xau`
-  - `ai_team`
+
+Canonical boundary:
+
+- `buyer_ai`: BuyerOS / AI Team / Context Hub / Telegram / Task Dispatcher / buyer report / refund reconciliation / OCR posting / manual review.
+- `commerce`: webshop order / after-sales / payment / inventory / support / shop finance / live selling. It supplies commerce data to `buyer_ai`; it does not own buyer refund reconciliation.
+- `xau`: XAU AI live stream / real-time news / script generation / OBS / promo / campaign / conversion / metrics.
+
+Compatibility aliases are allowed only at API boundaries or older docs:
+
+- `buyeros`, `ai_team`, `buyer_report`, `report` -> `buyer_ai`
+- `cloth`, `shop` -> `commerce`
+- `xau`, `promo`, `xau_promo` -> `xau`
 - Primary VPS:
   - `https://buyeros.206.189.116.155.sslip.io`
 - Staging VPS:
@@ -58,6 +69,13 @@ It does not directly own:
 - external provider dashboards
 
 Those are connected as systems or projects through BuyerOS.
+
+## Evidence Note
+
+The latest boundary cleanup was based on read-only code evidence and report
+normalisation. It did not run XAU, CLOTH, or BuyerOS tests in that pass. Treat
+runtime green status as coming from the most recent explicit smoke/test run, not
+from this documentation update.
 
 ## Repo Landing Phases
 
