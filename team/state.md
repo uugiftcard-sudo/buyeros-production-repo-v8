@@ -79,6 +79,174 @@
 - ✅ UI QA: main controls, dispatch flow, project switch, theme switch, mobile overflow fix, ops controls no-JS fallback, frontend build + Playwright smoke
 - 🔜 Review + merge
 
+<!-- ISSUES_START -->
+
+## GitHub Issues — Three Repo Automation
+
+---
+
+### Issue 1 — CLOTH Deploy Target（HITL）**[CLOTH repo]**
+```markdown
+## CLOTH VPS Deploy Target
+
+### 目標
+在 staging VPS (`167.172.60.38`) 建立 CLOTH 生產部署 target，subdomain: `cloth.staging.buyeros.com`，使用 nginx reverse proxy。
+
+### 需要定義
+- [ ] CLOTH 部署路徑（建議 `/opt/cloth` 或 `/var/www/cloth`）
+- [ ] nginx config：subdomain reverse proxy 到 Node.js service
+- [ ] systemd service file 或 PM2 設定
+- [ ] rollback script：`infra/cloth_rollback.sh`
+- [ ] backup 目錄（建議 `/opt/cloth-backups`）
+- [ ] deploy script：`infra/cloth_deploy.sh`
+
+### 依賴
+無（此 issue 不 blocked by others）
+
+### 交付
+- `infra/cloth_deploy.sh` 可執行
+- `infra/cloth_rollback.sh` 可執行
+- nginx config 可 reload
+- deployment smoke test pass
+```
+
+---
+
+### Issue 2 — Safety Gates Engine（AFK）**[BuyerOS repo]**
+```markdown
+## Safety Gates Engine
+
+### 目標
+在 `team/automation/run.py` 的 `check` lane 中實作三個 safety gates，全部 fail 即 block deploy。
+
+### 三個 Gates
+1. **dirty_tree_gate**：任一 repo 有 `git status --porcelain` 輸出非空 → block
+2. **secret_pattern_gate**：`git diff` 命中 `config.json` 入面嘅 secret_patterns 任一 → block
+3. **smoke_fail_gate**：任一 check command exit code ≠ 0 → block
+
+### Acceptance Criteria
+- [ ] `python3 run.py check --repo all --dry-run` 只列命令，不執行
+- [ ] `python3 run.py check --repo all` 在 dirty tree 時 deploy gate = blocked
+- [ ] `python3 run.py check --repo all` 在 secret diff 時 deploy gate = blocked
+- [ ] `python3 run.py check --repo all` 在 smoke fail 時 deploy gate = blocked
+
+### 依賴
+無
+
+### 交付
+- `run.py` 已實作三個 gates
+- 各 gate 有明確 error message 輸出
+```
+
+---
+
+### Issue 3 — CLOTH Deploy Adapter（AFK）**[CLOTH repo]**
+```markdown
+## CLOTH Deploy Adapter
+
+### 目標
+將 `infra/cloth_deploy.sh` + `infra/cloth_rollback.sh`（Issue #1 產出）接入 `team/automation/config.json` 的 CLOTH `deploy_commands`。
+
+### Acceptance Criteria
+- [ ] `config.json` 中 `cloth.deploy_commands` 非空
+- [ ] `python3 run.py deploy --repo cloth` 在 check 全綠時執行 deploy
+- [ ] `python3 run.py deploy --repo cloth` 在 check fail 時 block 並輸出 reason
+- [ ] rollback adapter 可獨立觸發
+
+### 依賴
+Issue #1 完成後才能實作
+
+### 交付
+- `config.json` 已更新
+- CLOTH deploy 在 controller 中暢通
+```
+
+---
+
+### Issue 4 — UI Smoke Suite（AFK）**[CLOTH repo]**
+```markdown
+## UI Smoke Suite
+
+### 目標
+將三個 repo 嘅 UI smoke 整合入 `team/automation/smoke_http.py`。
+
+### BuyerOS 覆蓋
+- [ ] main controls
+- [ ] ops controls
+- [ ] dispatch flow
+- [ ] project switch
+- [ ] theme switch
+- [ ] mobile overflow
+
+### XAU 覆蓋
+- [ ] dashboard
+- [ ] 三格 signal cards
+- [ ] copy fallback
+- [ ] live overlay
+- [ ] OBS scene console errors
+
+### CLOTH 覆蓋
+- [ ] products filtering/pagination
+- [ ] admin basic route
+- [ ] mobile nav
+- [ ] API health/readiness
+
+### 依賴
+無
+
+### 交付
+- `smoke_http.py` 支援三個 repo 嘅 UI smoke
+- 輸出 pass/fail + 有意義嘅 error message
+```
+
+---
+
+### Issue 5 — GitHub Actions CI Integration（AFK）**[BuyerOS repo]**
+```markdown
+## GitHub Actions CI Integration
+
+### 目標
+在 `buyeros-production-repo-v8` 建立 GitHub Actions workflow，觸發時跑 `check` lane。
+
+### Acceptance Criteria
+- [ ] `.github/workflows/automation-check.yml` 存在
+- [ ] workflow 在 push/PR 時觸發
+- [ ] PR status check 顯示 check gate 結果
+- [ ] `--dry-run` 模式用於 non-main branches
+
+### 依賴
+Issue #2 完成後才能驗證完整
+
+### 交付
+- GitHub Actions workflow 文件
+- PR checks 正常顯示
+```
+
+---
+
+### Issue 6 — State Report Writer（AFK）**[CLOTH repo]**
+```markdown
+## State Report Writer
+
+### 目標
+`report` lane 將 check 結果寫入 `state.md` + `projects/*.md`。
+
+### Acceptance Criteria
+- [ ] `python3 run.py report --write-state` 更新 `state.md`
+- [ ] 輸出包含每個 repo：status、dirty、secret diff、deploy gate、blockers
+- [ ] 不輸出任何 `.env` value、token、private key
+- [ ] Markdown 格式化可讀
+
+### 依賴
+Issue #2 + Issue #4 完成後才能實作
+
+### 交付
+- `run.py` 的 `report` mode 可寫入 team state
+- `latest-report.md` 每次更新
+```
+
+<!-- ISSUES_END -->
+
 <!-- AUTOMATION_STATUS_START -->
 # Automation Report
 

@@ -1,0 +1,162 @@
+{
+  "state_file": "/Users/rubykan/Documents/team/state.md",
+  "report_file": "/Users/rubykan/Documents/team/automation/latest-report.md",
+  "http_timeout_seconds": 5,
+  "secret_patterns": [
+    "sk-[A-Za-z0-9_\\-]{12,}",
+    "sbp_[A-Za-z0-9_\\-]{12,}",
+    "service_role",
+    "TELEGRAM_BOT_TOKEN",
+    "SUPABASE_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "OPENROUTER_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "HEYGEN_API_KEY",
+    "ELEVENLABS_API_KEY",
+    "BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY"
+  ],
+  "repos": {
+    "buyeros": {
+      "label": "BuyerOS",
+      "path": "/Users/rubykan/Downloads/buyeros-production-repo-v8",
+      "deploy_policy": "production",
+      "check_commands": [
+        {
+          "name": "backend pytest",
+          "cwd": "/Users/rubykan/Downloads/buyeros-production-repo-v8",
+          "cmd": ["/Users/rubykan/miniconda3/bin/python", "-m", "pytest", "backend/tests", "-v", "--tb=short"]
+        },
+        {
+          "name": "frontend lint",
+          "cwd": "/Users/rubykan/Downloads/buyeros-production-repo-v8/frontend",
+          "cmd": ["npm", "run", "lint"]
+        },
+        {
+          "name": "frontend build",
+          "cwd": "/Users/rubykan/Downloads/buyeros-production-repo-v8/frontend",
+          "cmd": ["npm", "run", "build"]
+        },
+        {
+          "name": "ui smoke",
+          "cwd": "/Users/rubykan/Downloads/buyeros-production-repo-v8/frontend",
+          "cmd": ["npm", "run", "ui:smoke"]
+        },
+        {
+          "name": "http runtime smoke",
+          "cwd": "/Users/rubykan/Documents/team/automation",
+          "cmd": ["python3", "with_server.py", "--cwd", "/Users/rubykan/Downloads/buyeros-production-repo-v8/frontend", "--command", "npm run dev -- --hostname 127.0.0.1 --port 3000", "--ready-url", "http://127.0.0.1:3000", "--", "python3", "smoke_http.py", "buyeros", "--base-url", "http://127.0.0.1:3000"]
+        }
+      ],
+      "deploy_commands": [
+        {
+          "name": "preflight deploy",
+          "cwd": "/Users/rubykan/Downloads/buyeros-production-repo-v8",
+          "cmd": ["bash", "infra/preflight_deploy.sh", ".env.production.local"]
+        },
+        {
+          "name": "deploy and smoke primary",
+          "cwd": "/Users/rubykan/Downloads/buyeros-production-repo-v8",
+          "cmd": ["bash", "infra/deploy_and_smoke.sh", "root@206.189.116.155", "/opt/buyeros", ".env.production.local", "https://buyeros.206.189.116.155.sslip.io", "--backup-before"]
+        }
+      ],
+      "rollback_commands": [
+        {
+          "name": "rollback primary",
+          "cwd": "/Users/rubykan/Downloads/buyeros-production-repo-v8",
+          "cmd": ["bash", "infra/rollback_vps.sh", "root@206.189.116.155", "/opt/buyeros", "/opt/buyeros-backups"]
+        }
+      ]
+    },
+    "xau": {
+      "label": "XAU",
+      "path": "/Users/rubykan/Documents/XAU",
+      "deploy_policy": "local-docker",
+      "check_commands": [
+        {
+          "name": "server tests",
+          "cwd": "/Users/rubykan/Documents/XAU",
+          "cmd": ["npm", "run", "test:server"]
+        },
+        {
+          "name": "analysis output tests",
+          "cwd": "/Users/rubykan/Documents/XAU",
+          "cmd": ["node", "--test", "tests/analysis-output.test.js"]
+        },
+        {
+          "name": "http ui smoke",
+          "cwd": "/Users/rubykan/Documents/team/automation",
+          "cmd": ["python3", "with_server.py", "--cwd", "/Users/rubykan/Documents/XAU", "--command", "PORT=3002 npm run dev", "--ready-url", "http://127.0.0.1:3002/health", "--", "python3", "smoke_http.py", "xau", "--base-url", "http://127.0.0.1:3002"]
+        }
+      ],
+      "deploy_commands": [
+        {
+          "name": "docker build",
+          "cwd": "/Users/rubykan/Documents/XAU",
+          "cmd": ["npm", "run", "docker:build"]
+        },
+        {
+          "name": "docker up",
+          "cwd": "/Users/rubykan/Documents/XAU",
+          "cmd": ["npm", "run", "docker:up"]
+        }
+      ],
+      "rollback_commands": [
+        {
+          "name": "docker down",
+          "cwd": "/Users/rubykan/Documents/XAU",
+          "cmd": ["npm", "run", "docker:down"]
+        }
+      ]
+    },
+    "cloth": {
+      "label": "CLOTH",
+      "path": "/Users/rubykan/Documents/CLOTH",
+      "deploy_policy": "blocked-no-target",
+      "check_commands": [
+        {
+          "name": "type/build check",
+          "cwd": "/Users/rubykan/Documents/CLOTH",
+          "cmd": ["npm", "run", "check"]
+        },
+        {
+          "name": "lint",
+          "cwd": "/Users/rubykan/Documents/CLOTH",
+          "cmd": ["npm", "run", "lint"]
+        },
+        {
+          "name": "api smoke",
+          "cwd": "/Users/rubykan/Documents/CLOTH",
+          "cmd": ["node", "--test", "scripts/api-smoke.test.mjs"]
+        },
+        {
+          "name": "validation errors",
+          "cwd": "/Users/rubykan/Documents/CLOTH",
+          "cmd": ["node", "--test", "scripts/api-validation-errors.test.mjs"]
+        },
+        {
+          "name": "market persistence",
+          "cwd": "/Users/rubykan/Documents/CLOTH",
+          "cmd": ["node", "--test", "scripts/product-market-persistence.test.mjs"]
+        },
+        {
+          "name": "products filtering pagination",
+          "cwd": "/Users/rubykan/Documents/CLOTH",
+          "cmd": ["node", "--test", "scripts/products-filter-pagination.test.mjs"]
+        },
+        {
+          "name": "mobile nav contract",
+          "cwd": "/Users/rubykan/Documents/CLOTH",
+          "cmd": ["node", "--test", "scripts/mobile-nav-contract.test.mjs"]
+        },
+        {
+          "name": "http api/ui smoke",
+          "cwd": "/Users/rubykan/Documents/team/automation",
+          "cmd": ["python3", "with_server.py", "--cwd", "/Users/rubykan/Documents/CLOTH", "--command", "PORT=3001 npm run dev --workspace=api", "--ready-url", "http://127.0.0.1:3001/api/health", "--", "python3", "smoke_http.py", "cloth", "--base-url", "http://127.0.0.1:3001"]
+        }
+      ],
+      "deploy_commands": [],
+      "rollback_commands": []
+    }
+  }
+}
