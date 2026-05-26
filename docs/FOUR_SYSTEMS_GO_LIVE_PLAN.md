@@ -4,7 +4,7 @@
 
 | System | Canonical lane | Scope |
 | --- | --- | --- |
-| 買手 AI 中樞 | `buyer_ai` | BuyerOS / AI Team / Context Hub / Telegram / 買手 Report / 退款 / OCR 入帳 / 對帳 / 採購 ROI |
+| 買手 AI 中樞 | `buyer_ai` | BuyerOS / AI Team / Context Hub / Telegram / 買手 Report / 退款 / OCR 入帳 / 對帳 / 採購 ROI / supplier / lead / manual review |
 | 網店自動系統 | `commerce` | AI 虛擬主播帶貨 / 訂單 / 庫存 / 客服 / 網店收支報表 / Shopify / TikTok / 網店資料同步 |
 | XAU 系統 | `xau` | AI 直播 / 虛擬主播 / Campaign / conversion / metrics / UTM / revenue |
 
@@ -52,8 +52,8 @@ bash infra/go_live_audit.sh .env.production.local "$PUBLIC_BASE_URL" root@206.18
 
 - `/projects` returns exactly `buyer_ai / commerce / xau`
 - `/tasks` normalizes legacy aliases into the three canonical lanes
-- Buyer AI can create/history/export a buyer report and process `退款 991` then recall `991 點？`
-- Commerce can handle AI livestream selling flows, shop orders, inventory, support, shop revenue/expense reports, Shopify/TikTok sync
+- Buyer AI can create/history/export a buyer report, run sourcing ROI tasks, and process `退款 991` then recall `991 點？`
+- Commerce can handle AI livestream selling flows, shop orders, inventory, support, shop revenue/expense reports, Shopify/TikTok sync, and supply webshop source data to `buyer_ai`
 - XAU can run AI livestream/campaign funnel tracking, create a campaign, record conversion, and return metrics
 - AI Team behavior is represented under `buyer_ai`: dispatch plan, run_all subtasks, routing/run_all timeline records
 

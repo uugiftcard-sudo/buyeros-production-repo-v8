@@ -113,7 +113,7 @@ echo
 echo "== dispatch plan =="
 curl ${curl_opts+"${curl_opts[@]}"} -fsS -X POST "${BASE_URL}/tasks/dispatch_plan" \
   "${json_header[@]}" "${auth_header[@]}" \
-  -d "{\"project\":\"cloth\",\"task_type\":\"refund\",\"title\":\"Smoke refund run_all\",\"prompt\":\"退款 991\",\"session_id\":\"${SESSION_ID}\",\"max_steps\":2}" | tee "$TMP_DIR/dispatch-plan.json"
+  -d "{\"project\":\"buyer_ai\",\"task_type\":\"refund\",\"title\":\"Smoke buyer_ai refund run_all\",\"prompt\":\"退款 991\",\"session_id\":\"${SESSION_ID}\",\"max_steps\":2}" | tee "$TMP_DIR/dispatch-plan.json"
 assert_json "$TMP_DIR/dispatch-plan.json" "data.get('ok') is True and data.get('task_id')"
 DISPATCH_TASK_ID="$("$PYTHON_BIN" - "$TMP_DIR/dispatch-plan.json" <<'PY'
 import json
@@ -135,7 +135,7 @@ echo
 echo "== memory timeline =="
 curl ${curl_opts+"${curl_opts[@]}"} -fsS -X POST "${BASE_URL}/memory/timeline" \
   "${json_header[@]}" "${auth_header[@]}" \
-  -d "{\"project_id\":\"cloth\",\"session_id\":\"${SESSION_ID}\",\"limit\":50}" | tee "$TMP_DIR/timeline.json"
+  -d "{\"project_id\":\"buyer_ai\",\"session_id\":\"${SESSION_ID}\",\"limit\":50}" | tee "$TMP_DIR/timeline.json"
 assert_json "$TMP_DIR/timeline.json" "data.get('ok') is True and len(data.get('items', [])) >= 1"
 echo
 

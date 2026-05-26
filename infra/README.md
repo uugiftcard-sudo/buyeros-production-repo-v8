@@ -73,8 +73,8 @@ primary release for `/ops/status` visibility.
 canonical 工作線：`buyer_ai`、`commerce`、`xau`。
 
 邊界：
-- `buyer_ai`：BuyerOS / AI Team / 買手 Report / refund reconciliation / OCR posting / manual review
-- `commerce`：webshop order / after-sales / payment / inventory / support / shop finance / live selling
+- `buyer_ai`：BuyerOS / AI Team / 買手 Report / sourcing ROI / refund reconciliation / OCR posting / manual review / shared memory / Telegram
+- `commerce`：webshop order / after-sales / payment / inventory / support / shop finance / live selling；only supplies commerce source data for `buyer_ai` reconciliation
 - `xau`：XAU AI live stream / news / script generation / OBS / promo / conversion / metrics
 
 一條命令全流程（後端 + UI）：

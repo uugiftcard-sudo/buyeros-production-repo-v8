@@ -1,7 +1,7 @@
 # Three Workspace Go-Live Plan (BuyerOS)
 
 核心對象：
-- `buyer_ai`（BuyerOS / AI 團隊 / 買手 Report / 退款 / OCR / 對帳）
+- `buyer_ai`（BuyerOS / AI 團隊 / 買手 Report / 採購 ROI / 退款 / OCR / 對帳 / reconciliation / manual review）
 - `commerce`（AI 直播帶貨 / 訂單 / 庫存 / 客服 / 網店收支報表）
 - `xau`（AI 直播 / XAU Promo / campaign / conversion / metrics）
 

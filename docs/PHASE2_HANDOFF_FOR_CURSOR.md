@@ -31,7 +31,7 @@ These tasks are already done:
   - BuyerOS calls XAU `/api/ai/script`
   - BuyerOS calls CLOTH live/readiness or selling-plan endpoint if present
 - Task Dispatcher mapping:
-  - `buyer_ai`: report/refund/OCR/reconcile
+  - `buyer_ai`: AI team, buyer report, sourcing ROI, supplier and lead tasks, refund, OCR, reconciliation, shared memory, Telegram
   - `commerce`: shop finance/order/support/inventory/live selling
   - `xau`: live stream/promo/conversion/metrics/news
 - Ops documentation and audit evidence.

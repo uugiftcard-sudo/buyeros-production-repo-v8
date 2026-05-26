@@ -65,7 +65,7 @@ short, executable, and collision-safe.
 1. Commerce first real business flow.
    - Shop order / inventory / support / shop finance path.
    - Daily shop report push.
-   - Keep buyer refund reconciliation and OCR posting under `buyer_ai`.
+   - Feed shop order and payment data into `buyer_ai` for refund reconciliation and OCR posting.
 
 2. Buyer AI refund/reconciliation flow.
    - Refund review states.
