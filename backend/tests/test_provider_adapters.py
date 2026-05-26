@@ -273,6 +273,38 @@ class TestProviderRegistry:
         chosen = registry.choose_provider("orchestrate tools")
         assert chosen == "openclaw"
 
+    def test_hermes_reports_not_configured_even_with_openrouter(self, monkeypatch) -> None:
+        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
+        memory = MemoryStore()
+        hub = ContextHub(memory)
+        registry = ProviderRegistry(context_hub=hub)
+        registry.register(HermesProviderAdapter(context_hub=hub))
+
+        status = registry.status()[0]
+
+        assert status["name"] == "hermes"
+        assert status["enabled"] is False
+        assert status["status"] == "not_configured"
+
+    def test_orchestration_task_falls_through_hermes_to_openai(self, monkeypatch) -> None:
+        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
+        memory = MemoryStore()
+        hub = ContextHub(memory)
+        registry = ProviderRegistry(context_hub=hub)
+        registry.register(HermesProviderAdapter(context_hub=hub))
+
+        class OpenAITestProvider(OpenAIProviderAdapter):
+            def run(self, prompt, context=None):
+                return {"provider": self.name, "ok": True, "reply": "openai handled"}
+
+        registry.register(OpenAITestProvider(context_hub=hub))
+
+        result = registry.run(prompt="orchestrate tools", session_id="hermes-fallback")
+
+        assert result["provider"] == "openai"
+        assert result["fallback_attempts"][0]["provider"] == "hermes"
+        assert result["fallback_attempts"][0]["error"] == "provider_not_configured"
+
     def test_choose_provider_fallback_to_openai(self, monkeypatch) -> None:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-xxx")
         memory = MemoryStore()
