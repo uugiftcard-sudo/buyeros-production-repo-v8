@@ -3,6 +3,29 @@
 ## Current status
 BuyerOS Redis orchestration runtime: Clean draft PR #19 opened (2026-05-25). Pending review + merge.
 
+## Three-line boundary cleanup — 2026-05-26
+
+Canonical lines are now:
+
+| Line | Canonical ID | Boundary |
+|---|---|---|
+| Buyer AI 中樞 | `buyer_ai` | BuyerOS / AI Team / Context Hub / Telegram / Task Dispatcher / 買手 Report / refund reconciliation / OCR posting / manual review |
+| Commerce 網店自動系統 | `commerce` | Webshop order / after-sales / payment / inventory / support / shop finance / live selling; supplies commerce data to `buyer_ai` but does not own buyer refund reconciliation |
+| XAU 系統 | `xau` | XAU AI live stream / real-time news / script generation / OBS / promo / campaign / conversion / metrics |
+
+Updated BuyerOS docs:
+- `/Users/rubykan/Downloads/buyeros-production-repo-v8/README.md`
+- `/Users/rubykan/Downloads/buyeros-production-repo-v8/infra/README.md`
+- `/Users/rubykan/Downloads/buyeros-production-repo-v8/docs/FAST_REPO_LANDING_PLAN.md`
+- `/Users/rubykan/Downloads/buyeros-production-repo-v8/docs/NEXT_STEPS_GO_LIVE_PLAN.md`
+- `/Users/rubykan/Downloads/buyeros-production-repo-v8/docs/THREE_SYSTEMS_GO_LIVE_PLAN.md`
+
+Historical note:
+- `/Users/rubykan/Desktop/xau/THREE-LINE-DEEP-DIVE-2026-05-23.md` is old evidence and now has a superseded notice. Do not use it as canonical task planning.
+
+Validation note:
+- This pass did not run XAU, CLOTH, or BuyerOS tests. It was documentation-only and based on read-only code evidence + report cleanup.
+
 ## Automation controller
 
 Shared automation controller added at `/Users/rubykan/Documents/team/automation/`.

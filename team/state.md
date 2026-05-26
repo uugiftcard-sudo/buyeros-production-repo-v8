@@ -1,7 +1,7 @@
 # Team Project State
 
 ## Last updated
-2026-05-26 02:35 UTC by Codex — dirty blockers cleared
+2026-05-26 02:45 UTC by Codex — BuyerOS three-line docs boundary updated
 
 ## Blockers ⚠️
 - Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff（PR merge 後做）
@@ -13,6 +13,9 @@
 - [✅ DONE] Refund reconciliation / refund matching / OCR posting / manual review are owned by `buyer_ai`
 - [✅ DONE] `commerce` only supplies webshop order, after-sales, payment, inventory, and support data for reconciliation
 - [✅ DONE] Buyer report remains separate from commerce/shop work
+- [✅ DONE] BuyerOS docs boundary cleanup: README / infra README / landing / next-step docs now use `buyer_ai`, `commerce`, `xau`
+- [ℹ️ NOTE] `/Users/rubykan/Desktop/xau/THREE-LINE-DEEP-DIVE-2026-05-23.md` is marked superseded; it is read-only historical evidence, not canonical planning
+- [ℹ️ NOTE] This boundary cleanup did not run XAU / CLOTH / BuyerOS tests; it was documentation-only based on read-only code evidence
 
 ### Three Repo Automation ✅ CONTROLLER ADDED
 - [✅ DONE] Shared controller created at `/Users/rubykan/Documents/team/automation/`
