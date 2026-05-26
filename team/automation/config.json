@@ -113,7 +113,7 @@
     "cloth": {
       "label": "CLOTH",
       "path": "/Users/rubykan/Documents/CLOTH",
-      "deploy_policy": "blocked-no-target",
+      "deploy_policy": "staging-systemd",
       "check_commands": [
         {
           "name": "type/build check",
@@ -156,8 +156,20 @@
           "cmd": ["python3", "with_server.py", "--cwd", "/Users/rubykan/Documents/CLOTH", "--command", "PORT=3001 npm run dev --workspace=api", "--ready-url", "http://127.0.0.1:3001/api/health", "--", "python3", "smoke_http.py", "cloth", "--base-url", "http://127.0.0.1:3001"]
         }
       ],
-      "deploy_commands": [],
-      "rollback_commands": []
+      "deploy_commands": [
+        {
+          "name": "deploy CLOTH staging",
+          "cwd": "/Users/rubykan/Documents/CLOTH",
+          "cmd": ["bash", "infra/cloth_deploy.sh", "root@167.172.60.38", "/opt/cloth", "https://cloth.staging.buyeros.com"]
+        }
+      ],
+      "rollback_commands": [
+        {
+          "name": "rollback CLOTH staging",
+          "cwd": "/Users/rubykan/Documents/CLOTH",
+          "cmd": ["bash", "infra/cloth_rollback.sh", "root@167.172.60.38", "/opt/cloth"]
+        }
+      ]
     }
   }
 }

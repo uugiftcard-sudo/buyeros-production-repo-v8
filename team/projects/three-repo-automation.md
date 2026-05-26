@@ -216,10 +216,11 @@
 - BuyerOS / XAU deploy adapters 完成
 - XAU dirty blocker cleared by `ab1ef39 fix: separate live avatar styling from try-on`
 - CLOTH dirty blocker cleared by `4480639 docs: define CLOTH ai try-on boundary`
-- CLOTH deploy adapter ⚠️ BLOCKED：target path 已選 `/opt/cloth`，service manager 已選 systemd，但 production deploy/rollback/nginx/systemd adapter 未實作
+- CLOTH deploy adapter 完成：`d5b6d1f infra: add CLOTH systemd deploy adapter`
+- CLOTH deployment ⚠️ BLOCKED by user/external action：需要真 VPS 上驗證 `/opt/cloth`、nginx、systemd、DNS/HTTP reachability
 
 ## 測試結果（2026-05-26 dry-run）
 - Report: `/Users/rubykan/Documents/team/automation/latest-report.md`
 - BuyerOS：PASS（no dirty diff, no secret diff, deploy gate open）
 - XAU：PASS（no dirty diff, no secret diff, deploy gate open）
-- CLOTH：PASS（no dirty diff, no secret diff, deploy gate open）
+- CLOTH：PASS（no dirty diff, no secret diff, deploy gate open；`deploy --repo cloth --dry-run` includes `infra/cloth_deploy.sh root@167.172.60.38 /opt/cloth https://cloth.staging.buyeros.com`）

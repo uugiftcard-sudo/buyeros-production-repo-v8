@@ -1,11 +1,11 @@
 # Team Project State
 
 ## Last updated
-2026-05-26 02:45 UTC by Codex — BuyerOS three-line docs boundary updated
+2026-05-26 02:45 UTC by Codex — BuyerOS boundary updated; CLOTH deploy adapter wired
 
 ## Blockers ⚠️
 - Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff（PR merge 後做）
-- CLOTH deploy target selected as `/opt/cloth`, service manager selected as systemd; nginx/systemd/rollback scripts still need implementation and VPS validation
+- CLOTH deploy target selected as `/opt/cloth`, service manager selected as systemd; remaining blocker is real VPS/nginx/systemd validation and DNS reachability
 
 ## Active Tasks
 
@@ -25,9 +25,9 @@
 - [✅ DONE] Secret scan false-positive handling narrowed to added diff lines and known env-name references
 - [✅ DONE] BuyerOS deploy adapter: existing VPS deploy + smoke scripts
 - [✅ DONE] XAU deploy adapter: local Docker only
-- [⚠️ BLOCKED] CLOTH deploy: target path selected as `/opt/cloth`; systemd deploy/rollback/nginx adapter not implemented yet
+- [✅ DONE] CLOTH deploy adapter: `infra/cloth_deploy.sh`, `infra/cloth_rollback.sh`, systemd service, nginx template wired into automation config
 - [✅ DONE] 30-minute Codex heartbeat created: `three-repo-automation-monitor`（app/session 關閉會停）
-- Latest dry-run validation: BuyerOS/XAU/CLOTH PASS/open; secret diff is `no` for all three repos
+- Latest dry-run validation: BuyerOS/XAU/CLOTH PASS/open; CLOTH deploy dry-run reaches staging deploy command; secret diff is `no` for all three repos
 
 ### CLOTH ✅ PHASE 2 COMPLETE
 - [✅ DONE] P2：GET /api/products filtering + pagination
