@@ -1,13 +1,11 @@
 # Team Project State
 
 ## Last updated
-2026-05-26 02:15 UTC by Codex — shared automation state synced
+2026-05-26 02:35 UTC by Codex — dirty blockers cleared
 
 ## Blockers ⚠️
 - Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff（PR merge 後做）
-- CLOTH deploy target selected as `/opt/cloth`, but nginx/systemd-or-PM2/rollback scripts still need implementation and VPS validation
-- XAU deploy currently blocked by dirty working tree: wardrobe/member UI files need classify/commit/revert decision
-- CLOTH deploy currently blocked by dirty working tree: untracked `docs/AI_TRY_ON_CONTRACT.md` needs classify/commit/remove decision
+- CLOTH deploy target selected as `/opt/cloth`, service manager selected as systemd; nginx/systemd/rollback scripts still need implementation and VPS validation
 
 ## Active Tasks
 
@@ -24,9 +22,9 @@
 - [✅ DONE] Secret scan false-positive handling narrowed to added diff lines and known env-name references
 - [✅ DONE] BuyerOS deploy adapter: existing VPS deploy + smoke scripts
 - [✅ DONE] XAU deploy adapter: local Docker only
-- [⚠️ BLOCKED] CLOTH deploy: target path selected as `/opt/cloth`; deploy/rollback/nginx/systemd adapter not implemented yet
+- [⚠️ BLOCKED] CLOTH deploy: target path selected as `/opt/cloth`; systemd deploy/rollback/nginx adapter not implemented yet
 - [✅ DONE] 30-minute Codex heartbeat created: `three-repo-automation-monitor`（app/session 關閉會停）
-- Latest dry-run validation: BuyerOS PASS/open; XAU and CLOTH checks PASS/skipped but deploy gates blocked by dirty working trees; secret diff is `no` for all three repos
+- Latest dry-run validation: BuyerOS/XAU/CLOTH PASS/open; secret diff is `no` for all three repos
 
 ### CLOTH ✅ PHASE 2 COMPLETE
 - [✅ DONE] P2：GET /api/products filtering + pagination
@@ -46,6 +44,7 @@
 ### XAU ✅ COMPLETED
 - [✅ DONE] Dark luxury UI 美化（Premium Bloomberg-style dark theme）
 - [✅ DONE] All fixes：.gitignore / clipboard fallback / Quiz API base / member entry clientId
+- [✅ DONE] Boundary copy fix: XAU wardrobe/member now labels feature as live avatar appearance, not CLOTH customer try-on (`ab1ef39`)
 - [✅ DONE] 119 npm tests pass，browser smoke pass
 - Dev server：http://127.0.0.1:3002/
 
