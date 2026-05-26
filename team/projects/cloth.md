@@ -101,9 +101,11 @@ npm run check
 - Shared controller: `/Users/rubykan/Documents/team/automation/`
 - CLOTH `check` lane includes `npm run check`, `npm run lint`, API smoke, validation, market persistence, and products filtering pagination tests
 - CLOTH production deploy target path selected: `/opt/cloth`
-- CLOTH `deploy` lane still needs `infra/cloth_deploy.sh`, `infra/cloth_rollback.sh`, nginx reverse proxy, and systemd-or-PM2 service wiring
+- CLOTH deploy service manager selected: systemd
+- CLOTH `deploy` lane still needs `infra/cloth_deploy.sh`, `infra/cloth_rollback.sh`, nginx reverse proxy, and systemd service wiring
 - Secret-scan false-positive for env-name references has been fixed in shared controller commit `45a81fc`
-- Latest automation report on 2026-05-26 02:11 UTC: CLOTH check commands are skipped/pass in dry-run, secret diff is `no`, but deploy gate is blocked by dirty working tree (`docs/AI_TRY_ON_CONTRACT.md` untracked).
+- AI Try-On boundary doc committed in CLOTH: `4480639 docs: define CLOTH ai try-on boundary`
+- Latest automation report on 2026-05-26 02:30 UTC: CLOTH check commands are skipped/pass in dry-run, secret diff is `no`, and deploy gate is open in check mode.
 
 ### Contract
 - 詳細契約已寫入：`/Users/rubykan/Documents/CLOTH/docs/PHASE_2_CONTRACT.md`

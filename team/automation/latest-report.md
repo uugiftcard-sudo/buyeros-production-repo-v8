@@ -12,8 +12,8 @@
 ## Notes
 
 - BuyerOS branch: `codex/buyeros-redis-orchestration-clean`, ahead 1 / behind 0.
-- XAU branch: `codex/xau-dashboard-live-ui`, ahead 1 / behind 0.
-- CLOTH branch: `codex/cloth-phase2-products-filter`, ahead 1 / behind 0.
+- XAU branch: `codex/xau-dashboard-live-ui`, ahead 0 / behind 0.
+- CLOTH branch: `codex/cloth-phase2-products-filter`, ahead 0 / behind 0.
 - XAU dirty blocker cleared by commit `ab1ef39`.
 - CLOTH dirty blocker cleared by commit `4480639`.
 - No secret values are stored in this report.

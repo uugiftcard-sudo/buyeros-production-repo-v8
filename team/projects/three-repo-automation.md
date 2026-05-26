@@ -96,7 +96,8 @@
 **需要定義：**
 - [x] CLOTH 部署路徑：`/opt/cloth`
 - [ ] nginx config：subdomain reverse proxy 到 Node.js service
-- [ ] systemd service file 或 PM2 設定
+- [x] service manager：systemd
+- [ ] systemd service file
 - [ ] rollback script：`infra/cloth_rollback.sh`
 - [ ] backup 目錄（建議 `/opt/cloth-backups`）
 - [ ] deploy script：`infra/cloth_deploy.sh`
@@ -213,11 +214,12 @@
 - Controller 已建立，3 modes（check/deploy/report）完成
 - Timeout + secret-scan false-positive 修正已提交：`45a81fc fix: harden team automation gates`
 - BuyerOS / XAU deploy adapters 完成
-- XAU deploy gate ⚠️ BLOCKED：working tree dirty，需要 classify wardrobe/member UI changes
-- CLOTH deploy adapter ⚠️ BLOCKED：target path 已選 `/opt/cloth`，但 production deploy/rollback/nginx/systemd-or-PM2 adapter 未實作；working tree 亦有未追蹤 `docs/AI_TRY_ON_CONTRACT.md`
+- XAU dirty blocker cleared by `ab1ef39 fix: separate live avatar styling from try-on`
+- CLOTH dirty blocker cleared by `4480639 docs: define CLOTH ai try-on boundary`
+- CLOTH deploy adapter ⚠️ BLOCKED：target path 已選 `/opt/cloth`，service manager 已選 systemd，但 production deploy/rollback/nginx/systemd adapter 未實作
 
 ## 測試結果（2026-05-26 dry-run）
 - Report: `/Users/rubykan/Documents/team/automation/latest-report.md`
 - BuyerOS：PASS（no dirty diff, no secret diff, deploy gate open）
-- XAU：PASS checks skipped in dry-run；dirty working tree blocks deploy；secret diff no
-- CLOTH：PASS checks skipped in dry-run；dirty working tree blocks deploy；secret diff no
+- XAU：PASS（no dirty diff, no secret diff, deploy gate open）
+- CLOTH：PASS（no dirty diff, no secret diff, deploy gate open）

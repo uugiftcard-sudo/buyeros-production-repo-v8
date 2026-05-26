@@ -23,6 +23,12 @@ Latest automation report on 2026-05-25 23:43 UTC:
 - HTTP UI smoke with temporary `PORT=3002 npm run dev`: pass for dashboard, OBS scene, and `/health`
 - deploy gate: open for local Docker target
 
+Update on 2026-05-26:
+- Dirty wardrobe/member/promo files classified as XAU live avatar and poster work, not CLOTH customer try-on.
+- Commit `ab1ef39 fix: separate live avatar styling from try-on` landed on `codex/xau-dashboard-live-ui`.
+- Verification: `npm test` passed with 121 tests; `git diff --check` passed.
+- Latest automation dry-run: XAU PASS, no dirty diff, no secret diff, deploy gate open.
+
 ## Safety notes
 - Do not restore `.env`, runtime DB, or generated signal data.
 - Production deploy target/domain is not defined in v1; Docker deploy is local only.
