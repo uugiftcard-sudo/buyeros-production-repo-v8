@@ -7,6 +7,7 @@ import datetime as dt
 import json
 import os
 import re
+import signal
 import shlex
 import shutil
 import subprocess
@@ -25,6 +26,17 @@ REDACTION_PATTERNS = [
     re.compile(r"sbp_[A-Za-z0-9_\-]{8,}"),
     re.compile(r"(Bearer\s+)[A-Za-z0-9._\-]+", re.IGNORECASE),
 ]
+SECRET_NAME_PATTERNS = {
+    "service_role",
+    "TELEGRAM_BOT_TOKEN",
+    "SUPABASE_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "OPENROUTER_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "HEYGEN_API_KEY",
+    "ELEVENLABS_API_KEY",
+}
 
 
 @dataclasses.dataclass
@@ -65,21 +77,22 @@ def render_cmd(cmd: list[str]) -> str:
     return " ".join(shlex.quote(part) for part in cmd)
 
 
-def run_command(step: dict[str, Any], dry_run: bool) -> StepResult:
+def run_command(step: dict[str, Any], dry_run: bool, timeout_seconds: int) -> StepResult:
     cmd = [str(part) for part in step["cmd"]]
     command = render_cmd(cmd)
     if dry_run:
         return StepResult(name=step["name"], ok=True, command=command, skipped=True, output="dry-run")
 
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             ["/bin/zsh", "-lc", command],
             cwd=step.get("cwd"),
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            check=False,
+            start_new_session=True,
         )
+        stdout, _ = proc.communicate(timeout=timeout_seconds)
     except FileNotFoundError as exc:
         return StepResult(
             name=step["name"],
@@ -88,7 +101,23 @@ def run_command(step: dict[str, Any], dry_run: bool) -> StepResult:
             returncode=127,
             output=redact(str(exc)),
         )
-    output = redact(proc.stdout or "")
+    except subprocess.TimeoutExpired as exc:
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        stdout = exc.output or ""
+        output = redact(stdout)
+        if len(output) > MAX_OUTPUT_CHARS:
+            output = output[-MAX_OUTPUT_CHARS:]
+        return StepResult(
+            name=step["name"],
+            ok=False,
+            command=command,
+            returncode=124,
+            output=(output.strip() + f"\nTimed out after {timeout_seconds}s").strip(),
+        )
+    output = redact(stdout or "")
     if len(output) > MAX_OUTPUT_CHARS:
         output = output[-MAX_OUTPUT_CHARS:]
     return StepResult(
@@ -164,14 +193,42 @@ def git_pr_hygiene(repo_path: str) -> StepResult:
     )
 
 
-def secret_scan(repo_path: str, patterns: list[str]) -> list[str]:
-    combined = ""
-    for args in (["diff", "--no-ext-diff"], ["diff", "--cached", "--no-ext-diff"]):
+def added_diff_lines(repo_path: str) -> list[str]:
+    lines: list[str] = []
+    for args in (["diff", "--no-ext-diff", "--unified=0"], ["diff", "--cached", "--no-ext-diff", "--unified=0"]):
         proc = git_output(repo_path, args)
-        combined += "\n" + (proc.stdout or "")
+        for line in (proc.stdout or "").splitlines():
+            if line.startswith("+") and not line.startswith("+++"):
+                lines.append(line[1:])
+    return lines
+
+
+def looks_like_secret_assignment(line: str, secret_name: str) -> bool:
+    if secret_name not in line:
+        return False
+    if "secrets." in line or "process.env" in line or "os.environ" in line or "getenv(" in line:
+        return False
+    match = re.search(rf"{re.escape(secret_name)}\s*[:=]\s*['\"]?([^'\"\s#]+)", line)
+    if not match:
+        return False
+    value = match.group(1).strip()
+    if not value or value.startswith(("<", "$", "{")):
+        return False
+    if value.upper() in {"REDACTED", "CHANGE_ME", "TODO", "PLACEHOLDER"}:
+        return False
+    return len(value) >= 8
+
+
+def secret_scan(repo_path: str, patterns: list[str]) -> list[str]:
+    lines = added_diff_lines(repo_path)
     hits: list[str] = []
     for pattern in patterns:
-        if re.search(pattern, combined, flags=re.IGNORECASE):
+        if pattern in SECRET_NAME_PATTERNS:
+            if any(looks_like_secret_assignment(line, pattern) for line in lines):
+                hits.append(pattern)
+            continue
+        compiled = re.compile(pattern, flags=re.IGNORECASE)
+        if any(compiled.search(line) for line in lines):
             hits.append(pattern)
     return sorted(set(hits))
 
@@ -193,6 +250,7 @@ def run_repo(config: dict[str, Any], repo_key: str, mode: str, dry_run: bool) ->
     secret_hits = secret_scan(path, config["secret_patterns"])
     blockers: list[str] = []
     steps: list[StepResult] = []
+    timeout_seconds = int(config.get("command_timeout_seconds", 180))
 
     if dirty:
         blockers.append("dirty working tree blocks deploy")
@@ -202,7 +260,7 @@ def run_repo(config: dict[str, Any], repo_key: str, mode: str, dry_run: bool) ->
     if mode in {"check", "deploy"}:
         steps.append(git_pr_hygiene(path))
         for step in repo.get("check_commands", []):
-            steps.append(run_command(step, dry_run=dry_run))
+            steps.append(run_command(step, dry_run=dry_run, timeout_seconds=timeout_seconds))
 
     check_ok = all(step.ok for step in steps)
     deploy_allowed = not dirty and not secret_hits and check_ok
@@ -215,14 +273,14 @@ def run_repo(config: dict[str, Any], repo_key: str, mode: str, dry_run: bool) ->
         if deploy_allowed:
             deployed = False
             for step in deploy_commands:
-                result = run_command(step, dry_run=dry_run)
+                result = run_command(step, dry_run=dry_run, timeout_seconds=timeout_seconds)
                 steps.append(result)
                 deployed = deployed or (not result.skipped)
                 if not result.ok:
                     blockers.append(f"deploy failed at step: {step['name']}")
                     if deployed and repo.get("rollback_commands"):
                         for rollback in repo["rollback_commands"]:
-                            steps.append(run_command(rollback, dry_run=dry_run))
+                            steps.append(run_command(rollback, dry_run=dry_run, timeout_seconds=timeout_seconds))
                     break
         else:
             steps.append(
@@ -235,7 +293,10 @@ def run_repo(config: dict[str, Any], repo_key: str, mode: str, dry_run: bool) ->
                 )
             )
 
-    ok = not blockers and all(step.ok for step in steps)
+    if mode == "check":
+        ok = all(step.ok for step in steps)
+    else:
+        ok = not blockers and all(step.ok for step in steps)
     return RepoResult(
         key=repo_key,
         label=label,

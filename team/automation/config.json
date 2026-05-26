@@ -1,6 +1,7 @@
 {
   "state_file": "/Users/rubykan/Documents/team/state.md",
   "report_file": "/Users/rubykan/Documents/team/automation/latest-report.md",
+  "command_timeout_seconds": 180,
   "http_timeout_seconds": 5,
   "secret_patterns": [
     "sk-[A-Za-z0-9_\\-]{12,}",
