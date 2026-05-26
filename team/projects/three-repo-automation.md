@@ -40,6 +40,7 @@
 
 ### CLOTH
 - Target: `cloth.staging.buyeros.com`（nginx reverse proxy on staging VPS `167.172.60.38`）
+- Deploy path: `/opt/cloth`
 - v1 deploy adapter 需要建立：
   - `infra/cloth_deploy.sh`：build + scp + nginx reload
   - `infra/cloth_rollback.sh`：restore backup + nginx reload
@@ -48,7 +49,8 @@
 ## Safety Gates
 
 - 任一 repo 有 dirty changes → block deploy
-- 任一 diff 命中 secret pattern → block deploy
+- 任一 diff 命中 true secret pattern → block deploy；已收窄 false-positive，避免只因 `secrets.*` / `process.env.*` / `os.environ` / `getenv()` 變數名稱而誤判
+- 每條 command 有 timeout；timeout 會終止 process group 並以 exit code `124` block deploy
 - BuyerOS：backend pytest + frontend lint/build + infra smoke
 - XAU：`npm run test:server` + analysis tests
 - CLOTH：`npm run check` + lint + API smoke
@@ -92,7 +94,7 @@
 **目標：** 在 staging VPS (`167.172.60.38`) 建立 CLOTH 生產部署 target，subdomain: `cloth.staging.buyeros.com`，使用 nginx reverse proxy。
 
 **需要定義：**
-- [ ] CLOTH 部署路徑（建議 `/opt/cloth` 或 `/var/www/cloth`）
+- [x] CLOTH 部署路徑：`/opt/cloth`
 - [ ] nginx config：subdomain reverse proxy 到 Node.js service
 - [ ] systemd service file 或 PM2 設定
 - [ ] rollback script：`infra/cloth_rollback.sh`
@@ -111,18 +113,20 @@
 
 **三個 Gates：**
 1. `dirty_tree_gate`：任一 repo 有 `git status --porcelain` 非空 → block
-2. `secret_pattern_gate`：`git diff` 命中 `config.json` 入面嘅 secret_patterns → block
+2. `secret_pattern_gate`：`git diff` 新增行命中 true secret pattern → block；env-name references 會跳過，避免 false-positive
 3. `smoke_fail_gate`：任一 check command exit code ≠ 0 → block
+4. `command_timeout_gate`：任一 check/deploy command 超過 `command_timeout_seconds` → kill process group 並 block
 
 **Acceptance Criteria：**
-- [ ] `python3 run.py check --repo all --dry-run` 只列命令，不執行
-- [ ] dirty tree → deploy gate = blocked
-- [ ] secret diff → deploy gate = blocked
-- [ ] smoke fail → deploy gate = blocked
+- [x] `python3 run.py check --repo all --dry-run` 只列命令，不執行
+- [x] dirty tree → deploy gate = blocked
+- [x] secret diff false-positive from env-name references no longer blocks
+- [x] smoke fail → deploy gate = blocked
+- [x] timeout → command returns `124` and blocks
 
 **依賴：** 無
 
-**交付：** `run.py` 已實作三個 gates，各 gate 有明確 error message
+**交付：** `run.py` 已實作 gates、timeout、false-positive reduction，各 gate 有明確 error message
 
 ---
 
@@ -207,10 +211,13 @@
 
 ## 目前狀態
 - Controller 已建立，3 modes（check/deploy/report）完成
+- Timeout + secret-scan false-positive 修正已提交：`45a81fc fix: harden team automation gates`
 - BuyerOS / XAU deploy adapters 完成
-- CLOTH deploy adapter ⚠️ BLOCKED：無 production deploy target，working tree dirty
+- XAU deploy gate ⚠️ BLOCKED：working tree dirty，需要 classify wardrobe/member UI changes
+- CLOTH deploy adapter ⚠️ BLOCKED：target path 已選 `/opt/cloth`，但 production deploy/rollback/nginx/systemd-or-PM2 adapter 未實作；working tree 亦有未追蹤 `docs/AI_TRY_ON_CONTRACT.md`
 
-## 測試結果（2026-05-25 dry-run）
-- BuyerOS：FAIL（dirty working tree blocks deploy）
-- XAU：PASS（gates open）
-- CLOTH：FAIL（dirty working tree + secret-like pattern in diff）
+## 測試結果（2026-05-26 dry-run）
+- Report: `/Users/rubykan/Documents/team/automation/latest-report.md`
+- BuyerOS：PASS（no dirty diff, no secret diff, deploy gate open）
+- XAU：PASS checks skipped in dry-run；dirty working tree blocks deploy；secret diff no
+- CLOTH：PASS checks skipped in dry-run；dirty working tree blocks deploy；secret diff no

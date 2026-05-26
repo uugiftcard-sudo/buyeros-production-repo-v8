@@ -100,9 +100,10 @@ npm run check
 ### Automation controller note
 - Shared controller: `/Users/rubykan/Documents/team/automation/`
 - CLOTH `check` lane includes `npm run check`, `npm run lint`, API smoke, validation, market persistence, and products filtering pagination tests
-- CLOTH `deploy` lane is intentionally blocked because no production deploy target/script is defined
-- Dry-run on 2026-05-25 23:04 UTC also blocked deploy because current working tree is dirty and git diff contains a secret-like variable name pattern
-- Latest automation report on 2026-05-25 23:43 UTC: check/build/lint/API smoke/validation/market persistence/filter pagination/mobile nav/HTTP API smoke all pass; deploy remains blocked by dirty working tree, secret-like diff, and missing production deploy target.
+- CLOTH production deploy target path selected: `/opt/cloth`
+- CLOTH `deploy` lane still needs `infra/cloth_deploy.sh`, `infra/cloth_rollback.sh`, nginx reverse proxy, and systemd-or-PM2 service wiring
+- Secret-scan false-positive for env-name references has been fixed in shared controller commit `45a81fc`
+- Latest automation report on 2026-05-26 02:11 UTC: CLOTH check commands are skipped/pass in dry-run, secret diff is `no`, but deploy gate is blocked by dirty working tree (`docs/AI_TRY_ON_CONTRACT.md` untracked).
 
 ### Contract
 - 詳細契約已寫入：`/Users/rubykan/Documents/CLOTH/docs/PHASE_2_CONTRACT.md`
