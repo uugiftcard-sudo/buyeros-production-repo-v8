@@ -5,7 +5,7 @@ Last updated: 2026-05-27 17:41 UTC. BuyerOS Redis orchestration runtime PR #19 m
 
 ## Functional completion project — Milestone 0 inventory
 
-Last updated: 2026-05-27 18:52 UTC by Codex.
+Last updated: 2026-05-27 19:05 UTC by Codex.
 
 Source plan:
 - `/Users/rubykan/Documents/team/automation/FUNCTION_COMPLETION_PROJECT.md`
@@ -26,11 +26,11 @@ Current routes/pages:
 | `/` | PASS-PARTIAL | Next.js app has single dashboard page in `frontend/app/page.tsx` | Needs full browser review for all controls, not only mocked smoke |
 | `#overview` | PASS-PARTIAL | Project workspace + AI team panels exist | Current Playwright smoke checks project card switch and provider row |
 | `#agents` | PASS-PARTIAL | Static AI team role cards exist | Mostly informational; no action controls |
-| `#dispatch` | PASS-PARTIAL | Dispatch form, create plan, run next, run all controls exist | Existing smoke covers create plan and run next, but not server run_all button |
-| `#memory` | PASS-PARTIAL | Timeline search and session context controls exist | Existing smoke covers `查 Timeline`; session context needs direct smoke |
-| `#tasks` | NEEDS-SMOKE | Task board controls exist: refresh, subtask, start, complete | Existing smoke does not cover task status buttons |
-| `#projects` | PASS-PARTIAL | Project switcher and workspace quick actions exist | Existing smoke covers buyer_ai close-cycle only; commerce/xau quick actions need smoke |
-| `#ops` | PASS-PARTIAL | Ops links: Health, Provider, Capabilities, Report History, Audit Log, Ops Status | Existing smoke covers health visibility and ops status; audit/report links need smoke |
+| `#dispatch` | PASS-SMOKE | Dispatch form, create plan, run next, run all controls exist | `codex/buyeros-m1-ui-smoke` smoke now covers create plan, run next, and `一鍵 Run All` |
+| `#memory` | PASS-SMOKE | Timeline search and session context controls exist | Smoke now covers `查 Timeline` and `查看 Session Context` |
+| `#tasks` | PASS-SMOKE | Task board controls exist: refresh, subtask, start, complete | Smoke now covers refresh, `分工`, `開始`, `完成` |
+| `#projects` | PASS-SMOKE | Project switcher and workspace quick actions exist | Smoke now covers buyer_ai, commerce, and xau quick actions |
+| `#ops` | PASS-SMOKE | Ops links: Health, Provider, Capabilities, Report History, Audit Log, Ops Status | Smoke now covers capabilities, report history, audit log, ops status |
 
 ### BuyerOS API / runtime map
 
@@ -43,12 +43,12 @@ Backend source:
 | Projects | `GET /projects`, `POST /projects` | PASS-PARTIAL | Existing tests assert canonical `buyer_ai / commerce / xau` | UI smoke should confirm visible active project changes |
 | Tasks | `GET /tasks`, `POST /tasks`, status/run/detail routes | PASS-PARTIAL | backend task board tests exist | UI task buttons need smoke |
 | Dispatch plan | `POST /tasks/dispatch_plan` | PASS-PARTIAL | Playwright mock covers create plan | Need live backend smoke through proxy |
-| Subtasks | `GET /tasks/{id}/subtasks`, `POST /subtasks/run`, `POST /subtasks/next`, `POST /run_all` | PASS-PARTIAL | backend service has run_all; UI smoke covers next only | Add UI smoke for `一鍵 Run All` / server result |
-| Memory timeline | `POST /memory/timeline`, context session routes | PASS-PARTIAL | Playwright mock covers timeline | Need live backend smoke and session context click |
+| Subtasks | `GET /tasks/{id}/subtasks`, `POST /subtasks/run`, `POST /subtasks/next`, `POST /run_all` | PASS-SMOKE | UI smoke verifies next + run_all request path | Live backend proxy smoke still desirable |
+| Memory timeline | `POST /memory/timeline`, context session routes | PASS-SMOKE | UI smoke covers timeline + session context click | Live backend proxy smoke still desirable |
 | Reports | `/reports/create`, `/reports/history`, `/reports/export` | PASS-PARTIAL | backend tests cover service/API | UI report history / daily report buttons need browser smoke |
 | Automation | `/automation/daily-report`, `/ocr-posting`, `/reconcile`, `/alerts`, `/approval`, `/retry`, `/close-cycle` | PASS-PARTIAL | backend tests cover automation paths | UI smoke currently covers close-cycle only |
 | Promo/XAU bridge | `/promo/campaigns`, `/promo/events`, `/promo/metrics` | PASS-PARTIAL | backend tests cover promo service/API | UI only has `查看 Promo 指標`; campaign/event UI not present |
-| Ops | `/ops/status`, `/health/ready`, `/system/capabilities`, `/audit/search` | PASS-PARTIAL | Playwright mock covers ops status; backend has routes | Need live smoke for audit/search and capabilities result |
+| Ops | `/ops/status`, `/health/ready`, `/system/capabilities`, `/audit/search` | PASS-SMOKE | UI smoke covers capabilities, audit search, report history, ops status | Live backend proxy smoke still desirable |
 | Telegram | `POST /telegram/webhook` | NEEDS-SMOKE | route exists and supports token guard | Need mock test evidence that it works without real Telegram send when token absent |
 | Redis orchestration | `/api/v1/orchestration/*`, `WS /ws/trace/{trace_id}` | PASS-BACKEND | `backend/tests/test_orchestration.py` covers state, timeline, websocket echo | Not yet exposed in frontend dashboard UI |
 
@@ -58,33 +58,42 @@ Backend source:
 |---|---|---|---|
 | 檢查系統健康 | PASS-PARTIAL | visible and route exists | live browser smoke still needed |
 | 查看 AI 狀態 | PASS-PARTIAL | Playwright smoke covers provider row | none for real backend in this pass |
-| 查看任務列表 | NEEDS-SMOKE | route exists | button not covered by existing smoke |
+| 查看任務列表 | PASS-SMOKE | route exists | smoke verifies task list via task board refresh path |
 | 刷新專案清單 | PASS-PARTIAL | project list smoke exists | real backend smoke still needed |
 | 選擇風格/theme switch | PASS-PARTIAL | existing UI smoke previously covered | no fresh evidence in this M0 pass |
 | 派工並寫回記憶 | NEEDS-SMOKE | frontend handler exists | existing smoke uses create plan, not dispatch submit |
 | 只生成 Plan | PASS-PARTIAL | Playwright smoke covers mocked route | live backend smoke needed |
-| Run 已選 Plan 下一步 | PASS-PARTIAL | Playwright smoke covers mocked next step | live backend smoke needed |
-| 一鍵 Run All | NEEDS-SMOKE | frontend handler exists | not covered in existing smoke |
-| 查看 Session Context | NEEDS-SMOKE | endpoint/button exists | not covered in existing smoke |
-| 任務板：分工/開始/完成 | NEEDS-SMOKE | buttons exist | not covered in existing smoke |
-| buyer_ai quick actions | PASS-PARTIAL | close-cycle covered; report/OCR/reconcile/alerts/approval/retry buttons exist | all except close-cycle need direct UI smoke |
-| commerce quick actions | NEEDS-SMOKE | buttons fill task form only | should verify form changes and no cross-line mutation |
-| xau quick actions | NEEDS-SMOKE | promo metrics and task prefill buttons exist | should verify promo metrics result and form changes |
-| ops links | PASS-PARTIAL | health/status smoke exists | report history, audit log, capabilities need direct smoke |
+| Run 已選 Plan 下一步 | PASS-SMOKE | Playwright smoke covers mocked next step | live backend smoke still needed |
+| 一鍵 Run All | PASS-SMOKE | smoke verifies `POST /tasks/task-ui/run_all` | live backend smoke still needed |
+| 查看 Session Context | PASS-SMOKE | smoke verifies `GET /context/session/sess-qa-1` | live backend smoke still needed |
+| 任務板：分工/開始/完成 | PASS-SMOKE | smoke covers all three buttons | live backend smoke still needed |
+| buyer_ai quick actions | PASS-SMOKE | smoke covers daily report, report history, OCR, reconcile, alerts, approval, retry, close-cycle | live backend smoke still needed |
+| commerce quick actions | PASS-SMOKE | smoke verifies form prefill for live selling and finance task | no cross-line mutation; prefill only |
+| xau quick actions | PASS-SMOKE | smoke verifies promo metrics result and task prefill | live backend smoke still needed |
+| ops links | PASS-SMOKE | smoke covers report history, audit log, capabilities, ops status | live backend smoke still needed |
 
 ### Immediate BuyerOS next tasks
 
-1. Add/extend frontend UI smoke to cover:
-   - `一鍵 Run All`
-   - `查看任務列表`
-   - `查看 Session Context`
-   - task board `分工 / 開始 / 完成`
-   - buyer_ai quick actions: daily report, OCR, reconcile, alerts, approval, retry
-   - commerce quick task prefill
-   - xau promo metrics / task prefill
-   - ops report history, audit log, capabilities
-2. Add live backend-proxy smoke after mocked UI smoke passes.
-3. Decide whether Redis orchestration needs frontend UI in this phase; backend is present, but dashboard does not yet expose it as a user-facing panel.
+1. Add live backend-proxy smoke after mocked UI smoke passes.
+2. Decide whether Redis orchestration needs frontend UI in this phase; backend is present, but dashboard does not yet expose it as a user-facing panel.
+3. Open/push PR for `codex/buyeros-m1-ui-smoke` after user confirms this test-only coverage belongs in BuyerOS mainline.
+
+### BuyerOS M1 smoke coverage update
+
+Branch:
+- `/Users/rubykan/Downloads/buyeros-production-repo-v8` branch `codex/buyeros-m1-ui-smoke`
+
+Commit:
+- `6812bac test: expand BuyerOS UI smoke coverage`
+
+Validation:
+- `cd /Users/rubykan/Downloads/buyeros-production-repo-v8/frontend && npm run ui:smoke -- --reporter=line` → `1 passed`
+- `cd /Users/rubykan/Downloads/buyeros-production-repo-v8/frontend && npm run build` → pass
+- `cd /Users/rubykan/Downloads/buyeros-production-repo-v8/frontend && npm run lint` → pass after build generated `.next/types`
+
+Notes:
+- This is a mocked UI smoke. It proves buttons are wired to UI feedback/request paths.
+- It does not yet prove live backend-proxy data for every button.
 
 ### Latest M0 evidence commands
 
