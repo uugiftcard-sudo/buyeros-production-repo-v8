@@ -1,7 +1,7 @@
 # BuyerOS Project Detail
 
 ## Current status
-Last updated: 2026-05-27 17:35 UTC. BuyerOS Redis orchestration runtime: clean draft PR #19 opened (2026-05-25). Pending review + merge. Latest local automation dry-run reports PASS, dirty=no, secret diff=no, deploy gate=open. Live `gh pr status` reports PR #19 checks passing.
+Last updated: 2026-05-27 17:41 UTC. BuyerOS Redis orchestration runtime PR #19 merged. Latest local automation dry-run reports PASS, dirty=no, secret diff=no, deploy gate=open. Local repo is on `main`, 0 ahead / 0 behind.
 
 ## Three-line boundary cleanup — 2026-05-26
 
@@ -42,15 +42,15 @@ Dry-run result on 2026-05-25 23:04 UTC:
 - secret diff: no
 - deploy gate: open
 
-Latest automation report on 2026-05-27 16:31 UTC:
+Latest automation report on 2026-05-27 17:41 UTC:
 - dry-run check: PASS
-- branch: `codex/buyeros-redis-orchestration-clean`
-- upstream: `origin/codex/buyeros-redis-orchestration-clean`
+- branch: `main`
+- upstream: `origin/main`
 - ahead/behind: 0 / 0
 - dirty tree: no
 - secret diff: no
 - deploy gate: open
-- live `gh pr status`: PR #19 checks passing
+- live `gh pr view`: PR #19 merged at `7f1b00b`
 
 ---
 
@@ -73,9 +73,9 @@ User wants all agents to learn the Redis/FastAPI orchestration direction:
 
 **Branch:** `codex/buyeros-redis-orchestration-clean`
 
-**Draft PR:** https://github.com/uugiftcard-sudo/buyeros-production-repo-v8/pull/19
+**Merged PR:** https://github.com/uugiftcard-sudo/buyeros-production-repo-v8/pull/19
 
-**Latest commit:** `24054a2` — `fix: make BuyerOS ops controls show results`
+**Merge commit:** `7f1b00b`
 
 **Clean PR commits:**
 - `a50ae89` — `feat: add Redis orchestration runtime`
