@@ -118,7 +118,7 @@ npm run check
 ### P2-A opened
 - PR： https://github.com/uugiftcard-sudo/ai-luxury-resale-os/pull/9
 - Branch：`codex/cloth-phase2-products-filter`
-- 2026-05-27 update：local ahead 2 resolved by pushing `4480639..04feb94`; branch is now 0 ahead / 0 behind. Live `gh pr status` shows PR #9 checks pending after push.
+- 2026-05-27 update：local ahead 2 resolved by pushing `4480639..04feb94`; branch is now 0 ahead / 0 behind. Live `gh pr status` shows PR #9 checks passing.
 - Query params：`market/status/brand/category/condition/minPrice/maxPrice/search/page/limit/sort`
 - Validation：invalid enum / numeric / range → 400 JSON
 - Tests：`scripts/products-filter-pagination.test.mjs`
