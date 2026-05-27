@@ -1,6 +1,6 @@
 # Functional Completion Audit
 
-Last updated: 2026-05-27 19:30 UTC by Codex
+Last updated: 2026-05-27 19:35 UTC by Codex
 
 Scope:
 - `buyer_ai`: BuyerOS
@@ -24,7 +24,7 @@ Evidence proves repo hygiene and BuyerOS M1 smoke progress, but does not yet pro
 | BuyerOS M0 UI/API/button inventory | `projects/buyeros.md` contains route, API, and button map | PASS |
 | BuyerOS M1 smoke evidence | PR #20, live backend-proxy smoke, CI green | PASS-PARTIAL |
 | CLOTH M0 UI map | `projects/cloth.md` now records route/API/control dependencies; Support/Inventory frontend mockStorage gap is explicit | PASS-CODE |
-| XAU M0 UI map | `projects/xau.md` now records route/API/control dependencies and known broken controls | PASS-CODE |
+| XAU M0 UI map | `projects/xau.md` now records route/API/control dependencies; member CTA air button fixed in XAU commit `286365d` | PASS-CODE |
 | Cross-line boundary | `buyer_ai / commerce / xau` boundary recorded in `state.md` and `FUNCTION_COMPLETION_PROJECT.md` | PASS-PARTIAL |
 | Final validation commands | Dry-run all repo PASS; full final command set not rerun in this audit | INCOMPLETE |
 | Product repos clean | BuyerOS, XAU, CLOTH git status clean on tracked branches | PASS |
@@ -42,7 +42,7 @@ BuyerOS:
 XAU:
 - Branch: `codex/xau-dashboard-live-ui`
 - Product repo dirty: no
-- Missing for completion: browser UI evidence; member dashboard appointment CTA is an air button; admin/API dependencies need authenticated smoke.
+- Missing for completion: browser UI evidence; admin/API dependencies need authenticated smoke.
 
 CLOTH:
 - Branch: `cursor/github-actions-workflows`
@@ -56,7 +56,6 @@ Shared Documents:
 ## Next Required Work
 
 1. Review/merge BuyerOS PR #20 if accepted.
-2. Fix or explicitly disable XAU member dashboard appointment CTA.
-3. Run CLOTH and XAU browser/UI smoke against the new route maps.
-4. Resolve CLOTH Support/Inventory mockStorage boundary.
-5. Rerun the final validation commands from `FUNCTION_COMPLETION_PROJECT.md`.
+2. Run CLOTH and XAU browser/UI smoke against the new route maps.
+3. Resolve CLOTH Support/Inventory mockStorage boundary.
+4. Rerun the final validation commands from `FUNCTION_COMPLETION_PROJECT.md`.

@@ -1,7 +1,7 @@
 # Team Project State
 
 ## Last updated
-2026-05-27 19:32 UTC by Codex — BuyerOS PR #20 CI verified green; CLOTH/XAU M0 route/control maps added; functional completion project remains active
+2026-05-27 19:35 UTC by Codex — XAU member CTA air button fixed; CLOTH/XAU M0 maps remain pending browser smoke
 
 ## Blockers ⚠️
 - Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff (PR merge 後做)
@@ -22,8 +22,8 @@
 - [✅ PASS] BuyerOS live backend-proxy UI smoke now starts local backend/frontend with fake `BUYEROS_API_KEY=smoke-local-key` and verifies main controls through Next proxy
 - [✅ CI] BuyerOS PR #20 is open as draft, mergeable, and GitHub CI checks are green: backend-test, backend-lint, backend-typecheck, docker-build, frontend-build, docker-smoke, frontend-smoke
 - [✅ PASS-CODE] CLOTH M0 route/control map added to `/Users/rubykan/Documents/team/projects/cloth.md`; Support/Inventory frontend are flagged as mockStorage-backed until browser/API wiring is verified
-- [✅ PASS-CODE] XAU M0 route/control map added to `/Users/rubykan/Documents/team/projects/xau.md`; member dashboard appointment CTA is flagged as FAIL-CODE / air button
-- [1️⃣ NEXT] Review/merge PR #20 when ready, then fix XAU member CTA and run CLOTH/XAU browser UI smoke
+- [✅ FIXED-CODE] XAU member dashboard appointment CTA now links to private-club registration; `npm test` passed with 123 tests
+- [1️⃣ NEXT] Review/merge PR #20 when ready, then run CLOTH/XAU browser UI smoke
 - [2️⃣ NEXT] Then Milestone 2: CLOTH `commerce` usable loop — products, cart, wishlist, orders, finance, inventory, support, admin, mobile nav
 - [3️⃣ NEXT] Then Milestone 3: XAU usable loop — dashboard, member pages, OBS/live overlay, teacher appearance, campaign/conversion/metrics
 - [🛑 NOTE] This is not the removed `team/multi-agent-system/` prompt system and not just the older `TRI_REPO_PLAN.md`

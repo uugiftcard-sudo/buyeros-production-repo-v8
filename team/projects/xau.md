@@ -35,7 +35,7 @@ Update on 2026-05-26:
 
 ## Functional completion project — Milestone 0 UI map
 
-Last updated: 2026-05-27 19:32 UTC by Codex.
+Last updated: 2026-05-27 19:35 UTC by Codex.
 
 Source plan:
 - `/Users/rubykan/Documents/team/automation/FUNCTION_COMPLETION_PROJECT.md`
@@ -61,7 +61,7 @@ Frontend/API sources:
 |---|---|---|---|---|---|
 | `/` / `index.html` | Main XAU dashboard | `/api/prices/*`, `/api/ai/script`, `/api/state`, client-side analysis engine | Dashboard controls and grid/copy/overlay code exist; analysis tests exist | PASS-CODE | Needs browser smoke for all dashboard buttons and 390px overflow |
 | `features/quiz/quiz.html` | Client quiz / learning route creation | `POST /api/clients/quiz`, `GET /api/clients/types` | Server tests cover quiz API; quiz UI has stepper, confirm submit, result link | PASS-CODE | Needs browser smoke from answer flow to member route |
-| `features/member/dashboard.html?clientId=...` | Member learning route | `GET /api/clients/:id`; optional Wardrobe integration | Member page loads client data and curriculum | FAIL-CODE | `預約私享會 →` button has no click handler/result; needs fix or explicit disabled/blocked feedback |
+| `features/member/dashboard.html?clientId=...` | Member learning route | `GET /api/clients/:id`; optional Wardrobe integration | Member page loads client data and curriculum; appointment CTA now links to private-club registration | FIXED-CODE | Needs browser smoke from quiz result to member page and CTA navigation |
 | `features/avatar-wardrobe/wardrobe.html` | Live avatar appearance editor | client-side `Wardrobe`, `MakeupSystem`, `SceneSystem`; optional `LiveEngine` | Outfit/makeup/scene tabs, apply button, toast, VIP boundary copy exist | PASS-CODE | Needs browser smoke; verify trigger, select, apply, Escape close, overlay click close |
 | `stream/obs-scene.html` | Main OBS scene | standalone engine or `GET /api/state`; optional SSE `/api/state/stream` | README + live-engine support standalone/OBS/SSE modes | PASS-CODE | Needs console-error browser smoke in standalone and `?mode=obs` |
 | `stream/obs-panel.html` | OBS avatar/panel scene | `LiveEngine` state | Scene B timer/price/three-lines code exists | PASS-CODE | Needs browser smoke |
@@ -97,7 +97,7 @@ Frontend/API sources:
 | 風控檢查 | dashboard `#riskCheckBtn` | listener exists | PASS-CODE | Browser smoke |
 | Copy / script buttons | generated copy list | delegated listeners and manual copy fallback exist | PASS-CODE | Browser smoke clipboard fallback |
 | Live overlay drag/autohide | dashboard `.live-overlay` | drag and auto-hide listeners exist | PASS-CODE | Browser smoke at desktop/mobile sizes |
-| Member appointment | member dashboard secondary CTA | static `<button>` only | FAIL-CODE | Add handler or replace with clear blocked/link feedback |
+| Member appointment | member dashboard secondary CTA | `286365d fix: link member appointment CTA`; regression test `tests/member-dashboard.test.js` | FIXED-CODE | Browser smoke still required |
 | Wardrobe trigger/select/apply | avatar wardrobe | `WardrobeUI` listeners exist | PASS-CODE | Browser smoke |
 | Wardrobe upgrade | avatar wardrobe `#wUpgradeBtn` | toast explains CLOTH try-on boundary | PASS-CODE | Browser smoke |
 | Admin signal actions | admin panel | approve/reject/trigger/close/delete buttons exist | BLOCKED-PARTIAL | Needs auth/admin API smoke |
@@ -106,7 +106,11 @@ Frontend/API sources:
 
 ### Immediate XAU next tasks
 
-1. Fix or explicitly disable the member dashboard `預約私享會 →` air button.
-2. Run browser smoke for dashboard, quiz/member, wardrobe, OBS scenes, admin, landing, poster v2.
-3. Verify `stream/admin.html` API dependencies, especially `/api/admin/*`, before marking admin done.
-4. Update this file with browser evidence and screenshots/log summary.
+1. Run browser smoke for dashboard, quiz/member, wardrobe, OBS scenes, admin, landing, poster v2.
+2. Verify `stream/admin.html` API dependencies, especially `/api/admin/*`, before marking admin done.
+3. Update this file with browser evidence and screenshots/log summary.
+
+### Latest XAU validation evidence
+
+- `cd /Users/rubykan/Documents/XAU && npm test` → 123 passed
+- New regression: `tests/member-dashboard.test.js` confirms the appointment CTA is a real link to `../../stream/landing-private-club.html#register`, not an unhandled button.
