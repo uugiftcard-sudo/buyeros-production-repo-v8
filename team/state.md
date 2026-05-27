@@ -1,12 +1,14 @@
 # Team Project State
 
 ## Last updated
-2026-05-27 17:32 UTC by Codex — active detailed project set to TRI_REPO_PLAN; previous project not yet fully closed
+2026-05-27 17:35 UTC by Codex — TRI_REPO_PLAN active; CLOTH branch pushed; automation dry-run PASS
 
 ## Blockers ⚠️
 - Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff (PR merge 後做)
 - CLOTH deploy target selected as `/opt/cloth`, service manager selected as systemd; remaining blocker is real VPS/nginx/systemd validation and DNS reachability
-- GitHub PR status remains unavailable from automation output; local branch/upstream/ahead-behind checks still run
+- GitHub PR status from automation output remains unavailable, but live `gh pr status` was checked manually:
+  - BuyerOS PR #19: checks passing
+  - CLOTH PR #9: checks pending after pushing local ahead commits
 
 ## Active Tasks
 
@@ -18,6 +20,7 @@
 - [3️⃣ NEXT] Third batch: `xau` — campaign/conversion/metrics loop and BuyerOS memory/timeline handback
 - [🛑 NOTE] This is not the removed `team/multi-agent-system/` prompt system
 - [🧪 ACCEPTANCE] BuyerOS pytest + smoke, CLOTH lint/check/test, XAU test/server test; no secrets, no production env mutation, no dirty deploy
+- [ℹ️ EVIDENCE] 2026-05-27 17:35 dry-run: BuyerOS/XAU/CLOTH PASS/open, dirty=no, secret diff=no
 
 ### Control Room Boundary ✅ UPDATED
 - [✅ DONE] Refund reconciliation / refund matching / OCR posting / manual review are owned by `buyer_ai`
@@ -37,7 +40,7 @@
 - [✅ DONE] XAU deploy adapter: local Docker only
 - [✅ DONE] CLOTH deploy adapter: `infra/cloth_deploy.sh`, `infra/cloth_rollback.sh`, systemd service, nginx template wired into automation config
 - [✅ DONE] 30-minute Codex heartbeat created: `three-repo-automation-monitor`（app/session 關閉會停）
-- Latest dry-run validation: 2026-05-27 16:31 UTC BuyerOS/XAU/CLOTH PASS/open; secret diff is `no` for all three repos; CLOTH branch ahead 2 is not a dirty blocker
+- Latest dry-run validation: 2026-05-27 17:35 UTC BuyerOS/XAU/CLOTH PASS/open; secret diff is `no` for all three repos; all three tracked branches are 0 ahead / 0 behind
 
 ### CLOTH ✅ PHASE 2 COMPLETE
 - [✅ DONE] P2：GET /api/products filtering + pagination
@@ -52,7 +55,7 @@
 - [✅ DONE] P1-D API smoke contracts
 
 ### BuyerOS 🔄 PHASE 5 — GitHub PR pending merge
-- [🔄 IN PROGRESS] Review + merge open BuyerOS PRs; branch `codex/buyeros-redis-orchestration-clean` is clean and deploy gate is open in local dry-run
+- [🔄 IN PROGRESS] Review + merge open BuyerOS PRs; branch `codex/buyeros-redis-orchestration-clean` is clean, 0 ahead / 0 behind, deploy gate is open in local dry-run, and PR #19 checks are passing
 
 ### XAU ✅ COMPLETED
 - [✅ DONE] Dark luxury UI 美化（Premium Bloomberg-style dark theme）
@@ -267,7 +270,7 @@ Issue #2 + Issue #4 完成後才能實作
 <!-- AUTOMATION_STATUS_START -->
 # Automation Report
 
-- Generated: 2026-05-27 16:31 UTC
+- Generated: 2026-05-27 17:35 UTC
 - Dry run: yes
 
 | Repo | Status | Dirty | Secret diff | Deploy gate | Blockers |
@@ -276,5 +279,5 @@ Issue #2 + Issue #4 完成後才能實作
 | XAU | PASS | no | no | open | - |
 | CLOTH | PASS | no | no | open | - |
 
-**Note:** BuyerOS branch `codex/buyeros-redis-orchestration-clean` is 0 ahead / 0 behind. XAU branch `codex/xau-dashboard-live-ui` is 0 ahead / 0 behind. CLOTH branch `codex/cloth-phase2-products-filter` is ahead 2, which is a PR hygiene item but not a dirty blocker. `gh pr status` is unavailable for all three repos in this dry-run.
+**Note:** BuyerOS branch `codex/buyeros-redis-orchestration-clean` is 0 ahead / 0 behind. XAU branch `codex/xau-dashboard-live-ui` is 0 ahead / 0 behind. CLOTH branch `codex/cloth-phase2-products-filter` is now 0 ahead / 0 behind after pushing `4480639..04feb94`. Live `gh pr status`: BuyerOS PR #19 checks passing; CLOTH PR #9 checks pending after push. Automation's internal `gh pr status` field still reports unavailable, so live PR status should be refreshed before merge.
 <!-- AUTOMATION_STATUS_END -->

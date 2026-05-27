@@ -1,7 +1,7 @@
 # BuyerOS Project Detail
 
 ## Current status
-Last updated: 2026-05-27 16:31 UTC. BuyerOS Redis orchestration runtime: clean draft PR #19 opened (2026-05-25). Pending review + merge. Latest local automation dry-run reports PASS, dirty=no, secret diff=no, deploy gate=open; `gh pr status` remains unavailable.
+Last updated: 2026-05-27 17:35 UTC. BuyerOS Redis orchestration runtime: clean draft PR #19 opened (2026-05-25). Pending review + merge. Latest local automation dry-run reports PASS, dirty=no, secret diff=no, deploy gate=open. Live `gh pr status` reports PR #19 checks passing.
 
 ## Three-line boundary cleanup — 2026-05-26
 
@@ -50,7 +50,7 @@ Latest automation report on 2026-05-27 16:31 UTC:
 - dirty tree: no
 - secret diff: no
 - deploy gate: open
-- `gh pr status`: unavailable
+- live `gh pr status`: PR #19 checks passing
 
 ---
 
