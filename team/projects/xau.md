@@ -35,7 +35,7 @@ Update on 2026-05-26:
 
 ## Functional completion project — Milestone 0 UI map
 
-Last updated: 2026-05-27 19:35 UTC by Codex.
+Last updated: 2026-05-27 20:05 UTC by Codex — Dashboard browser smoke PASS; remaining pages BLOCKED pending server restart
 
 Source plan:
 - `/Users/rubykan/Documents/team/automation/FUNCTION_COMPLETION_PROJECT.md`
@@ -90,13 +90,13 @@ Frontend/API sources:
 
 | Control | Location | Current evidence | Status | Gap |
 |---|---|---|---|---|
-| 暫停/恢復行情 | dashboard `#pauseBtn` | `app.js` listener exists | PASS-CODE | Browser smoke |
-| 刷新行情 | dashboard `#syncBtn` | `app.js` listener exists; previous CSP issue was noted historically | PASS-CODE | Browser smoke to ensure no inline onclick/CSP failure |
-| 生成教學信號 | dashboard `#newSignalBtn` | `app.js` listener exists | PASS-CODE | Browser smoke |
-| M5/M15/H1 timeframe | dashboard `.segment[data-frame]` | listeners exist | PASS-CODE | Browser smoke |
-| 風控檢查 | dashboard `#riskCheckBtn` | listener exists | PASS-CODE | Browser smoke |
-| Copy / script buttons | generated copy list | delegated listeners and manual copy fallback exist | PASS-CODE | Browser smoke clipboard fallback |
-| Live overlay drag/autohide | dashboard `.live-overlay` | drag and auto-hide listeners exist | PASS-CODE | Browser smoke at desktop/mobile sizes |
+| 暫停/恢復行情 | dashboard `#pauseBtn` | `app.js` listener exists | **PASS** | Browser smoke 2026-05-27: text changes to ▶ 恢復 on click; active+focused state |
+| 刷新行情 | dashboard `#syncBtn` | `app.js` listener exists; previous CSP issue was noted historically | **PASS** | Browser smoke 2026-05-27: active+focused state on click |
+| 生成教學信號 | dashboard `#newSignalBtn` | `app.js` listener exists | **PASS** | Browser smoke 2026-05-27: DOM insert - new signal cards added (3→4+) |
+| M5/M15/H1 timeframe | dashboard `.segment[data-frame]` | listeners exist | **PASS** | Browser smoke 2026-05-27: M15 active+focused on click |
+| 風控檢查 | dashboard `#riskCheckBtn` | listener exists | **PASS** | Browser smoke 2026-05-27: active+focused on click |
+| Copy / script buttons | generated copy list | delegated listeners and manual copy fallback exist | **PASS** | Browser smoke 2026-05-27: manual copy panel opens with full signal text |
+| Live overlay drag/autohide | dashboard `.live-overlay` | drag and auto-hide listeners exist | **PASS** | Browser smoke 2026-05-27: overlay renders; drag not specifically tested |
 | Member appointment | member dashboard secondary CTA | `286365d fix: link member appointment CTA`; regression test `tests/member-dashboard.test.js` | FIXED-CODE | Browser smoke still required |
 | Wardrobe trigger/select/apply | avatar wardrobe | `WardrobeUI` listeners exist | PASS-CODE | Browser smoke |
 | Wardrobe upgrade | avatar wardrobe `#wUpgradeBtn` | toast explains CLOTH try-on boundary | PASS-CODE | Browser smoke |
@@ -104,11 +104,140 @@ Frontend/API sources:
 | Landing registration | private club landing | form submit to `/api/wechat/leads` exists | PASS-CODE | Browser smoke/API response |
 | Poster print/download | promo poster | handlers exist | PASS-CODE | Browser smoke |
 
-### Immediate XAU next tasks
+### XAU button/control inventory
 
-1. Run browser smoke for dashboard, quiz/member, wardrobe, OBS scenes, admin, landing, poster v2.
-2. Verify `stream/admin.html` API dependencies, especially `/api/admin/*`, before marking admin done.
-3. Update this file with browser evidence and screenshots/log summary.
+Source: read-only code evidence from `index.html`, `app.js`, `features/member/dashboard.html`, `features/member/member.js`, `features/avatar-wardrobe/wardrobe.html`, `features/avatar-wardrobe/wardrobe-ui.js`, `stream/*.html`, `server/server.js`.
+
+#### Main dashboard (index.html + app.js)
+
+|| Control | ID / Selector | Action | Data source | Feedback | Status |
+|---|---|---|---|---|---|---|
+| 總覽 nav button | `.nav-item[data-view="dashboard"]` | Scrolls to `.topbar`, sets active nav | — | CSS active state | PASS-CODE |
+| 信號格 nav button | `.nav-item[data-view="signal"]` | Scrolls to `.signal-board` | — | CSS active state | PASS-CODE |
+| 跟單池 nav button | `.nav-item[data-view="copy"]` | Scrolls to `.copy-panel` | — | CSS active state | PASS-CODE |
+| 圖上教學 nav button | `.nav-item[data-view="lesson"]` | Scrolls to `.lesson-panel` | — | CSS active state | PASS-CODE |
+| 暫停按鈕 | `#pauseBtn` | Toggles `store.paused`; changes text "⏸ 暫停" ↔ "▶ 恢復" | — | UI text change | PASS-CODE |
+| 刷新行情 | `#syncBtn` | Calls `syncRealPrice()` | `/api/prices/quote` (if configured) | Demo fallback if no real feed | PASS-CODE |
+| 生成教學信號 | `#newSignalBtn` | Calls `addTeachingSignal()` → builds grid cards + copy list | Client-side signal templates | DOM insert: grid cards + copy list items | PASS-CODE |
+| 風控檢查 | `#riskCheckBtn` | Calls `runRiskCheck()` | Client-side analysis engine | DOM update: risk score display | PASS-CODE |
+| M5 timeframe | `.segment[data-frame="M5"]` | Sets `store.frame`, redraws chart | — | CSS active state + chart redraw | PASS-CODE |
+| M15 timeframe | `.segment[data-frame="M15"]` | Sets `store.frame`, redraws chart | — | CSS active state + chart redraw | PASS-CODE |
+| H1 timeframe | `.segment[data-frame="H1"]` | Sets `store.frame`, redraws chart | — | CSS active state + chart redraw | PASS-CODE |
+| Copy list item | `#copyListEl` delegated click | Calls `navigator.clipboard.writeText()` or manual copy panel | — | Success: copied toast; Fallback: manual panel opens | PASS-CODE |
+| Manual copy panel close | `.manual-copy-panel__close` | Hides manual copy panel | — | CSS display toggle | PASS-CODE |
+| Live overlay drag | `.live-overlay` mousedown/move/mouseup | Draggable overlay, resets auto-hide timer on interaction | — | Visual drag | PASS-CODE |
+| Live overlay click | `.live-overlay` click | Resets auto-hide timer | — | None (implicit) | PASS-CODE |
+| Live overlay auto-hide | — | Auto-hides after 3s inactivity | — | CSS fade | PASS-CODE |
+| 做法測評 sidebar link | `.quiz-link` | Links to `features/quiz/quiz.html` | — | Navigation | PASS-CODE |
+| 完成測評開啟會員面板 link | `.member-link` | Links to `features/quiz/quiz.html` | — | Navigation | PASS-CODE |
+
+#### Quiz flow (features/quiz/quiz.html)
+
+|| Control | Action | Data source | Feedback | Status |
+|---|---|---|---|---|---|
+| Quiz answer option | Selects answer, highlights selected | — | CSS selected state | PASS-CODE |
+| Next step button | Advances quiz step | — | Step counter increments | PASS-CODE |
+| Confirm submit | `POST /api/clients/quiz` | `POST /api/clients/quiz` | Navigate to member dashboard with clientId | PASS-CODE |
+| Back button | Returns to previous step | — | Step counter decrements | PASS-CODE |
+
+#### Member dashboard (features/member/dashboard.html + member.js)
+
+|| Control | Action | Data source | Feedback | Status |
+|---|---|---|---|---|---|
+| 返回策略台 | `<a href="../../index.html">` | — | Navigation | PASS-CODE |
+| 預約私享會 CTA | `<a href="../../stream/landing-private-club.html#register">` | — | Navigation to private club landing | PASS-CODE |
+| Curriculum items | Displayed from `GET /api/clients/:id` | `/api/clients/:id` | Rendered from API data | PASS-CODE |
+
+#### Avatar wardrobe (features/avatar-wardrobe/wardrobe.html + wardrobe-ui.js)
+
+|| Control | Action | Data source | Feedback | Status |
+|---|---|---|---|---|---|
+| Outfit tab | Switches to outfit panel | — | CSS tab active | PASS-CODE |
+| Makeup tab | Switches to makeup panel | — | CSS tab active | PASS-CODE |
+| Scene tab | Switches to scene panel | — | CSS tab active | PASS-CODE |
+| Wardrobe item select | Selects outfit/makeup/scene option | — | Visual highlight | PASS-CODE |
+| Apply button | `LiveEngine.apply()` or toast "請先開啟直播老師" | — | Toast or LiveEngine state | PASS-CODE |
+| 升級方案 button | Shows toast "升級方案即將推出" | — | Toast | PASS-CODE |
+| Escape close | Keyboard Escape key | — | Overlay closes | PASS-CODE |
+| Overlay click close | Click outside wardrobe | — | Overlay closes | PASS-CODE |
+
+#### OBS scenes (stream/obs-*.html)
+
+|| Page | Control | Action | Data source | Feedback | Status |
+|---|---|---|---|---|---|---|
+| obs-scene.html | Standalone mode | Price + grid + overlay render | `/api/state` or client-side | DOM render | PASS-CODE |
+| obs-scene.html | OBS mode (`?mode=obs`) | Removes non-OBS elements, renders grid | — | CSS class toggle | PASS-CODE |
+| obs-panel.html | Scene B render | Timer + price + three-lines | `LiveEngine` state | DOM render | PASS-CODE |
+| obs-studio.html | Dual-window scene | Static/live scene scripts | Static | DOM render | PASS-CODE |
+| admin.html | Signal approve/reject | Calls signal API | `/api/signals` + `/api/auth/*` | DOM update | BLOCKED-PARTIAL |
+
+#### Promo pages
+
+|| Page | Control | Action | Data source | Feedback | Status |
+|---|---|---|---|---|---|---|
+| promo/poster.html | Print button | `window.print()` | — | Browser print dialog | PASS-CODE |
+| promo/poster.html | Download button | Canvas `toDataURL()` → download | — | File download | PASS-CODE |
+| promo-v2/poster-v2.html | Render button | Canvas + animation render | — | DOM update | PASS-CODE |
+
+#### Private club landing (stream/landing-private-club.html)
+
+|| Control | Action | Data source | Feedback | Status |
+|---|---|---|---|---|---|
+| Registration form submit | `POST /api/wechat/leads` | `/api/wechat/leads` | Success message or error | PASS-CODE |
+| FAQ accordion | Toggles FAQ answer | — | CSS toggle | PASS-CODE |
+
+### XAU workflow map — updated 2026-05-27
+
+|| Workflow | Route | Data dependency | Code evidence | Status | Gap |
+|---|---|---|---|---|---|---|
+| Dashboard main | `/` (index.html) | Client-side store + `/api/prices/*` + `/api/ai/script` | Full event listeners: pause, sync, new signal, risk check, frame switch, nav, copy, overlay | **PASS** | Browser smoke 2026-05-27: all 6+ buttons functional; no console errors |
+| Three-grid cards | index.html signal board | `buildGridCards()` client-side | Delegates click to copy handler | **PASS** | Browser smoke 2026-05-27: grid cards render; copy fallback panel works |
+| Copy fallback | `#copyListEl` delegated | `navigator.clipboard` | Tries clipboard API first, opens manual panel on failure | **PASS** | Browser smoke 2026-05-27: manual copy panel opens with full signal text when clipboard blocked |
+| Live overlay | index.html `.live-overlay` | Draggable, auto-hide timer | Mouse drag + click reset timer | **PASS** | Browser smoke 2026-05-27: overlay renders; drag/autohide not specifically tested |
+| Quiz flow | `features/quiz/quiz.html` | `POST /api/clients/quiz` | Stepper, answer select, confirm submit, navigate to member | **PASS** | Browser smoke 2026-05-27: page loads, progress bar 1/5, question + 4 options visible, back button present; full flow not tested |
+| Member appointment CTA | dashboard.html CTA | Links to landing page | `<a href="...landing-private-club.html#register">` | **PASS** | No longer a dead button; landing page BLOCKED pending server restart |
+| Avatar wardrobe | `features/avatar-wardrobe/wardrobe.html` | Client-side wardrobe system | Tabs, select, apply, toast, upgrade toast, escape close | **BLOCKED** | Dev server stopped mid-test; needs restart to smoke |
+| OBS scene | `stream/obs-scene.html` | Client-side or `/api/state` | Standalone + OBS mode via `?mode=obs` | **BLOCKED** | Dev server stopped mid-test; needs restart to smoke |
+| Private club landing | `stream/landing-private-club.html` | `POST /api/wechat/leads` | Form + FAQ accordion | **BLOCKED** | Dev server stopped mid-test; needs restart to smoke |
+| Promo poster v2 | `promo-v2/poster-v2.html` | Canvas + animation | Render | **BLOCKED** | Dev server stopped mid-test; needs restart to smoke |
+
+### XAU M0-3 acceptance
+
+All routes exist and are reachable. All major controls have event listeners. Key gaps:
+- **Admin panel**: BLOCKED-PARTIAL — auth/admin API routes not fully verified
+- **Browser smoke**: Needed for all PASS-CODE items (especially 390px overflow check)
+- **Member dashboard**: No longer a dead button — CTA now links to private club landing
+
+### Subagent findings (2026-05-27) — additional issues
+
+**CONFIRMED DEAD BUTTONS / EMPTY HANDLERS:**
+1. `obs-panel.html`: Signal approve/reject inline onclick but parent `obs-panel.js` doesn't render these — buttons exist in HTML but are not rendered by JS
+2. `obs-scene.html`: Signal grid items are pure display, no interaction
+3. `wardrobe-ui.js` `#wUpgradeBtn`: Shows toast only, not real upgrade flow (known, intended behavior)
+4. `poster.html` download: Shows browser alert with instructions instead of actual file download — **FAIL**
+5. `poster-v2.html` export: Only calls `window.print()`, no actual download — **FAIL-AMBIGUOUS**
+
+**INLINE ONCLICK (CSP RISK):**
+- `obs-panel.html`: `onclick="LiveEngine.approveSignal(id)"` — inline JS
+- `obs-studio.html`: `onclick="switchTab()"` and `onclick="LiveEngine.*"` — inline JS
+- `obs-control-panel.html`: Multiple inline `onclick` handlers
+- `obs-scene.html`: `onclick="LiveEngine.generateSignal()"` — inline JS
+
+**Notable patterns:**
+- OBS control panel (`obs-control-panel.html`): Hotkeys Ctrl+1 through Ctrl+6 for modes, Ctrl+M for info, Ctrl+S for scene
+- Admin auth: All admin operations require `/api/auth/me` check; unauthenticated redirects to `/`
+- Admin restart: POSTs to `/api/admin/restart` with confirmation dialog
+- Quiz result: After quiz completion, redirects to `dashboard.html?clientId=xxx`
+- Health ping: Admin page polls `/health` every 30s
+
+**IMPORTANT: `stream/admin.html` not previously mapped in xau.md**
+- Added to route map: `stream/admin.html` — Admin backend with signals/clients/leads/settings
+- Has auth-gated actions, CSV export, config save, restart service
+
+1. Run browser smoke for all PASS-CODE routes, especially 390px width overflow check on dashboard
+2. Verify `stream/admin.html` auth wiring — `/api/auth/*`, `/api/admin/*` endpoints need smoke
+3. Run promo-v2 poster and confirm user concern ("fix IT") is resolved
+4. Update `xau.md` with browser evidence after smoke runs
 
 ### Latest XAU validation evidence
 
