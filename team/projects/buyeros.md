@@ -1,7 +1,7 @@
 # BuyerOS Project Detail
 
 ## Current status
-BuyerOS Redis orchestration runtime: Clean draft PR #19 opened (2026-05-25). Pending review + merge.
+Last updated: 2026-05-27 16:31 UTC. BuyerOS Redis orchestration runtime: clean draft PR #19 opened (2026-05-25). Pending review + merge. Latest local automation dry-run reports PASS, dirty=no, secret diff=no, deploy gate=open; `gh pr status` remains unavailable.
 
 ## Three-line boundary cleanup — 2026-05-26
 
@@ -42,12 +42,15 @@ Dry-run result on 2026-05-25 23:04 UTC:
 - secret diff: no
 - deploy gate: open
 
-Latest automation report on 2026-05-25 23:43 UTC:
-- backend pytest: 234 passed
-- frontend lint/build: pass
-- Playwright UI smoke: 1 passed
-- HTTP runtime smoke: pass (`/`, `/#ops`)
-- deploy gate: blocked because the BuyerOS working tree currently has unrelated dirty docs changes
+Latest automation report on 2026-05-27 16:31 UTC:
+- dry-run check: PASS
+- branch: `codex/buyeros-redis-orchestration-clean`
+- upstream: `origin/codex/buyeros-redis-orchestration-clean`
+- ahead/behind: 0 / 0
+- dirty tree: no
+- secret diff: no
+- deploy gate: open
+- `gh pr status`: unavailable
 
 ---
 
@@ -195,4 +198,4 @@ Rotate keys after deployment if machine is shared.
 ## Next action
 1. Review + merge draft PR: https://github.com/uugiftcard-sudo/buyeros-production-repo-v8/compare/main...codex/buyeros-phase45-p2
 2. After merge: revoke/replace any setup tokens or third-party keys pasted during BuyerOS handoff
-3. Before automated deploy: clear/classify current dirty docs changes, then run `python3 /Users/rubykan/Documents/team/automation/run.py deploy --repo buyeros`
+3. Before automated deploy: run `python3 /Users/rubykan/Documents/team/automation/run.py check --repo buyeros`, then only deploy after gates remain open

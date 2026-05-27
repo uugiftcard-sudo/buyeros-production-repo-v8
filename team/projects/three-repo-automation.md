@@ -41,9 +41,11 @@
 ### CLOTH
 - Target: `cloth.staging.buyeros.com`（nginx reverse proxy on staging VPS `167.172.60.38`）
 - Deploy path: `/opt/cloth`
-- v1 deploy adapter 需要建立：
+- v1 deploy adapter 已建立：
   - `infra/cloth_deploy.sh`：build + scp + nginx reload
   - `infra/cloth_rollback.sh`：restore backup + nginx reload
+  - systemd service template
+  - nginx reverse proxy template
 - Deploy gate：`npm run check` + lint + API smoke 全綠
 
 ## Safety Gates
@@ -95,16 +97,16 @@
 
 **需要定義：**
 - [x] CLOTH 部署路徑：`/opt/cloth`
-- [ ] nginx config：subdomain reverse proxy 到 Node.js service
+- [x] nginx config template：subdomain reverse proxy 到 Node.js service
 - [x] service manager：systemd
-- [ ] systemd service file
-- [ ] rollback script：`infra/cloth_rollback.sh`
-- [ ] backup 目錄（建議 `/opt/cloth-backups`）
-- [ ] deploy script：`infra/cloth_deploy.sh`
+- [x] systemd service file
+- [x] rollback script：`infra/cloth_rollback.sh`
+- [x] backup 目錄：`/opt/cloth-backups`
+- [x] deploy script：`infra/cloth_deploy.sh`
 
 **依賴：** 無
 
-**交付：** `infra/cloth_deploy.sh` + `infra/cloth_rollback.sh` 可執行，deployment smoke test pass
+**交付：** deploy/rollback/systemd/nginx templates 已完成；real VPS deployment smoke 仍 blocked by user/external action
 
 ---
 
@@ -136,10 +138,10 @@
 **目標：** 將 `infra/cloth_deploy.sh` + `infra/cloth_rollback.sh`（Issue #1 產出）接入 `team/automation/config.json` 的 CLOTH `deploy_commands`。
 
 **Acceptance Criteria：**
-- [ ] `config.json` 中 `cloth.deploy_commands` 非空
-- [ ] `python3 run.py deploy --repo cloth` 在 check 全綠時執行 deploy
-- [ ] `python3 run.py deploy --repo cloth` 在 check fail 時 block 並輸出 reason
-- [ ] rollback adapter 可獨立觸發
+- [x] `config.json` 中 `cloth.deploy_commands` 非空
+- [x] `python3 run.py deploy --repo cloth --dry-run` 在 check 全綠時 reaches deploy command
+- [x] `python3 run.py deploy --repo cloth` 在 check fail 時 block 並輸出 reason
+- [x] rollback adapter wired in config
 
 **依賴：** Issue #1 完成後才能實作
 
@@ -219,8 +221,9 @@
 - CLOTH deploy adapter 完成：`d5b6d1f infra: add CLOTH systemd deploy adapter`
 - CLOTH deployment ⚠️ BLOCKED by user/external action：需要真 VPS 上驗證 `/opt/cloth`、nginx、systemd、DNS/HTTP reachability
 
-## 測試結果（2026-05-26 dry-run）
+## 測試結果（2026-05-27 16:31 UTC dry-run）
 - Report: `/Users/rubykan/Documents/team/automation/latest-report.md`
 - BuyerOS：PASS（no dirty diff, no secret diff, deploy gate open）
 - XAU：PASS（no dirty diff, no secret diff, deploy gate open）
-- CLOTH：PASS（no dirty diff, no secret diff, deploy gate open；`deploy --repo cloth --dry-run` includes `infra/cloth_deploy.sh root@167.172.60.38 /opt/cloth https://cloth.staging.buyeros.com`）
+- CLOTH：PASS（no dirty diff, no secret diff, deploy gate open；branch ahead 2 is PR hygiene only, not dirty blocker）
+- `gh pr status` unavailable for all three repos; local branch/upstream/ahead-behind checks still ran

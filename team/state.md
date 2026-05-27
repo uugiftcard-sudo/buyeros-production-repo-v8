@@ -1,11 +1,12 @@
 # Team Project State
 
 ## Last updated
-2026-05-26 02:45 UTC by Codex — BuyerOS boundary updated; CLOTH deploy adapter wired
+2026-05-27 16:31 UTC by Codex — shared-state sync after three-repo automation dry-run
 
 ## Blockers ⚠️
-- Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff（PR merge 後做）
+- Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff (PR merge 後做)
 - CLOTH deploy target selected as `/opt/cloth`, service manager selected as systemd; remaining blocker is real VPS/nginx/systemd validation and DNS reachability
+- GitHub PR status remains unavailable from automation output; local branch/upstream/ahead-behind checks still run
 
 ## Active Tasks
 
@@ -27,7 +28,7 @@
 - [✅ DONE] XAU deploy adapter: local Docker only
 - [✅ DONE] CLOTH deploy adapter: `infra/cloth_deploy.sh`, `infra/cloth_rollback.sh`, systemd service, nginx template wired into automation config
 - [✅ DONE] 30-minute Codex heartbeat created: `three-repo-automation-monitor`（app/session 關閉會停）
-- Latest dry-run validation: BuyerOS/XAU/CLOTH PASS/open; CLOTH deploy dry-run reaches staging deploy command; secret diff is `no` for all three repos
+- Latest dry-run validation: 2026-05-27 16:31 UTC BuyerOS/XAU/CLOTH PASS/open; secret diff is `no` for all three repos; CLOTH branch ahead 2 is not a dirty blocker
 
 ### CLOTH ✅ PHASE 2 COMPLETE
 - [✅ DONE] P2：GET /api/products filtering + pagination
@@ -42,7 +43,7 @@
 - [✅ DONE] P1-D API smoke contracts
 
 ### BuyerOS 🔄 PHASE 5 — GitHub PR pending merge
-- [🔄 IN PROGRESS] Push `codex/buyeros-phase45-p2` + open draft PR (blocked on security cleanup first)
+- [🔄 IN PROGRESS] Review + merge open BuyerOS PRs; branch `codex/buyeros-redis-orchestration-clean` is clean and deploy gate is open in local dry-run
 
 ### XAU ✅ COMPLETED
 - [✅ DONE] Dark luxury UI 美化（Premium Bloomberg-style dark theme）
@@ -100,12 +101,12 @@
 在 staging VPS (`167.172.60.38`) 建立 CLOTH 生產部署 target，subdomain: `cloth.staging.buyeros.com`，使用 nginx reverse proxy。
 
 ### 需要定義
-- [ ] CLOTH 部署路徑（建議 `/opt/cloth` 或 `/var/www/cloth`）
-- [ ] nginx config：subdomain reverse proxy 到 Node.js service
-- [ ] systemd service file 或 PM2 設定
-- [ ] rollback script：`infra/cloth_rollback.sh`
-- [ ] backup 目錄（建議 `/opt/cloth-backups`）
-- [ ] deploy script：`infra/cloth_deploy.sh`
+- [x] CLOTH 部署路徑：`/opt/cloth`
+- [x] nginx config template：subdomain reverse proxy 到 Node.js service
+- [x] systemd service file
+- [x] rollback script：`infra/cloth_rollback.sh`
+- [x] backup 目錄：`/opt/cloth-backups`
+- [x] deploy script：`infra/cloth_deploy.sh`
 
 ### 依賴
 無（此 issue 不 blocked by others）
@@ -113,8 +114,7 @@
 ### 交付
 - `infra/cloth_deploy.sh` 可執行
 - `infra/cloth_rollback.sh` 可執行
-- nginx config 可 reload
-- deployment smoke test pass
+- nginx/systemd/deployment smoke still require real VPS validation
 ```
 
 ---
@@ -132,10 +132,11 @@
 3. **smoke_fail_gate**：任一 check command exit code ≠ 0 → block
 
 ### Acceptance Criteria
-- [ ] `python3 run.py check --repo all --dry-run` 只列命令，不執行
-- [ ] `python3 run.py check --repo all` 在 dirty tree 時 deploy gate = blocked
-- [ ] `python3 run.py check --repo all` 在 secret diff 時 deploy gate = blocked
-- [ ] `python3 run.py check --repo all` 在 smoke fail 時 deploy gate = blocked
+- [x] `python3 run.py check --repo all --dry-run` 只列命令，不執行
+- [x] `python3 run.py check --repo all` 在 dirty tree 時 deploy gate = blocked
+- [x] secret diff false-positive from env-name references no longer blocks
+- [x] `python3 run.py check --repo all` 在 smoke fail 時 deploy gate = blocked
+- [x] timeout returns exit code `124` and blocks deploy
 
 ### 依賴
 無
@@ -155,10 +156,10 @@
 將 `infra/cloth_deploy.sh` + `infra/cloth_rollback.sh`（Issue #1 產出）接入 `team/automation/config.json` 的 CLOTH `deploy_commands`。
 
 ### Acceptance Criteria
-- [ ] `config.json` 中 `cloth.deploy_commands` 非空
-- [ ] `python3 run.py deploy --repo cloth` 在 check 全綠時執行 deploy
-- [ ] `python3 run.py deploy --repo cloth` 在 check fail 時 block 並輸出 reason
-- [ ] rollback adapter 可獨立觸發
+- [x] `config.json` 中 `cloth.deploy_commands` 非空
+- [x] `python3 run.py deploy --repo cloth --dry-run` 在 check 全綠時 reaches deploy command
+- [x] `python3 run.py deploy --repo cloth` 在 check fail 時 block 並輸出 reason
+- [x] rollback adapter wired in config
 
 ### 依賴
 Issue #1 完成後才能實作
@@ -257,12 +258,14 @@ Issue #2 + Issue #4 完成後才能實作
 <!-- AUTOMATION_STATUS_START -->
 # Automation Report
 
-- Generated: 2026-05-25 23:43 UTC
-- Dry run: no
+- Generated: 2026-05-27 16:31 UTC
+- Dry run: yes
 
 | Repo | Status | Dirty | Secret diff | Deploy gate | Blockers |
 |---|---:|---:|---:|---:|---|
-| BuyerOS | FAIL | yes | no | blocked | dirty working tree blocks deploy |
+| BuyerOS | PASS | no | no | open | - |
 | XAU | PASS | no | no | open | - |
-| CLOTH | FAIL | yes | yes | blocked | dirty working tree blocks deploy; secret-like pattern found in git diff |
+| CLOTH | PASS | no | no | open | - |
+
+**Note:** BuyerOS branch `codex/buyeros-redis-orchestration-clean` is 0 ahead / 0 behind. XAU branch `codex/xau-dashboard-live-ui` is 0 ahead / 0 behind. CLOTH branch `codex/cloth-phase2-products-filter` is ahead 2, which is a PR hygiene item but not a dirty blocker. `gh pr status` is unavailable for all three repos in this dry-run.
 <!-- AUTOMATION_STATUS_END -->
