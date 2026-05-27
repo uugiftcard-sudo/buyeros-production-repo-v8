@@ -1,7 +1,7 @@
 # Team Project State
 
 ## Last updated
-2026-05-27 18:52 UTC by Codex — active project rewritten as FUNCTION_COMPLETION_PROJECT; automation dry-run PASS
+2026-05-27 18:55 UTC by Codex — FUNCTION_COMPLETION_PROJECT active; BuyerOS M0 inventory started; automation dry-run PASS
 
 ## Blockers ⚠️
 - Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff (PR merge 後做)
