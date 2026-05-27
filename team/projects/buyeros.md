@@ -83,6 +83,9 @@ Backend source:
 Branch:
 - `/Users/rubykan/Downloads/buyeros-production-repo-v8` branch `codex/buyeros-m1-ui-smoke`
 
+Draft PR:
+- https://github.com/uugiftcard-sudo/buyeros-production-repo-v8/pull/20
+
 Commit:
 - `b798fbb test: expand BuyerOS UI smoke coverage`
 
