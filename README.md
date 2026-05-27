@@ -167,7 +167,7 @@ key is missing, providers fail gracefully and still write task context.
 - `GET /health/ready`: memory, Redis and provider readiness.
 - `GET /providers`: provider/model status, protected by `BUYEROS_API_KEY`.
 - `GET /audit/search`: recent audit events, protected by `BUYEROS_API_KEY`.
-- `GET /projects`: three canonical workspaces (`buyeros`, `cloth`, `xau`).
+- `GET /projects`: three canonical lines (`buyer_ai`, `commerce`, `xau`).
 - `POST /tasks/dispatch_plan`: create a deterministic subtask plan.
 - `POST /tasks/{task_id}/run_all`: run subtasks until completed/blocked/max steps.
 - `POST /memory/timeline`: inspect context, routing, run_all, audit and task history.
@@ -190,9 +190,10 @@ One-command gate audit:
 bash infra/go_live_audit.sh .env.production.local "$PUBLIC_BASE_URL" root@206.189.116.155 root@167.172.60.38
 ```
 
-`smoke_api.sh` validates the core API and then runs the three-workspace smoke:
-CLOTH daily report, CLOTH refund recall, XAU promo metrics and BuyerOS
-dispatch/run_all/timeline. To run only the core API checks:
+`smoke_api.sh` validates the core API and then runs the three-line smoke:
+`buyer_ai` report/refund/OCR/reconciliation routing, `commerce` shop
+order/inventory/support/finance data paths, `xau` promo/live metrics, and
+BuyerOS dispatch/run_all/timeline. To run only the core API checks:
 
 ```bash
 BUYEROS_SKIP_THREE_SYSTEMS_SMOKE=1 bash infra/smoke_api.sh "$PUBLIC_BASE_URL" "$BUYEROS_API_KEY"

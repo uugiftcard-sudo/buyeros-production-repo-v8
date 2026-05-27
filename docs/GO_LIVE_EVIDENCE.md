@@ -11,7 +11,7 @@ Do not deploy directly from a dirty local worktree.
 
 | Line | Canonical ID | Scope |
 | --- | --- | --- |
-| 買手 AI 中樞 | `buyer_ai` | BuyerOS / AI Team / 買手 Report / 退款 / OCR 入帳 / 對帳 / 採購 ROI |
+| 買手 AI 中樞 | `buyer_ai` | BuyerOS / AI Team / 買手 Report / 退款 / OCR 入帳 / 對帳 / 採購 ROI / supplier / lead / manual review |
 | 網店自動系統 | `commerce` | AI 虛擬主播帶貨 / 訂單 / 庫存 / 客服 / 網店收支報表 |
 | XAU 系統 | `xau` | AI 直播 / 虛擬主播 / 實時新聞提示 / promo / conversion / metrics |
 

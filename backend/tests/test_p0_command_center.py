@@ -158,7 +158,7 @@ def test_run_all_runs_until_done(monkeypatch) -> None:
     plan = client.post(
         "/tasks/dispatch_plan",
         json={
-            "project": "buyer_ai",
+            "project": "commerce",
             "task_type": "refund",
             "title": "run_all test",
             "prompt": "退款 991",
@@ -173,7 +173,8 @@ def test_run_all_runs_until_done(monkeypatch) -> None:
     run_all = client.post(f"/tasks/{task_id}/run_all", json={"session_id": "sess-runall", "max_steps": 10}, headers=headers)
     assert run_all.status_code == 200
     body = run_all.json()
-    assert body["status"] in {"completed", "blocked", "max_steps_exceeded"}
+    assert body["status"] == "completed"
+    assert body["ok"] is True
     assert "results" in body
     assert "blocked_reason" in body
     replies = [
@@ -187,7 +188,7 @@ def test_run_all_runs_until_done(monkeypatch) -> None:
 
     timeline = client.post(
         "/memory/timeline",
-        json={"project_id": "buyer_ai", "session_id": "sess-runall", "limit": 50},
+        json={"project_id": "commerce", "session_id": "sess-runall", "limit": 50},
         headers=headers,
     )
     assert timeline.status_code == 200

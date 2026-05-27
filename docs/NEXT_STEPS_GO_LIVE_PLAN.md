@@ -19,7 +19,7 @@ short, executable, and collision-safe.
   - docker compose config
   - HTTPS ping
   - context / dispatcher / run_all smoke
-  - three workspace smoke: `buyeros`, `cloth`, `xau`
+  - three canonical line smoke: `buyer_ai`, `commerce`, `xau`
   - Telegram webhook mock smoke
   - Telegram bot token check
   - primary compose
@@ -62,17 +62,22 @@ short, executable, and collision-safe.
 
 ## Next
 
-1. CLOTH first real business flow.
-   - Refund review states.
-   - Daily report push.
-   - Keep OCR posting and reconciliation for the following pass.
+1. Commerce first real business flow.
+   - Shop order / inventory / support / shop finance path.
+   - Daily shop report push.
+   - Feed shop order and payment data into `buyer_ai` for refund reconciliation and OCR posting.
 
-2. Reliability drill.
+2. Buyer AI refund/reconciliation flow.
+   - Refund review states.
+   - OCR posting.
+   - Manual review queue.
+
+3. Reliability drill.
    - Run staging rollback drill from latest staging backup.
    - Run failover smoke from primary to staging.
    - Record RTO/RPO result in docs.
 
-3. BuyerOS AI Team ops.
+4. BuyerOS AI Team ops.
    - Provider fallback quality checks.
    - Task rerun / retry.
    - Memory timeline filtering only if backend data is already present.

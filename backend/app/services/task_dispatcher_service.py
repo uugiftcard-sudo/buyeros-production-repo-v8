@@ -76,18 +76,19 @@ class TaskDispatcherService:
         lower = (prompt or "").lower()
         proj = (project or "").lower()
 
-        # xau project: route to XAU integration for gold trading live scripts
-        if proj == "xau" or t in {"live_stream", "gold_script", "news", "signal"}:
-            return "xau"
-
-        # commerce/cloth project: route to CLOTH integration for live-selling plans
-        if proj == "commerce" or t in {"live_selling", "selling_plan"}:
-            return "cloth"
-
         if t in {"ops", "refund", "order", "inventory", "support"} or any(k in lower for k in ["refund", "退款", "order", "ocr", "文字識別"]):
             return "ops"
         if t in {"finance", "payout", "profit", "shop_finance"} or any(k in lower for k in ["profit", "盈利", "payout", "出糧", "結算"]):
             return "finance"
+
+        # xau project: route to XAU integration for gold trading live scripts
+        if proj == "xau" or t in {"live_stream", "gold_script", "news", "signal"}:
+            return "xau"
+
+        # commerce/cloth project: route to CLOTH integration for live-selling plans.
+        # Shared ops such as refund/OCR/reconciliation are handled above by BuyerOS.
+        if proj == "commerce" or t in {"live_selling", "selling_plan"}:
+            return "cloth"
         return "provider"
 
     def create_plan(
@@ -357,6 +358,9 @@ class TaskDispatcherService:
         for it in subtasks:
             sub = it.get("content") or {}
             if sub.get("status") in {"queued", "planned"}:
+                latest = self._latest_subtask_content(str(sub.get("subtask_id") or ""))
+                if latest and latest.get("status") not in {"queued", "planned"}:
+                    continue
                 return self.run_subtask(
                     task_id=task_id,
                     subtask_id=str(sub.get("subtask_id")),
@@ -448,12 +452,24 @@ class TaskDispatcherService:
             content["provider"] = provider
         self.memory.save_memory(["buyeros", "subtasks"], subtask_id, content, created_by="dispatcher")
 
+    def _latest_subtask_content(self, subtask_id: str) -> Dict[str, Any]:
+        if not subtask_id:
+            return {}
+        items = self.memory.search_memory(namespace_prefix=("buyeros", "subtasks"), memory_key=subtask_id, limit=1)
+        if not items:
+            return {}
+        return dict(items[0].get("content") or {})
+
     def _item_timestamp(self, item: Dict[str, Any]) -> float:
-        raw = item.get("created_at") or (item.get("content") or {}).get("updated_at") or ""
-        try:
-            return datetime.fromisoformat(str(raw).replace("Z", "+00:00")).timestamp()
-        except Exception:
-            return 0.0
+        values: List[float] = []
+        for raw in (item.get("created_at"), (item.get("content") or {}).get("updated_at")):
+            if not raw:
+                continue
+            try:
+                values.append(datetime.fromisoformat(str(raw).replace("Z", "+00:00")).timestamp())
+            except Exception:
+                continue
+        return max(values) if values else 0.0
 
     def _heuristic_plan(self, *, project: str, task_type: str, prompt: str, max_steps: int) -> List[Dict[str, Any]]:
         # Deterministic v1: safe defaults + no external calls.

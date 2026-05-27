@@ -1,4 +1,4 @@
-# Deprecated: use FOUR_SYSTEMS_GO_LIVE_PLAN
+# Deprecated wrapper: use the canonical three-line plan
 
 This file is kept only so older links do not break.
 
@@ -8,7 +8,8 @@ Canonical go-live planning has moved to:
 docs/FOUR_SYSTEMS_GO_LIVE_PLAN.md
 ```
 
-The current canonical systems are:
+Despite the historical file name, `FOUR_SYSTEMS_GO_LIVE_PLAN.md` now proves the
+current three canonical lines:
 
 - `buyer_ai`
 - `commerce`

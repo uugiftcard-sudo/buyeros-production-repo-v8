@@ -167,7 +167,9 @@ class ProviderRegistry:
             runtime = self._runtime_summary(name)
             configured = provider_key_configured or openrouter_key
             status = "ready"
-            if not configured:
+            if not provider.enabled:
+                status = "not_configured"
+            elif not configured:
                 status = "not_configured"
             elif runtime["last_error"] or (runtime["failure_count_24h"] > 0 and runtime["success_count_24h"] == 0):
                 status = "degraded"

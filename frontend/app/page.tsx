@@ -1401,12 +1401,86 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="sop-list">
-            <button type="button" onClick={() => callApi("/health/ready", {}, "Health Check")}>Health Check</button>
-            <button type="button" onClick={loadTeamStatus}>Provider Check</button>
-            <button type="button" onClick={loadCapabilities}>Capabilities / Gaps</button>
-            <button type="button" onClick={() => callApi("/reports/history", {}, "報表歷史")}>Report History</button>
-            <button type="button" onClick={() => callApi("/audit/search", {}, "Audit Log")}>Audit Log</button>
-            <button type="button" onClick={() => runWorkspaceAction("ops_status")}>維運狀態</button>
+            <a
+              className="ops-link-button"
+              role="button"
+              href={`${normalizedProxyUrl}/health/ready`}
+              target="ops-result-frame"
+              onClick={(event) => {
+                event.preventDefault();
+                void callApi("/health/ready", {}, "Health Check");
+              }}
+            >
+              Health Check
+            </a>
+            <a
+              className="ops-link-button"
+              role="button"
+              href={`${normalizedProxyUrl}/ai-team/status`}
+              target="ops-result-frame"
+              onClick={(event) => {
+                event.preventDefault();
+                void loadTeamStatus();
+              }}
+            >
+              Provider Check
+            </a>
+            <a
+              className="ops-link-button"
+              role="button"
+              href={`${normalizedProxyUrl}/system/capabilities`}
+              target="ops-result-frame"
+              onClick={(event) => {
+                event.preventDefault();
+                void loadCapabilities();
+              }}
+            >
+              Capabilities / Gaps
+            </a>
+            <a
+              className="ops-link-button"
+              role="button"
+              href={`${normalizedProxyUrl}/reports/history`}
+              target="ops-result-frame"
+              onClick={(event) => {
+                event.preventDefault();
+                void callApi("/reports/history", {}, "報表歷史");
+              }}
+            >
+              Report History
+            </a>
+            <a
+              className="ops-link-button"
+              role="button"
+              href={`${normalizedProxyUrl}/audit/search`}
+              target="ops-result-frame"
+              onClick={(event) => {
+                event.preventDefault();
+                void callApi("/audit/search", {}, "Audit Log");
+              }}
+            >
+              Audit Log
+            </a>
+            <a
+              className="ops-link-button"
+              role="button"
+              href={`${normalizedProxyUrl}/ops/status`}
+              target="ops-result-frame"
+              onClick={(event) => {
+                event.preventDefault();
+                void runWorkspaceAction("ops_status");
+              }}
+            >
+              維運狀態
+            </a>
+          </div>
+          <div className="ops-result-card" aria-live="polite">
+            <div className="row">
+              <span>最近操作結果</span>
+              <strong>{loading ? "執行中" : result.label}</strong>
+            </div>
+            <pre>{JSON.stringify(result.data, null, 2)}</pre>
+            <iframe name="ops-result-frame" title="Ops fallback result" />
           </div>
           <div className="ops-checklist">
             <div>

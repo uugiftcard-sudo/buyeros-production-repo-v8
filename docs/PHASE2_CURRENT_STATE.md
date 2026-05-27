@@ -8,9 +8,12 @@ This file records the current state of the three-system Phase 2 work so parallel
 
 | System | Canonical ID | Repo | Role |
 | --- | --- | --- | --- |
-| Buyer AI 中樞 | `buyer_ai` | `/Users/rubykan/Downloads/buyeros-production-repo-v8` | BuyerOS, AI Team, Context Hub, Telegram, buyer report, refund/OCR/reconciliation |
-| Commerce 網店自動系統 | `commerce` | `/Users/rubykan/Documents/CLOTH` | Orders, refund operations, inventory, support, shop finance, live-selling flow |
+| Buyer AI 中樞 | `buyer_ai` | `/Users/rubykan/Downloads/buyeros-production-repo-v8` | BuyerOS, AI Team, Context Hub, Telegram, buyer report, sourcing ROI, refund reconciliation, OCR posting, manual review |
+| Commerce 網店自動系統 | `commerce` | `/Users/rubykan/Documents/CLOTH` | Orders, after-sales source data, inventory, support, shop finance, live-selling flow |
 | XAU 系統 | `xau` | `/Users/rubykan/Documents/XAU` | AI live stream, real-time news, script generation, OBS, campaign/conversion |
+
+Boundary note: refund reconciliation, refund matching, OCR posting, and manual review belong to `buyer_ai`.
+`commerce` only supplies webshop order, after-sales, payment, inventory, and support data for reconciliation.
 
 ## PR And Branch State
 
