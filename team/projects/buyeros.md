@@ -5,7 +5,7 @@ Last updated: 2026-05-27 17:41 UTC. BuyerOS Redis orchestration runtime PR #19 m
 
 ## Functional completion project — Milestone 0 inventory
 
-Last updated: 2026-05-27 19:14 UTC by Codex.
+Last updated: 2026-05-27 19:24 UTC by Codex.
 
 Source plan:
 - `/Users/rubykan/Documents/team/automation/FUNCTION_COMPLETION_PROJECT.md`
@@ -87,22 +87,28 @@ Draft PR:
 - https://github.com/uugiftcard-sudo/buyeros-production-repo-v8/pull/20
 
 Commit:
-- `b798fbb test: expand BuyerOS UI smoke coverage`
+- `ff49ef8 test: expand BuyerOS UI smoke coverage`
 
 Validation:
-- `cd /Users/rubykan/Downloads/buyeros-production-repo-v8/frontend && npm run ui:smoke -- --reporter=line` → `1 passed`
+- `cd /Users/rubykan/Downloads/buyeros-production-repo-v8/frontend && npm run ui:smoke` → mocked smoke pass; live-proxy spec skipped unless explicitly enabled
 - `cd /Users/rubykan/Downloads/buyeros-production-repo-v8/frontend && npm run build` → pass
 - `cd /Users/rubykan/Downloads/buyeros-production-repo-v8/frontend && npm run lint` → pass after build generated `.next/types`
-- `python3 /Users/rubykan/Documents/team/automation/run.py check --repo buyeros` → PASS
+- `bash /Users/rubykan/Downloads/buyeros-production-repo-v8/infra/smoke_ui_live_proxy.sh` → PASS
+  - Starts local backend on `127.0.0.1:8010`
+  - Starts local frontend on `127.0.0.1:3010`
+  - Uses safe fake `BUYEROS_API_KEY=smoke-local-key`, no real `.env` value
+  - Verifies UI buttons reach the real local backend through Next proxy
+- `python3 /Users/rubykan/Documents/team/automation/run.py check --repo buyeros` → PASS for all checks, but deploy gate blocked until this branch/config work is committed/merged
   - backend pytest: 236 passed
   - frontend lint: pass
   - frontend build: pass
   - UI smoke: 1 passed
+  - live backend-proxy UI smoke: 1 passed
   - HTTP runtime smoke: dashboard shell + ops anchor pass
 
 Notes:
 - This is a mocked UI smoke. It proves buttons are wired to UI feedback/request paths.
-- The automation HTTP runtime smoke proves dashboard shell and ops anchor only; it does not yet prove live backend-proxy data for every individual quick action.
+- Live backend-proxy smoke now proves the main M1 controls reach a real local backend via the Next proxy. It still uses local in-memory state and a fake API key; no production deploy or external mutation.
 
 ### Latest M0 evidence commands
 

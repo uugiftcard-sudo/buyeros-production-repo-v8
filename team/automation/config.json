@@ -44,6 +44,11 @@
           "cmd": ["npm", "run", "ui:smoke"]
         },
         {
+          "name": "live backend-proxy UI smoke",
+          "cwd": "/Users/rubykan/Downloads/buyeros-production-repo-v8",
+          "cmd": ["bash", "infra/smoke_ui_live_proxy.sh"]
+        },
+        {
           "name": "http runtime smoke",
           "cwd": "/Users/rubykan/Documents/team/automation",
           "cmd": ["python3", "with_server.py", "--cwd", "/Users/rubykan/Downloads/buyeros-production-repo-v8/frontend", "--command", "npm run dev -- --hostname 127.0.0.1 --port 3000", "--ready-url", "http://127.0.0.1:3000", "--", "python3", "smoke_http.py", "buyeros", "--base-url", "http://127.0.0.1:3000"]
