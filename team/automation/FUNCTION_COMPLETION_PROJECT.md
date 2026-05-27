@@ -86,7 +86,7 @@ Status: ACTIVE project definition
   - Acceptance: each route has API dependency and current smoke status.
   - Evidence: `/Users/rubykan/Documents/team/projects/cloth.md` now records route/API/control dependencies and flags Support/Inventory frontend as mockStorage-backed until browser/API wiring is verified.
 
-- [ ] **M0-3 XAU UI map**
+- [x] **M0-3 XAU UI map**
   - Repo: `/Users/rubykan/Documents/XAU`
   - Produce list of pages/routes:
     - dashboard
@@ -99,6 +99,7 @@ Status: ACTIVE project definition
     - campaign / promo / metrics pages
   - Output file: `/Users/rubykan/Documents/team/projects/xau.md`
   - Acceptance: each route has browser URL, known broken controls, and owner line.
+  - Evidence: `/Users/rubykan/Documents/team/projects/xau.md` now records route/API/control dependencies and flags the member dashboard appointment button as `FAIL-CODE`.
 
 ### Validation
 
