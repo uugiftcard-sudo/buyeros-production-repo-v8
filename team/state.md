@@ -1,7 +1,7 @@
 # Team Project State
 
 ## Last updated
-2026-05-27 19:05 UTC by Codex — BuyerOS M1 mocked UI smoke coverage expanded; live backend-proxy smoke still next
+2026-05-27 19:14 UTC by Codex — BuyerOS M1 UI smoke branch check lane PASS; live per-button backend-proxy smoke still next
 
 ## Blockers ⚠️
 - Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff (PR merge 後做)
@@ -16,8 +16,9 @@
 - [🔄 ACTIVE] Current detailed project is `/Users/rubykan/Documents/team/automation/FUNCTION_COMPLETION_PROJECT.md`
 - [🎯 SCOPE] Complete usable product functionality across `buyer_ai / commerce / xau`; repo hygiene or merged PRs are not enough
 - [0️⃣ NEXT] First batch: Milestone 0 functional inventory — page/API/button map for BuyerOS, CLOTH, and XAU
-- [✅ PARTIAL] BuyerOS M0/M1 mocked UI smoke now covers project switch, dispatch plan, run_all, memory/timeline, report, buyer_ai quick actions, commerce/xau quick actions, task board, ops controls
-- [1️⃣ NEXT] BuyerOS live backend-proxy smoke — prove the same controls against real local backend/proxy, not only mocked Playwright routes
+- [✅ PASS] BuyerOS branch `codex/buyeros-m1-ui-smoke`: `python3 /Users/rubykan/Documents/team/automation/run.py check --repo buyeros` PASS
+- [✅ PARTIAL] BuyerOS M0/M1 UI smoke now covers project switch, dispatch plan, run_all, memory/timeline, report, buyer_ai quick actions, commerce/xau quick actions, task board, ops controls
+- [1️⃣ NEXT] BuyerOS live per-button backend-proxy smoke — current HTTP smoke only proves dashboard shell + ops anchor, not every quick action against real backend data
 - [2️⃣ NEXT] Then Milestone 2: CLOTH `commerce` usable loop — products, cart, wishlist, orders, finance, inventory, support, admin, mobile nav
 - [3️⃣ NEXT] Then Milestone 3: XAU usable loop — dashboard, member pages, OBS/live overlay, teacher appearance, campaign/conversion/metrics
 - [🛑 NOTE] This is not the removed `team/multi-agent-system/` prompt system and not just the older `TRI_REPO_PLAN.md`

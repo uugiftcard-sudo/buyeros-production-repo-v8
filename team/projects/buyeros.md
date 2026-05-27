@@ -5,7 +5,7 @@ Last updated: 2026-05-27 17:41 UTC. BuyerOS Redis orchestration runtime PR #19 m
 
 ## Functional completion project — Milestone 0 inventory
 
-Last updated: 2026-05-27 19:05 UTC by Codex.
+Last updated: 2026-05-27 19:14 UTC by Codex.
 
 Source plan:
 - `/Users/rubykan/Documents/team/automation/FUNCTION_COMPLETION_PROJECT.md`
@@ -84,16 +84,22 @@ Branch:
 - `/Users/rubykan/Downloads/buyeros-production-repo-v8` branch `codex/buyeros-m1-ui-smoke`
 
 Commit:
-- `6812bac test: expand BuyerOS UI smoke coverage`
+- `b798fbb test: expand BuyerOS UI smoke coverage`
 
 Validation:
 - `cd /Users/rubykan/Downloads/buyeros-production-repo-v8/frontend && npm run ui:smoke -- --reporter=line` → `1 passed`
 - `cd /Users/rubykan/Downloads/buyeros-production-repo-v8/frontend && npm run build` → pass
 - `cd /Users/rubykan/Downloads/buyeros-production-repo-v8/frontend && npm run lint` → pass after build generated `.next/types`
+- `python3 /Users/rubykan/Documents/team/automation/run.py check --repo buyeros` → PASS
+  - backend pytest: 236 passed
+  - frontend lint: pass
+  - frontend build: pass
+  - UI smoke: 1 passed
+  - HTTP runtime smoke: dashboard shell + ops anchor pass
 
 Notes:
 - This is a mocked UI smoke. It proves buttons are wired to UI feedback/request paths.
-- It does not yet prove live backend-proxy data for every button.
+- The automation HTTP runtime smoke proves dashboard shell and ops anchor only; it does not yet prove live backend-proxy data for every individual quick action.
 
 ### Latest M0 evidence commands
 
