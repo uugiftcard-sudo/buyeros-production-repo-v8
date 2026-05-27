@@ -1,7 +1,7 @@
 # Team Project State
 
 ## Last updated
-2026-05-27 17:41 UTC by Codex — PR #9/#19 merged; tri-repo automation dry-run PASS
+2026-05-27 18:52 UTC by Codex — active project rewritten as FUNCTION_COMPLETION_PROJECT; automation dry-run PASS
 
 ## Blockers ⚠️
 - Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff (PR merge 後做)
@@ -12,15 +12,16 @@
 
 ## Active Tasks
 
-### Active Detailed Project 🔄 TRI_REPO_PLAN
-- [🔄 ACTIVE] Current detailed project is `/Users/rubykan/Documents/team/automation/TRI_REPO_PLAN.md`
-- [🎯 SCOPE] Complete the canonical three-line system: `buyer_ai / commerce / xau`
-- [1️⃣ NEXT] First batch: `buyer_ai` foundation — projects, dispatch plan, run_all, memory timeline, Telegram mock, ops status
-- [2️⃣ NEXT] Second batch: `commerce` operational chain — order / after-sales / payment / inventory / support feeding buyer_ai refund/OCR/reconciliation
-- [3️⃣ NEXT] Third batch: `xau` — campaign/conversion/metrics loop and BuyerOS memory/timeline handback
-- [🛑 NOTE] This is not the removed `team/multi-agent-system/` prompt system
-- [🧪 ACCEPTANCE] BuyerOS pytest + smoke, CLOTH lint/check/test, XAU test/server test; no secrets, no production env mutation, no dirty deploy
-- [ℹ️ EVIDENCE] 2026-05-27 17:41 dry-run: BuyerOS/XAU/CLOTH PASS/open, dirty=no, secret diff=no
+### Active Detailed Project 🔄 FUNCTION_COMPLETION_PROJECT
+- [🔄 ACTIVE] Current detailed project is `/Users/rubykan/Documents/team/automation/FUNCTION_COMPLETION_PROJECT.md`
+- [🎯 SCOPE] Complete usable product functionality across `buyer_ai / commerce / xau`; repo hygiene or merged PRs are not enough
+- [0️⃣ NEXT] First batch: Milestone 0 functional inventory — page/API/button map for BuyerOS, CLOTH, and XAU
+- [1️⃣ NEXT] Then Milestone 1: BuyerOS `buyer_ai` usable loop — project switch, dispatch plan, run_all, memory/timeline, report, Telegram mock, ops controls
+- [2️⃣ NEXT] Then Milestone 2: CLOTH `commerce` usable loop — products, cart, wishlist, orders, finance, inventory, support, admin, mobile nav
+- [3️⃣ NEXT] Then Milestone 3: XAU usable loop — dashboard, member pages, OBS/live overlay, teacher appearance, campaign/conversion/metrics
+- [🛑 NOTE] This is not the removed `team/multi-agent-system/` prompt system and not just the older `TRI_REPO_PLAN.md`
+- [🧪 ACCEPTANCE] Each feature needs UI/API/test evidence plus clean git hygiene; no secrets, no production env mutation, no dirty deploy
+- [ℹ️ EVIDENCE] 2026-05-27 17:41 dry-run: BuyerOS/XAU/CLOTH PASS/open, dirty=no, secret diff=no; this proves hygiene only, not feature completion
 
 ### Control Room Boundary ✅ UPDATED
 - [✅ DONE] Refund reconciliation / refund matching / OCR posting / manual review are owned by `buyer_ai`
