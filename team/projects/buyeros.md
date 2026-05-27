@@ -1,7 +1,7 @@
 # BuyerOS Project Detail
 
 ## Current status
-Last updated: 2026-05-27 17:41 UTC. BuyerOS Redis orchestration runtime PR #19 merged. Latest local automation dry-run reports PASS, dirty=no, secret diff=no, deploy gate=open. Local repo is on `main`, 0 ahead / 0 behind.
+Last updated: 2026-05-27 19:30 UTC. BuyerOS Redis orchestration runtime PR #19 merged. BuyerOS M1 UI smoke PR #20 is open as draft, mergeable, and CI-green. Latest local automation dry-run reports PASS, dirty=no, secret diff=no, deploy gate=open. Local repo is on `codex/buyeros-m1-ui-smoke`, 0 ahead / 0 behind.
 
 ## Functional completion project — Milestone 0 inventory
 
@@ -74,9 +74,9 @@ Backend source:
 
 ### Immediate BuyerOS next tasks
 
-1. Add live backend-proxy smoke after mocked UI smoke passes.
+1. Review/merge PR #20 when user confirms this smoke coverage belongs in BuyerOS mainline.
 2. Decide whether Redis orchestration needs frontend UI in this phase; backend is present, but dashboard does not yet expose it as a user-facing panel.
-3. Open/push PR for `codex/buyeros-m1-ui-smoke` after user confirms this test-only coverage belongs in BuyerOS mainline.
+3. Continue functional inventory for CLOTH and XAU before claiming the whole project is complete.
 
 ### BuyerOS M1 smoke coverage update
 
@@ -107,8 +107,9 @@ Validation:
   - HTTP runtime smoke: dashboard shell + ops anchor pass
 
 Notes:
-- This is a mocked UI smoke. It proves buttons are wired to UI feedback/request paths.
-- Live backend-proxy smoke now proves the main M1 controls reach a real local backend via the Next proxy. It still uses local in-memory state and a fake API key; no production deploy or external mutation.
+- Mocked UI smoke proves buttons are wired to UI feedback/request paths.
+- Live backend-proxy smoke proves the main M1 controls reach a real local backend via the Next proxy. It still uses local in-memory state and a fake API key; no production deploy or external mutation.
+- GitHub PR #20 CI is green: backend-test, backend-lint, backend-typecheck, docker-build, frontend-build, docker-smoke, frontend-smoke.
 
 ### Latest M0 evidence commands
 

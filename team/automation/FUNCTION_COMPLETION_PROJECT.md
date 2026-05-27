@@ -56,7 +56,7 @@ Status: ACTIVE project definition
 
 ### Tasks
 
-- [ ] **M0-1 BuyerOS UI map**
+- [x] **M0-1 BuyerOS UI map**
   - Repo: `/Users/rubykan/Downloads/buyeros-production-repo-v8`
   - Produce list of pages/routes:
     - `/`
@@ -67,6 +67,7 @@ Status: ACTIVE project definition
     - report / promo / orchestration panel
   - Output file: `/Users/rubykan/Documents/team/projects/buyeros.md`
   - Acceptance: each route has status `PASS / FAIL / BLOCKED / NOT IMPLEMENTED`.
+  - Evidence: `/Users/rubykan/Documents/team/projects/buyeros.md` now records route/API/button coverage; PR #20 adds mocked and live backend-proxy smoke.
 
 - [ ] **M0-2 CLOTH UI map**
   - Repo: `/Users/rubykan/Documents/CLOTH`

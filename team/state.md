@@ -1,7 +1,7 @@
 # Team Project State
 
 ## Last updated
-2026-05-27 19:24 UTC by Codex — BuyerOS M1 live backend-proxy smoke added to PR #20 and automation config
+2026-05-27 19:30 UTC by Codex — BuyerOS PR #20 CI verified green; functional completion project remains active, not complete
 
 ## Blockers ⚠️
 - Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff (PR merge 後做)
@@ -20,7 +20,8 @@
 - [✅ PR] BuyerOS draft PR #20 opened: https://github.com/uugiftcard-sudo/buyeros-production-repo-v8/pull/20
 - [✅ PARTIAL] BuyerOS M0/M1 UI smoke now covers project switch, dispatch plan, run_all, memory/timeline, report, buyer_ai quick actions, commerce/xau quick actions, task board, ops controls
 - [✅ PASS] BuyerOS live backend-proxy UI smoke now starts local backend/frontend with fake `BUYEROS_API_KEY=smoke-local-key` and verifies main controls through Next proxy
-- [1️⃣ NEXT] Merge/review PR #20, then continue Milestone 0 inventory for CLOTH and XAU pages
+- [✅ CI] BuyerOS PR #20 is open as draft, mergeable, and GitHub CI checks are green: backend-test, backend-lint, backend-typecheck, docker-build, frontend-build, docker-smoke, frontend-smoke
+- [1️⃣ NEXT] Review/merge PR #20 when ready, then continue Milestone 0 inventory for CLOTH and XAU pages
 - [2️⃣ NEXT] Then Milestone 2: CLOTH `commerce` usable loop — products, cart, wishlist, orders, finance, inventory, support, admin, mobile nav
 - [3️⃣ NEXT] Then Milestone 3: XAU usable loop — dashboard, member pages, OBS/live overlay, teacher appearance, campaign/conversion/metrics
 - [🛑 NOTE] This is not the removed `team/multi-agent-system/` prompt system and not just the older `TRI_REPO_PLAN.md`
