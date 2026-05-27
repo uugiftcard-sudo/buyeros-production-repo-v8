@@ -1,7 +1,7 @@
 # Team Project State
 
 ## Last updated
-2026-05-27 16:31 UTC by Codex — shared-state sync after three-repo automation dry-run
+2026-05-27 17:32 UTC by Codex — active detailed project set to TRI_REPO_PLAN; previous project not yet fully closed
 
 ## Blockers ⚠️
 - Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff (PR merge 後做)
@@ -9,6 +9,15 @@
 - GitHub PR status remains unavailable from automation output; local branch/upstream/ahead-behind checks still run
 
 ## Active Tasks
+
+### Active Detailed Project 🔄 TRI_REPO_PLAN
+- [🔄 ACTIVE] Current detailed project is `/Users/rubykan/Documents/team/automation/TRI_REPO_PLAN.md`
+- [🎯 SCOPE] Complete the canonical three-line system: `buyer_ai / commerce / xau`
+- [1️⃣ NEXT] First batch: `buyer_ai` foundation — projects, dispatch plan, run_all, memory timeline, Telegram mock, ops status
+- [2️⃣ NEXT] Second batch: `commerce` operational chain — order / after-sales / payment / inventory / support feeding buyer_ai refund/OCR/reconciliation
+- [3️⃣ NEXT] Third batch: `xau` — campaign/conversion/metrics loop and BuyerOS memory/timeline handback
+- [🛑 NOTE] This is not the removed `team/multi-agent-system/` prompt system
+- [🧪 ACCEPTANCE] BuyerOS pytest + smoke, CLOTH lint/check/test, XAU test/server test; no secrets, no production env mutation, no dirty deploy
 
 ### Control Room Boundary ✅ UPDATED
 - [✅ DONE] Refund reconciliation / refund matching / OCR posting / manual review are owned by `buyer_ai`
