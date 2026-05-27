@@ -23,7 +23,7 @@ Evidence proves repo hygiene and BuyerOS M1 smoke progress, but does not yet pro
 | Shared state synchronized | `state.md`, `projects/buyeros.md`, `FUNCTION_COMPLETION_PROJECT.md` updated | PASS |
 | BuyerOS M0 UI/API/button inventory | `projects/buyeros.md` contains route, API, and button map | PASS |
 | BuyerOS M1 smoke evidence | PR #20, live backend-proxy smoke, CI green | PASS-PARTIAL |
-| CLOTH M0 UI map | `projects/cloth.md` has phase/API detail but not full PASS/FAIL/NOT IMPLEMENTED UI route map | INCOMPLETE |
+| CLOTH M0 UI map | `projects/cloth.md` now records route/API/control dependencies; Support/Inventory frontend mockStorage gap is explicit | PASS-CODE |
 | XAU M0 UI map | `projects/xau.md` has automation notes, but not full browser route/control inventory | INCOMPLETE |
 | Cross-line boundary | `buyer_ai / commerce / xau` boundary recorded in `state.md` and `FUNCTION_COMPLETION_PROJECT.md` | PASS-PARTIAL |
 | Final validation commands | Dry-run all repo PASS; full final command set not rerun in this audit | INCOMPLETE |
@@ -47,7 +47,7 @@ XAU:
 CLOTH:
 - Branch: `cursor/github-actions-workflows`
 - Product repo dirty: no
-- Missing for completion: full commerce UI route/control map and final UI evidence.
+- Missing for completion: browser UI evidence for mapped routes; decision/fix for Support and Inventory frontend mockStorage vs backend API wiring.
 
 Shared Documents:
 - Branch: `2026-05-23-2xf9`
@@ -56,9 +56,7 @@ Shared Documents:
 ## Next Required Work
 
 1. Review/merge BuyerOS PR #20 if accepted.
-2. Build CLOTH M0 UI map in `projects/cloth.md`:
-   products, detail, cart, wishlist, orders, support, admin, inventory, finance, mobile nav.
-3. Build XAU M0 UI map in `projects/xau.md`:
+2. Build XAU M0 UI map in `projects/xau.md`:
    dashboard, member dashboard, OBS/live overlay, wardrobe/live avatar, signal cards, copy/manual prompt, campaign/promo/metrics.
+3. Run CLOTH browser/UI smoke against the new route map and resolve Support/Inventory mockStorage boundary.
 4. Rerun the final validation commands from `FUNCTION_COMPLETION_PROJECT.md`.
-

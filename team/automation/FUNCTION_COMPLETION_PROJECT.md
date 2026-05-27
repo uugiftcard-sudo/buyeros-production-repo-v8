@@ -69,7 +69,7 @@ Status: ACTIVE project definition
   - Acceptance: each route has status `PASS / FAIL / BLOCKED / NOT IMPLEMENTED`.
   - Evidence: `/Users/rubykan/Documents/team/projects/buyeros.md` now records route/API/button coverage; PR #20 adds mocked and live backend-proxy smoke.
 
-- [ ] **M0-2 CLOTH UI map**
+- [x] **M0-2 CLOTH UI map**
   - Repo: `/Users/rubykan/Documents/CLOTH`
   - Produce list of pages/routes:
     - products list
@@ -84,6 +84,7 @@ Status: ACTIVE project definition
     - mobile nav
   - Output file: `/Users/rubykan/Documents/team/projects/cloth.md`
   - Acceptance: each route has API dependency and current smoke status.
+  - Evidence: `/Users/rubykan/Documents/team/projects/cloth.md` now records route/API/control dependencies and flags Support/Inventory frontend as mockStorage-backed until browser/API wiring is verified.
 
 - [ ] **M0-3 XAU UI map**
   - Repo: `/Users/rubykan/Documents/XAU`

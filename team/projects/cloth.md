@@ -124,6 +124,60 @@ npm run check
 - Tests：`scripts/products-filter-pagination.test.mjs`
 - Scope：只改 `GET /api/products` + contract enum correction；不改 UI/auth/finance/inventory/support
 
+## Functional completion project — Milestone 0 UI map
+
+Last updated: 2026-05-27 19:30 UTC by Codex.
+
+Source plan:
+- `/Users/rubykan/Documents/team/automation/FUNCTION_COMPLETION_PROJECT.md`
+
+Important correction:
+- CLOTH is not function-complete just because API smoke and Phase 2 filtering pass.
+- This map is code evidence only. Browser route/control smoke still needs to be run before final completion.
+
+Frontend route source:
+- `/Users/rubykan/Documents/CLOTH/web/src/App.tsx`
+
+API client sources:
+- `/Users/rubykan/Documents/CLOTH/web/src/api/client.ts`
+- `/Users/rubykan/Documents/CLOTH/web/src/api/finance.ts`
+- `/Users/rubykan/Documents/CLOTH/web/src/api/support.ts`
+- `/Users/rubykan/Documents/CLOTH/web/src/api/inventory.ts`
+
+### CLOTH route map
+
+The same core pages exist for UK default, HK, and CN market prefixes:
+
+| Market | Home | Products | Detail | Cart | Orders | Admin | Support | Inventory | Warehouse admin | Finance | Wishlist |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| UK | `/` | `/products` | `/products/:id` | `/cart` | `/orders` | `/admin` | `/support` | `/inventory` | `/admin/warehouse` | `/finance` | `/wishlist` |
+| HK | `/hk` | `/hk/products` | `/hk/products/:id` | `/hk/cart` | `/hk/orders` | `/hk/admin` | `/hk/support` | `/hk/inventory` | `/hk/admin/warehouse` | `/hk/finance` | `/hk/wishlist` |
+| CN | `/cn` | `/cn/products` | `/cn/products/:id` | `/cn/cart` | `/cn/orders` | `/cn/admin` | `/cn/support` | `/cn/inventory` | `/cn/admin/warehouse` | `/cn/finance` | `/cn/wishlist` |
+
+### CLOTH workflow map
+
+| Workflow | Route(s) | Data dependency | Current evidence | Status | Gap / next action |
+|---|---|---|---|---|---|
+| Home / market landing | `/`, `/hk`, `/cn` | `productApi.list`, `brandApi.list`, `categoryApi.list` | Route exists in `App.tsx`; home pages link to products by category/brand | PASS-CODE | Needs browser smoke for visible market copy and CTA links |
+| Browse products | `/products`, `/hk/products`, `/cn/products` | `/api/products`, `/api/brands`, `/api/categories` | `products-filter-pagination.test.mjs` covers filtering/pagination API; ProductList controls exist | PASS-PARTIAL | Needs UI smoke for filter buttons, clear filter, next/prev pagination |
+| Product detail | `*/products/:id` | `/api/products/:id`; cart/wishlist local state | ProductDetail has image selector, buy modal, add-to-cart button | PASS-CODE | Needs browser smoke for modal submit, add-to-cart feedback, sold-out disabled state |
+| Cart | `*/cart` | localStorage cart + `orderApi.create` on checkout | Cart page has remove and checkout controls | PASS-CODE | Needs browser smoke for add/remove/update/checkout and order creation |
+| Wishlist | `*/wishlist` | localStorage wishlist + product list API | ProductCard heart and Wishlist remove controls exist | PASS-CODE | Needs browser smoke for add/remove/list persistence |
+| Orders | `*/orders` | `/api/orders` | API smoke covers order list/update; Orders page has status filters | PASS-PARTIAL | Needs UI smoke for status filter and product detail link |
+| Admin products/orders | `*/admin` | `productApi`, `orderApi` | Admin tabs, add/edit/delete product form, order status select exist | PASS-CODE | Needs browser smoke; verify no destructive admin action without visible feedback |
+| Finance | `*/finance` | `/api/finance`, `/api/finance/stats` | API smoke + numeric validation tests cover backend; Finance page has create/edit/delete/date filters | PASS-PARTIAL | Needs UI smoke for create/edit/delete/error feedback |
+| Inventory | `*/inventory` | **web uses `mockStorage`, not `/api/inventory`** | API smoke covers backend; Inventory UI has inbound/outbound/add tabs | BLOCKED-PARTIAL | Wire web Inventory API to backend or explicitly mark as local demo |
+| Warehouse admin | `*/admin/warehouse` | **web uses `mockStorage`, sessionStorage auth** | Route exists; login, list/add/inbound/outbound tabs exist | BLOCKED-PARTIAL | Needs browser smoke and decision: demo-only local storage vs backend inventory |
+| Support | `*/support` | **web uses `mockStorage`, not `/api/support`** | API smoke covers backend; Support UI has list/new/FAQ tabs | BLOCKED-PARTIAL | Wire web support API to backend or explicitly mark as local demo |
+| Mobile nav | all markets | React Router links + local cart/wishlist counts | `mobile-nav-contract.test.mjs` covers overlay contract | PASS-PARTIAL | Needs browser smoke for iPhone width, Escape close, route click, scroll lock |
+
+### Immediate CLOTH next tasks
+
+1. Run browser/UI smoke for the mapped routes, not just API tests.
+2. Decide whether Support and Inventory frontend should be API-backed now or honestly marked demo/local-only.
+3. Add/extend UI smoke to cover products, product detail, cart, wishlist, orders, admin, finance, support, inventory, and mobile nav.
+4. Update this file with `PASS / FAIL / BLOCKED / NOT IMPLEMENTED` after live UI verification.
+
 ## API 路由一覽
 | Route | 檔案 |
 |-------|------|
