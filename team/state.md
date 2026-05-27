@@ -1,7 +1,7 @@
 # Team Project State
 
 ## Last updated
-2026-05-27 19:35 UTC by Codex — XAU member CTA air button fixed; CLOTH/XAU M0 maps remain pending browser smoke
+2026-05-27 19:55 UTC by Codex — CLOTH admin browser smoke failure fixed; XAU full browser smoke still pending
 
 ## Blockers ⚠️
 - Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff (PR merge 後做)
@@ -22,10 +22,13 @@
 - [✅ PASS] BuyerOS live backend-proxy UI smoke now starts local backend/frontend with fake `BUYEROS_API_KEY=smoke-local-key` and verifies main controls through Next proxy
 - [✅ CI] BuyerOS PR #20 is open as draft, mergeable, and GitHub CI checks are green: backend-test, backend-lint, backend-typecheck, docker-build, frontend-build, docker-smoke, frontend-smoke
 - [✅ PASS-CODE] CLOTH M0 route/control map added to `/Users/rubykan/Documents/team/projects/cloth.md`; Support/Inventory frontend are flagged as mockStorage-backed until browser/API wiring is verified
+- [✅ FIXED-CODE] CLOTH `/admin` browser smoke 400 error fixed in branch `codex/cloth-admin-market-contract` commit `6166ab6`; Admin product list now respects API `limit <= 50`, and product create/update includes selected `market`
+- [✅ PR] CLOTH draft PR #11 opened: https://github.com/uugiftcard-sudo/ai-luxury-resale-os/pull/11
+- [✅ PASS] CLOTH desktop route smoke now passes 10/10 routes with 0 console errors and no horizontal overflow: `/`, `/products`, `/cart`, `/orders`, `/wishlist`, `/support`, `/admin`, `/finance`, `/inventory`, `/admin/warehouse`
 - [✅ FIXED-CODE] XAU member dashboard appointment CTA now links to private-club registration; `npm test` passed with 123 tests
-- [1️⃣ NEXT] Review/merge PR #20 when ready, then run CLOTH/XAU browser UI smoke
-- [2️⃣ NEXT] Then Milestone 2: CLOTH `commerce` usable loop — products, cart, wishlist, orders, finance, inventory, support, admin, mobile nav
-- [3️⃣ NEXT] Then Milestone 3: XAU usable loop — dashboard, member pages, OBS/live overlay, teacher appearance, campaign/conversion/metrics
+- [1️⃣ NEXT] Review/merge BuyerOS PR #20 when ready
+- [2️⃣ NEXT] Continue CLOTH `commerce` usable loop: interactive product/cart/wishlist/order/admin workflows plus Support/Inventory backend wiring decision
+- [3️⃣ NEXT] Then run XAU full browser smoke: dashboard, member pages, OBS/live overlay, teacher appearance, campaign/conversion/metrics
 - [🛑 NOTE] This is not the removed `team/multi-agent-system/` prompt system and not just the older `TRI_REPO_PLAN.md`
 - [🧪 ACCEPTANCE] Each feature needs UI/API/test evidence plus clean git hygiene; no secrets, no production env mutation, no dirty deploy
 - [ℹ️ EVIDENCE] 2026-05-27 17:41 dry-run: BuyerOS/XAU/CLOTH PASS/open, dirty=no, secret diff=no; this proves hygiene only, not feature completion

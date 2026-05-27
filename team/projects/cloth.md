@@ -126,14 +126,30 @@ npm run check
 
 ## Functional completion project — Milestone 0 UI map
 
-Last updated: 2026-05-27 19:30 UTC by Codex.
+Last updated: 2026-05-27 19:55 UTC by Codex.
 
 Source plan:
 - `/Users/rubykan/Documents/team/automation/FUNCTION_COMPLETION_PROJECT.md`
 
 Important correction:
 - CLOTH is not function-complete just because API smoke and Phase 2 filtering pass.
-- This map is code evidence only. Browser route/control smoke still needs to be run before final completion.
+- Browser route-load smoke has now been run for the primary desktop routes, but deeper interaction smoke is still required before final completion.
+
+Latest fix:
+- Branch: `codex/cloth-admin-market-contract`
+- Commit: `6166ab6 fix: align admin product market contract`
+- Draft PR: https://github.com/uugiftcard-sudo/ai-luxury-resale-os/pull/11
+- Fixed `/admin` route browser smoke failure caused by `productApi.list(market, { limit: 100 })` exceeding the API `limit <= 50` validation.
+- Fixed frontend product create/update client so the selected `market` is included in the request body.
+
+Latest validation:
+- `node --test scripts/admin-product-contract.test.mjs`: 2 passed
+- `npm run check`: pass
+- `npm run lint`: pass, 7 existing console warnings
+- Browser route smoke at `http://127.0.0.1:5173`: 10/10 routes pass, 0 console errors, no horizontal overflow
+- `node --test scripts/products-filter-pagination.test.mjs`: 2 passed
+- `node --test scripts/product-market-persistence.test.mjs`: 1 passed
+- `node --test scripts/api-smoke.test.mjs`: 26 passed when run standalone
 
 Frontend route source:
 - `/Users/rubykan/Documents/CLOTH/web/src/App.tsx`
@@ -164,19 +180,149 @@ The same core pages exist for UK default, HK, and CN market prefixes:
 | Cart | `*/cart` | localStorage cart + `orderApi.create` on checkout | Cart page has remove and checkout controls | PASS-CODE | Needs browser smoke for add/remove/update/checkout and order creation |
 | Wishlist | `*/wishlist` | localStorage wishlist + product list API | ProductCard heart and Wishlist remove controls exist | PASS-CODE | Needs browser smoke for add/remove/list persistence |
 | Orders | `*/orders` | `/api/orders` | API smoke covers order list/update; Orders page has status filters | PASS-PARTIAL | Needs UI smoke for status filter and product detail link |
-| Admin products/orders | `*/admin` | `productApi`, `orderApi` | Admin tabs, add/edit/delete product form, order status select exist | PASS-CODE | Needs browser smoke; verify no destructive admin action without visible feedback |
+| Admin products/orders | `*/admin` | `productApi`, `orderApi` | Admin route-load browser smoke passes after `limit=50` fix; add/edit/delete product form and order status select exist | PASS-PARTIAL | Needs deeper interaction smoke for add/edit/delete and order status updates |
 | Finance | `*/finance` | `/api/finance`, `/api/finance/stats` | API smoke + numeric validation tests cover backend; Finance page has create/edit/delete/date filters | PASS-PARTIAL | Needs UI smoke for create/edit/delete/error feedback |
 | Inventory | `*/inventory` | **web uses `mockStorage`, not `/api/inventory`** | API smoke covers backend; Inventory UI has inbound/outbound/add tabs | BLOCKED-PARTIAL | Wire web Inventory API to backend or explicitly mark as local demo |
 | Warehouse admin | `*/admin/warehouse` | **web uses `mockStorage`, sessionStorage auth** | Route exists; login, list/add/inbound/outbound tabs exist | BLOCKED-PARTIAL | Needs browser smoke and decision: demo-only local storage vs backend inventory |
 | Support | `*/support` | **web uses `mockStorage`, not `/api/support`** | API smoke covers backend; Support UI has list/new/FAQ tabs | BLOCKED-PARTIAL | Wire web support API to backend or explicitly mark as local demo |
 | Mobile nav | all markets | React Router links + local cart/wishlist counts | `mobile-nav-contract.test.mjs` covers overlay contract | PASS-PARTIAL | Needs browser smoke for iPhone width, Escape close, route click, scroll lock |
 
+### CLOTH button/control inventory
+
+Source: read-only code evidence from `web/src/pages/*.tsx` and `web/src/api/*.ts`.
+Key finding: **Inventory** (`web/src/api/inventory.ts`) and **Support** (`web/src/api/support.ts`) frontends use `mockStorage` (localStorage) — not real backend API. AdminWarehouse also uses `InventoryContext` → `mockStorage`. These pages are local demos, not API-backed.
+
+#### UK / CN / HK shared control inventory
+
+|| Page | Control | Text / Label | Action | Data source | Feedback | Status |
+|---|---|---|---|---|---|---|
+| ProductList | Filter toggle button | "篩選" / "Filter" | Sets `filtersOpen` state, shows/hides filter panel | — | No API call; UI-only | PASS-CODE |
+| ProductList | Brand dropdown | select | Sets `searchParams` brand, triggers re-render | — | No API call; URL-driven | PASS-CODE |
+| ProductList | Category dropdown | select | Sets `searchParams` category | — | No API call; URL-driven | PASS-CODE |
+| ProductList | Condition dropdown | select | Sets `searchParams` condition | — | No API call; URL-driven | PASS-CODE |
+| ProductList | Clear filter button | "清除全部篩選" / "Clear All" | Clears all searchParams | — | No API call | PASS-CODE |
+| ProductList | Prev page button | "上一页" / "← Prev" | Decrements page | `productApi.list()` | No loading/error state on button itself | PASS-CODE |
+| ProductList | Next page button | "下一页" / "Next →" | Increments page | `productApi.list()` | No loading/error state on button itself | PASS-CODE |
+| ProductList | ProductCard add to cart | heart icon | Calls `useCart().addItem()` | `useCart` localStorage | Toast feedback | PASS-CODE |
+| ProductList | ProductCard add to wishlist | heart icon (filled) | Calls `useWishlist` localStorage toggle | localStorage | Visual toggle | PASS-CODE |
+| ProductDetail | Add to cart | "加入購物車" / "Add to Cart" | `useCart().addItem()` + `showToast()` | `useCart` localStorage | Toast confirmation | PASS-CODE |
+| ProductDetail | Buy now | "立即結算" / "Buy Now" | `useCart().addItem()` + `navigate('/cart')` | `useCart` localStorage | Toast + navigate | PASS-CODE |
+| ProductDetail | Image thumbnail | img | Sets selected image index | — | Visual only | PASS-CODE |
+| ProductDetail | Size selector | button | Sets selected size | — | Visual highlight | PASS-CODE |
+| ProductDetail | Order form submit | "提交結算" | `orderApi.create()` | `/api/orders` | Success/error toast | PASS-CODE |
+| Cart | Remove item | "×" | `useCart().removeItem()` | `useCart` localStorage | Immediate DOM removal | PASS-CODE |
+| Cart | Checkout form | name/phone/address inputs | Controlled form state | — | Validation messages | PASS-CODE |
+| Cart | Checkout submit | "結算" / "Checkout" | `orderApi.create()` → clear cart | `/api/orders` | Success navigate + toast | PASS-CODE |
+| Wishlist | Remove from wishlist | "×" | `useWishlist` localStorage toggle | localStorage | Immediate DOM removal | PASS-CODE |
+| Wishlist | Move to cart | "加入購物車" | `useCart().addItem()` | `useCart` localStorage | Toast feedback | PASS-CODE |
+| Orders | Status filter tab | "全部"/"待付款"/etc. | Sets `filterStatus`, re-fetches | `orderApi.list()` | Loading spinner | PASS-PARTIAL |
+| Orders | Order detail link | order item | `navigate()` to order detail | — | Navigation | PASS-CODE |
+| Admin | Tab: products | "商品管理" / "Products" | Sets `activeTab` | — | UI-only | PASS-CODE |
+| Admin | Tab: orders | "訂單管理" / "Orders" | Sets `activeTab` | — | UI-only | PASS-CODE |
+| Admin | Add product button | "新增商品" / "Add Product" | Opens modal, sets `formOpen` | — | Modal opens | PASS-CODE |
+| Admin | Edit product | edit icon | Opens modal with product data | — | Modal opens | PASS-CODE |
+| Admin | Delete product | delete icon | `handleDelete(id)` | `productApi.delete()` | Confirm dialog expected but not visible in code | FAIL-AMBIGUOUS |
+| Admin | Product form submit | "保存" / "Submit" | `handleSubmit()` → `productApi.create/update()` | `/api/products` | Success/error toast | PASS-CODE |
+| Admin | Order status select | dropdown | `handleOrderStatus(orderId, status)` | `orderApi.updateStatus()` | Visual feedback | PASS-CODE |
+| Finance | Tab: list/new/stats | — | Sets `activeTab` | — | UI-only | PASS-CODE |
+| Finance | Date filter inputs | date inputs | Sets `filterDateFrom/to` | — | No API call on change | PASS-CODE |
+| Finance | Clear date filter | "清除" | Clears date filters | — | UI-only | PASS-CODE |
+| Finance | Edit record | edit button | `openEdit(r)` | — | Opens modal | PASS-CODE |
+| Finance | Delete record | delete button | `handleDelete(id)` | `financeApi.delete()` | Success toast | PASS-CODE |
+| Finance | Quick add income | income button | `openAdd('收入')` | — | Opens modal | PASS-CODE |
+| Finance | Quick add expense | expense button | `openAdd('支出')` | — | Opens modal | PASS-CODE |
+| Finance | Record form submit | "保存" / "Submit" | `handleSubmit()` → `financeApi.create/update()` | `/api/finance` | Success/error toast | PASS-CODE |
+| Finance | Income/expense toggle | radio buttons | Sets `form.type` | — | UI-only | PASS-CODE |
+| Inventory | Tab: list/add/inbound/outbound | — | Sets `tab` | — | UI-only | PASS-CODE |
+| Inventory | Search input | search | Filters `items` locally | **mockStorage (localStorage)** | No API call | BLOCKED-DEMO |
+| Inventory | Add form submit | submit | `handleSubmit()` | **mockStorage** | Toast (mock) | BLOCKED-DEMO |
+| Inventory | Inbound form submit | "確認入庫" | calls `inventoryApi.inbound()` | **mockStorage** | Toast (mock) | BLOCKED-DEMO |
+| Inventory | Outbound form submit | "確認出庫" | calls `inventoryApi.outbound()` | **mockStorage** | Toast (mock) | BLOCKED-DEMO |
+| AdminWarehouse | Login form | password input + submit | `handleLogin()` | — | Error message if wrong | PASS-PARTIAL |
+| AdminWarehouse | Logout button | "登出" | Clears `sessionStorage`, sets `authenticated` | — | Immediate | PASS-CODE |
+| AdminWarehouse | Tabs: items/add/inbound/outbound/transactions | — | Sets `activeTab` | — | UI-only | PASS-CODE |
+| AdminWarehouse | Edit item | edit button | Opens add tab with item data | **mockStorage** | Modal form | BLOCKED-DEMO |
+| AdminWarehouse | Item form submit | "新增商品"/"保存更改" | `createItem`/`updateItem` | **mockStorage** | Toast (mock) | BLOCKED-DEMO |
+| AdminWarehouse | Inbound form submit | "確認入庫" | `inbound()` | **mockStorage** | Toast (mock) | BLOCKED-DEMO |
+| AdminWarehouse | Outbound form submit | "確認出庫" | `outbound()` | **mockStorage** | Toast (mock) | BLOCKED-DEMO |
+| Support | Tab: list/new/FAQ | — | Sets `activeTab` | — | UI-only | PASS-CODE |
+| Support | FAQ accordion | question | Toggles `open` state | — | UI accordion | PASS-CODE |
+| Support | Order search | input + button | `handleOrderSearch()` | **mockStorage** | Result display | BLOCKED-DEMO |
+| Support | New ticket form submit | submit | `handleSubmit()` → `supportApi.create()` | **mockStorage** | Toast (mock) | BLOCKED-DEMO |
+| Support | Ticket expand | ticket header click | Toggles `open` | — | UI-only | PASS-CODE |
+| Header | Mobile nav hamburger | menu icon | Toggles mobile overlay | — | Full-screen overlay | PASS-PARTIAL |
+| Header | Cart icon | cart icon | Navigate to `/cart` | — | Navigation | PASS-CODE |
+| Header | Wishlist icon | heart icon | Navigate to `/wishlist` | — | Navigation | PASS-CODE |
+| Header | Market switch | market dropdown | Sets `market` in `useMarket` context | — | URL changes to `/hk/...` | PASS-PARTIAL |
+
+### CLOTH workflow map — updated 2026-05-27
+
+|| Workflow | Route(s) | Data dependency | Code evidence | Status | Gap |
+|---|---|---|---|---|---|---|
+| Home / market landing | `/`, `/hk`, `/cn` | `productApi.list`, `brandApi.list`, `categoryApi.list` | Routes exist; UKHome/HKHome/Home components exist | PASS-CODE | Browser smoke: visible market copy and CTA links |
+| Browse products + filter | `/products`, `*/products` | `/api/products` + `/api/brands` + `/api/categories` | `ProductList` calls `productApi.list()` with market param; filter controls set searchParams | PASS-CODE | Browser smoke: filter toggle, brand/category/condition select, clear, prev/next pagination |
+| Product detail | `*/products/:id` | `/api/products/:id` | `productApi.getById()`; add to cart → localStorage; buy now → order API | PASS-CODE | Browser smoke: image selector, size select, add to cart toast, buy modal submit |
+| Cart | `*/cart` | localStorage + `/api/orders` | Remove from localStorage; checkout → `orderApi.create()` | PASS-CODE | Browser smoke: remove item, form validation, checkout success navigate |
+| Wishlist | `*/wishlist` | localStorage + `/api/products` | `useWishlist` toggle; product cards from `productApi.list()` | PASS-CODE | Browser smoke: add/remove, move to cart |
+| Orders | `*/orders` | `/api/orders` | `orderApi.list(market, status)`; status filter tabs | PASS-PARTIAL | Browser smoke: status filter tab click, order list load |
+| Admin products | `*/admin` | `/api/products` + `/api/orders` | Route loads without console errors after `limit=50`; add/edit/delete product via `productApi`; order status via `orderApi` | PASS-PARTIAL | Needs interaction smoke for add/edit/delete and visible confirmation behavior |
+| Admin orders | `*/admin` | `/api/orders` | Order status dropdown calls `orderApi.updateStatus()` | PASS-CODE | Browser smoke: status change → API call → visual update |
+| Finance | `*/finance` | `/api/finance` + `/api/finance/stats` | `financeApi` CRUD; quick add income/expense; date filters | PASS-PARTIAL | Browser smoke: create/edit/delete with toast feedback |
+| Inventory | `*/inventory` | **mockStorage (localStorage)** | `InventoryContext` → `inventoryApi` → `mockStorage` | **BLOCKED-DEMO** | Wire to `/api/inventory` or honestly label as local demo |
+| Warehouse admin | `*/admin/warehouse` | **mockStorage (localStorage)** | `useInventory()` → `mockStorage`; password-gated | **BLOCKED-DEMO** | Wire to `/api/inventory` or honestly label as local demo |
+| Support | `*/support` | **mockStorage (localStorage)** | `SupportContext` → `supportApi` → `mockStorage` | **BLOCKED-DEMO** | Wire to `/api/support` or honestly label as local demo |
+| Mobile nav | all markets | React Router + localStorage counts | Header mobile hamburger; Playwright contract test exists | PASS-PARTIAL | Browser smoke: 390px width, Escape close, route click, scroll lock |
+
+### Key blocker: CLOTH Inventory/Support/Warehouse are LOCAL DEMOS
+
+**Confirmed on 2026-05-27 by code inspection:**
+
+- `web/src/api/inventory.ts`: All methods call `inventoryStorage` (localStorage mock), not `/api/inventory`
+- `web/src/api/support.ts`: All methods call `supportStorage` (localStorage mock), not `/api/support`
+- `web/src/contexts/InventoryContext.tsx`: Calls `inventoryApi.list()` → mockStorage
+- `web/src/contexts/SupportContext.tsx`: Calls `supportApi.list()` → mockStorage
+- `web/src/pages/AdminWarehouse.tsx`: Uses `useInventory()` → mockStorage
+
+**Backend smoke tests pass** (`/api/inventory`, `/api/support`) but the **frontend does NOT call them**. The backend exists and works; the frontend is disconnected.
+
+**Two honest options:**
+1. **Wire frontend to backend now** (M2 task): Replace `mockStorage` calls with real `fetch('/api/inventory')` and `fetch('/api/support')`
+2. **Mark as local demo honestly**: Update docs to say Inventory/Support/Warehouse are browser-local demos that persist to localStorage
+
+The backend API is production-ready; the frontend wiring is the gap.
+
+### Subagent findings (2026-05-27) — additional issues
+
+**CONFIRMED BUGS:**
+1. `Inventory.tsx` InboundForm: `unitCost` field in state but **no visible input** — always `undefined` on submit
+2. `AdminWarehouse` In/Out forms: `notes` field in `onSubmit` but **no visible textarea** — always empty string
+3. `Orders.tsx` and `Admin.tsx`: API errors silently swallowed with `catch(() => {})` — **no user-visible error feedback**
+4. `ProductDetail` modal: `×` button close works; backdrop click close works; no other issue
+5. Promo poster download: `poster.html` download button shows browser alert instead of actual file download
+
+**Dead / Non-Functional Controls:**
+- `Inventory.tsx` InboundForm: `unitCost` always undefined (no visible input)
+- `AdminWarehouse` In/Out: `notes` always empty string (no visible textarea)
+- `poster.html` download: shows alert not actual download
+
+**Notable UX issues:**
+- Silent API failures in Orders and Admin pages
+- Inventory/Support/Warehouse: localStorage demo, not real backend
+
+### CLOTH M0-2 acceptance
+
+All routes exist and are reachable. Key gaps:
+- **Inventory / Support / Warehouse**: BLOCKED-DEMO — frontend uses localStorage, not backend API
+- **Admin route load**: PASS — browser smoke passes after `limit=50` fix
+- **Admin delete product**: PASS-PARTIAL — delete handler exists; interaction smoke still needs to verify confirm + feedback
+- **Browser route smoke**: PASS 10/10 primary desktop routes; deeper control-level smoke still needed
+
 ### Immediate CLOTH next tasks
 
-1. Run browser/UI smoke for the mapped routes, not just API tests.
-2. Decide whether Support and Inventory frontend should be API-backed now or honestly marked demo/local-only.
-3. Add/extend UI smoke to cover products, product detail, cart, wishlist, orders, admin, finance, support, inventory, and mobile nav.
-4. Update this file with `PASS / FAIL / BLOCKED / NOT IMPLEMENTED` after live UI verification.
+1. Decide: wire Inventory/Support/Warehouse frontend to real backend API, or honestly label as local demos
+2. Add interaction smoke for product detail, cart checkout, wishlist, admin add/edit/delete, finance create/edit/delete, and mobile nav
+3. Decide whether `window.confirm` is acceptable UX for Admin delete or replace it with visible modal confirmation
+4. Update `cloth.md` after interaction evidence, not just route-load evidence
 
 ## API 路由一覽
 | Route | 檔案 |
@@ -202,6 +348,7 @@ The same core pages exist for UK default, HK, and CN market prefixes:
 | `scripts/product-market-persistence.test.mjs` | P1-B regression test |
 | `scripts/api-validation-errors.test.mjs` | P1-C validation/error handling regression test |
 | `scripts/api-smoke.test.mjs` | P1-D API smoke contracts |
+| `scripts/admin-product-contract.test.mjs` | Admin route/client contract regression |
 
 ## Dev Server
 - URL：http://127.0.0.1:3002/
