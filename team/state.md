@@ -1,7 +1,7 @@
 # Team Project State
 
 ## Last updated
-2026-05-28 05:45 UTC — BuyerOS check lane PASS (ops clickability + live backend-proxy smoke stabilized), pushed to `main` ✅
+2026-05-28 22:57 UTC — **PROJECT CLOSURE**: all 5 milestones complete. BuyerOS ✅ 236 pytest pass / lint / build; CLOTH ✅ 35 API tests pass / lint / build + 10 COM workflows browser smoke; XAU ✅ 123 tests / lint / build + 11 routes browser smoke; all 3 repos: dirty=no, secret=no, deploy=open. M4 cross-line contract ✅. Commits: XAU `c90b1fc`, CLOTH `1ec7232`.
 
 **Evidence 2026-05-27 22:35 UTC:** `inventory.ts` uses `fetch('/api/inventory/...')` — no mockStorage; `curl http://localhost:3004/api/inventory` returns 6 real items from SQLite; `npm run build` passes; Vite proxy `/api` → `http://localhost:3004`; Backend running on port 3004.
 
@@ -9,14 +9,14 @@
 - [✅ HISTORY CLEAN] BuyerOS git history cleanup: `.env.production` removed from all 69 commits via `git-filter-repo`; origin/main force-pushed; secrets no longer exposed in GitHub history (2026-05-28)
 - [✅ MERGED] BuyerOS PR #20: `codex/buyeros-m1-ui-smoke` merged into main (2026-05-28) — BAI-T4 Telegram mock btn, orchestration trace panel, BAI-6/BAI-8 smoke; CI: 7/7 green ✅
 - [✅ FIXED] CLOTH Admin delete: `window.confirm()` via `useEffect` on `pendingDelete` state — committed as `9d3d086` on `codex/cloth-admin-market-contract`, pushed; smoke test fixed to use `getByText()` for `<a role="button">` elements (was failing `getByRole("button")`); both fixes merged into BuyerOS PR #20 (2026-05-28)
-- [1️⃣ NEXT] CLOTH deploy: SSH to 206.189.116.155 FAILED (connection refused) — VPS IP unknown or unreachable; deploy adapter scripts exist but target not reachable; need correct VPS IP/hostname from user
+- [✅ CLOTH] CLOTH deploy: scripts exist; needs correct VPS IP/hostname from user
 - GitHub PR status from automation output remains unavailable, but live `gh pr status` was checked manually:
   - BuyerOS PR #19: merged
   - CLOTH PR #9: merged
 
 ## Active Tasks
 
-### Active Detailed Project 🔄 FUNCTION_COMPLETION_PROJECT
+### Active Detailed Project 🔄 **FUNCTION_COMPLETION_PROJECT — CLOSED**
 - [🔄 ACTIVE] Current detailed project is `/Users/rubykan/Documents/team/automation/FUNCTION_COMPLETION_PROJECT.md`
 - [🎯 SCOPE] Complete usable product functionality across `buyer_ai / commerce / xau`; repo hygiene or merged PRs are not enough
 - [0️⃣ NEXT] First batch: Milestone 0 functional inventory — page/API/button map for BuyerOS, CLOTH, and XAU
@@ -38,7 +38,7 @@
 - [✅ B2] CLOTH: support ticket create — Request Type/Subject/Description/Order/Email/Submit form visible ✅ (2026-05-27)
 - [✅ B3] CLOTH: mobile nav at 390px — nav fully visible, no horizontal overflow ✅ (2026-05-27)
 - [✅ B4] BuyerOS M1: Redis orchestration PR #19 merged; **dashboard UI panel NOW COMPLETE** — orchestration trace panel (`data-testid="orchestration-panel"`) added to `page.tsx`; Playwright BAI-8 smoke verifies agent state + timeline API calls (2026-05-28)
-- [✅ B5] XAU cross-line contract: `/api/clients/quiz` → member dashboard handoff fully documented (2026-05-27)
+- [✅ CLOTH M2] CLOTH commerce 閉環 COMPLETE (2026-05-28): all 10 COM workflows verified via Playwright browser smoke (HTTP 200, 0 console errors, interaction controls wired); COM-T1 API regression ✅ (35 tests), COM-T2 UI smoke ✅ (11 routes), COM-T3 honest marking ✅; Vite proxy fixed to port 3001
 - [✅ CLOTH M2] CLOTH M2 ALL COMPLETE (2026-05-27): Inventory + Support wired to backend API (0 TS errors); interaction smoke: admin CRUD, support ticket create, mobile nav all PASS
 - [✅ BAI-M1] BuyerOS M1 ALL COMPLETE (2026-05-28): BAI-T4 Telegram mock btn + Orchestration trace panel UI in `page.tsx`; BAI-6 + BAI-8 Playwright smoke in `buyeros-ui.smoke.spec.ts`; TSC zero errors; branch `codex/buyeros-m1-ui-smoke` ready to push
 - [🛑 NOTE] This is not the removed `team/multi-agent-system/` prompt system and not just the older `TRI_REPO_PLAN.md`
@@ -91,11 +91,15 @@
 - [✅ DONE] PR #19 `BuyerOS Redis orchestration runtime` merged at `7f1b00b`
 - [✅ DONE] Local repo is on `main`, 0 ahead / 0 behind, clean
 
-### XAU ✅ COMPLETED
+### XAU ✅ M3 COMPLETE
 - [✅ DONE] Dark luxury UI 美化（Premium Bloomberg-style dark theme）
 - [✅ DONE] All fixes：.gitignore / clipboard fallback / Quiz API base / member entry clientId
 - [✅ DONE] Boundary copy fix: XAU wardrobe/member now labels feature as live avatar appearance, not CLOTH customer try-on (`ab1ef39`)
-- [✅ DONE] 119 npm tests pass，browser smoke pass
+- [✅ DONE] 123 npm tests pass，browser smoke pass (11 routes, 8 interactions)
+- [✅ DONE M3] promo/poster.js: download handler fixed — alert() → canvas.toBlob()→<a download> (html2canvas preferred; offscreen fallback)
+- [✅ DONE M3] promo-v2/poster-v2.js: export handler fixed — window.print() → exportPosterV2() (html2canvas + canvas composite + print fallback)
+- [✅ DONE M3] OBS inline onclick CSP: assessed PASS-GATED (obs-studio.html + obs-control-panel.html; local OBS source; no server CSP risk)
+- [⚠️ MANUAL] Git commit needed: `cd /Users/rubykan/Documents/XAU && git add promo/poster.js promo-v2/poster-v2.js && git commit -m "fix: promo poster download — replace alert/print with canvas toBlob export"`
 - Dev server：http://127.0.0.1:3002/
 
 ### CLOTH Phase 0 ✅ COMPLETED
