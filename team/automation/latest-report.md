@@ -1,11 +1,11 @@
 # Automation Report
 
-- Generated: 2026-05-28 07:52 UTC
+- Generated: 2026-05-28 07:53 UTC
 - Dry run: no
 
 | Repo | Status | Dirty | Secret diff | Deploy gate | Blockers |
 |---|---:|---:|---:|---:|---|
-| CLOTH | FAIL | no | no | blocked | - |
+| CLOTH | PASS | yes | no | blocked | dirty working tree blocks deploy |
 
 ## CLOTH
 
@@ -44,7 +44,7 @@ computing gzip size...
 dist/index.html                   0.85 kB │ gzip:  0.52 kB
 dist/assets/index-BEiVVUG5.css   83.80 kB │ gzip: 14.84 kB
 dist/assets/index-BxkHyllk.js   314.30 kB │ gzip: 93.68 kB
-✓ built in 3.23s
+✓ built in 2.44s
 ```
 
 - PASS `lint`: `npm run lint`
@@ -61,157 +61,157 @@ TAP version 13
 # Subtest: Products GET → 200 + array
 ok 1 - Products GET → 200 + array
   ---
-  duration_ms: 45.831791
+  duration_ms: 30.022016
   type: 'test'
   ...
 # Subtest: Products POST → 200 + created with market
 ok 2 - Products POST → 200 + created with market
   ---
-  duration_ms: 141.132387
+  duration_ms: 15.06512
   type: 'test'
   ...
 # Subtest: Products POST missing required → 400
 ok 3 - Products POST missing required → 400
   ---
-  duration_ms: 10.55383
+  duration_ms: 9.456291
   type: 'test'
   ...
 # Subtest: Products market filter finds UK products
 ok 4 - Products market filter finds UK products
   ---
-  duration_ms: 32.306513
+  duration_ms: 12.193361
   type: 'test'
   ...
 # Subtest: Products PUT updates + persists
 ok 5 - Products PUT updates + persists
   ---
-  duration_ms: 29.429696
+  duration_ms: 28.126934
   type: 'test'
   ...
 # Subtest: Products DELETE → soft-deleted (status=已下架)
 ok 6 - Products DELETE → soft-deleted (status=已下架)
   ---
-  duration_ms: 12.673833
+  duration_ms: 14.503246
   type: 'test'
   ...
 # Subtest: Orders GET → 200 + paginated
 ok 7 - Orders GET → 200 + paginated
   ---
-  duration_ms: 5.557026
+  duration_ms: 7.040216
   type: 'test'
   ...
 # Subtest: Orders POST missing productId → 400
 ok 8 - Orders POST missing productId → 400
   ---
-  duration_ms: 9.63616
+  duration_ms: 6.189377
   type: 'test'
   ...
 # Subtest: Orders PUT valid status → 200
 ok 9 - Orders PUT valid status → 200
   ---
-  duration_ms: 8.556589
+  duration_ms: 9.405207
   type: 'test'
   ...
 # Subtest: Finance GET → 200 + array
 ok 10 - Finance GET → 200 + array
   ---
-  duration_ms: 3.016283
+  duration_ms: 2.852091
   type: 'test'
   ...
 # Subtest: Finance GET /stats → 200 + stats object
 ok 11 - Finance GET /stats → 200 + stats object
   ---
-  duration_ms: 2.863823
+  duration_ms: 5.086063
   type: 'test'
   ...
 # Subtest: Finance POST → 200 + created
 ok 12 - Finance POST → 200 + created
   ---
-  duration_ms: 5.032923
+  duration_ms: 7.689195
   type: 'test'
   ...
 # Subtest: Finance POST invalid type → 400
 ok 13 - Finance POST invalid type → 400
   ---
-  duration_ms: 4.820806
+  duration_ms: 4.215565
   type: 'test'
   ...
 # Subtest: Finance DELETE → removed
 ok 14 - Finance DELETE → removed
   ---
-  duration_ms: 11.01279
+  duration_ms: 15.327408
   type: 'test'
   ...
 # Subtest: Inventory GET → 200 + array
 ok 15 - Inventory GET → 200 + array
   ---
-  duration_ms: 5.405994
+  duration_ms: 6.07903
   type: 'test'
   ...
 # Subtest: Inventory GET /stats → 200 + stats
 ok 16 - Inventory GET /stats → 200 + stats
   ---
-  duration_ms: 2.828351
+  duration_ms: 2.820128
   type: 'test'
   ...
 # Subtest: Inventory POST → 200 + created
 ok 17 - Inventory POST → 200 + created
   ---
-  duration_ms: 30.140843
+  duration_ms: 4.387014
   type: 'test'
   ...
 # Subtest: Inventory POST missing sku/productName → 400
 ok 18 - Inventory POST missing sku/productName → 400
   ---
-  duration_ms: 87.540606
+  duration_ms: 3.137707
   type: 'test'
   ...
 # Subtest: Inventory inbound → stock increases
 ok 19 - Inventory inbound → stock increases
   ---
-  duration_ms: 31.069711
+  duration_ms: 9.766421
   type: 'test'
   ...
 # Subtest: Inventory outbound → stock decreases
 ok 20 - Inventory outbound → stock decreases
   ---
-  duration_ms: 9.866323
+  duration_ms: 10.116755
   type: 'test'
   ...
 # Subtest: Inventory outbound insufficient stock → 400
 ok 21 - Inventory outbound insufficient stock → 400
   ---
-  duration_ms: 12.811043
+  duration_ms: 8.249441
   type: 'test'
   ...
 # Subtest: Support tickets GET → 200 + array
 ok 22 - Support tickets GET → 200 + array
   ---
-  duration_ms: 6.125531
+  duration_ms: 5.411854
   type: 'test'
   ...
 # Subtest: Support tickets POST → 200 + ticket with ticketNo
 ok 23 - Support tickets POST → 200 + ticket with ticketNo
   ---
-  duration_ms: 7.79354
+  duration_ms: 4.578262
   type: 'test'
   ...
 # Subtest: Support tickets POST missing required → 400
 ok 24 - Support tickets POST missing required → 400
   ---
-  duration_ms: 14.895176
+  duration_ms: 3.206772
   type: 'test'
   ...
 # Subtest: Support FAQs GET → 200 + array
 ok 25 - Support FAQs GET → 200 + array
   ---
-  duration_ms: 4.302694
+  duration_ms: 5.251742
   type: 'test'
   ...
 # Subtest: Support ticket messages POST → 200
 ok 26 - Support ticket messages POST → 200
   ---
-  duration_ms: 14.930499
+  duration_ms: 6.596706
   type: 'test'
   ...
 1..26
@@ -222,7 +222,7 @@ ok 26 - Support ticket messages POST → 200
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 988.387862
+# duration_ms 460.726323
 ```
 
 - PASS `validation errors`: `node --test scripts/api-validation-errors.test.mjs`
@@ -232,19 +232,19 @@ TAP version 13
 # Subtest: POST routes return 400 JSON for missing required fields
 ok 1 - POST routes return 400 JSON for missing required fields
   ---
-  duration_ms: 284.11006
+  duration_ms: 140.527791
   type: 'test'
   ...
 # Subtest: malformed JSON returns structured JSON instead of HTML or stack trace
 ok 2 - malformed JSON returns structured JSON instead of HTML or stack trace
   ---
-  duration_ms: 66.177378
+  duration_ms: 24.614585
   type: 'test'
   ...
 # Subtest: numeric fields reject invalid values instead of coercing to zero
 ok 3 - numeric fields reject invalid values instead of coercing to zero
   ---
-  duration_ms: 80.496691
+  duration_ms: 43.110038
   type: 'test'
   ...
 1..3
@@ -255,82 +255,17 @@ ok 3 - numeric fields reject invalid values instead of coercing to zero
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 731.64872
+# duration_ms 404.903641
 ```
 
-- FAIL `market persistence`: `node --test scripts/product-market-persistence.test.mjs`
+- PASS `market persistence`: `node --test scripts/product-market-persistence.test.mjs`
 
 ```text
 TAP version 13
 # Subtest: POST /api/products persists market so market filtering can find the product
-not ok 1 - POST /api/products persists market so market filtering can find the product
+ok 1 - POST /api/products persists market so market filtering can find the product
   ---
-  duration_ms: 185.715324
-  type: 'test'
-  location: '/Users/rubykan/Documents/CLOTH/scripts/product-market-persistence.test.mjs:36:1'
-  failureType: 'testCodeFailure'
-  error: |-
-    Expected values to be strictly equal:
-    
-    2 !== 1
-    
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  expected: 1
-  actual: 2
-  operator: 'strictEqual'
-  stack: |-
-    TestContext.<anonymous> (file:///Users/rubykan/Documents/CLOTH/scripts/product-market-persistence.test.mjs:79:12)
-    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
-    async Test.run (node:internal/test_runner/test:1054:7)
-    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
-  ...
-1..1
-# tests 1
-# suites 0
-# pass 0
-# fail 1
-# cancelled 0
-# skipped 0
-# todo 0
-# duration_ms 612.665524
-```
-
-- PASS `products filtering pagination`: `node --test scripts/products-filter-pagination.test.mjs`
-
-```text
-TAP version 13
-# Subtest: products filtering supports market, category, price, search, sort, and pagination
-ok 1 - products filtering supports market, category, price, search, sort, and pagination
-  ---
-  duration_ms: 120.181846
-  type: 'test'
-  ...
-# Subtest: products filtering rejects invalid query params with 400 JSON
-ok 2 - products filtering rejects invalid query params with 400 JSON
-  ---
-  duration_ms: 22.574659
-  type: 'test'
-  ...
-1..2
-# tests 2
-# suites 0
-# pass 2
-# fail 0
-# cancelled 0
-# skipped 0
-# todo 0
-# duration_ms 523.819272
-```
-
-- PASS `mobile nav contract`: `node --test scripts/mobile-nav-contract.test.mjs`
-
-```text
-TAP version 13
-# Subtest: mobile navigation implements the Phase 1 overlay contract
-ok 1 - mobile navigation implements the Phase 1 overlay contract
-  ---
-  duration_ms: 2.479845
+  duration_ms: 100.285118
   type: 'test'
   ...
 1..1
@@ -341,7 +276,55 @@ ok 1 - mobile navigation implements the Phase 1 overlay contract
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 204.286889
+# duration_ms 342.028541
+```
+
+- PASS `products filtering pagination`: `node --test scripts/products-filter-pagination.test.mjs`
+
+```text
+TAP version 13
+# Subtest: products filtering supports market, category, price, search, sort, and pagination
+ok 1 - products filtering supports market, category, price, search, sort, and pagination
+  ---
+  duration_ms: 132.938849
+  type: 'test'
+  ...
+# Subtest: products filtering rejects invalid query params with 400 JSON
+ok 2 - products filtering rejects invalid query params with 400 JSON
+  ---
+  duration_ms: 20.087941
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 400.226234
+```
+
+- PASS `mobile nav contract`: `node --test scripts/mobile-nav-contract.test.mjs`
+
+```text
+TAP version 13
+# Subtest: mobile navigation implements the Phase 1 overlay contract
+ok 1 - mobile navigation implements the Phase 1 overlay contract
+  ---
+  duration_ms: 1.077972
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 182.657063
 ```
 
 - PASS `http api/ui smoke`: `python3 with_server.py --timeout 180 --cwd /Users/rubykan/Documents/CLOTH --command 'cd /Users/rubykan/Documents/CLOTH && PORT=3499 npm run dev --workspace=api' --ready-url http://127.0.0.1:3499/api/health -- python3 smoke_http.py cloth --base-url http://127.0.0.1:3499`
@@ -352,3 +335,5 @@ PASS live readiness: http://127.0.0.1:3499/api/live/readiness
 PASS products pagination: http://127.0.0.1:3499/api/products?limit=3
 PASS support faqs: http://127.0.0.1:3499/api/support/faqs
 ```
+
+- Blockers: dirty working tree blocks deploy
