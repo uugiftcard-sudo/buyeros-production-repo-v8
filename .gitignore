@@ -62,3 +62,7 @@ build/
 */.git
 */*/.git
 */*/*/.git
+
+# ── Playwright / browser automation artifacts ─────────────────────────────────
+.playwright-cli/
+**/.playwright-cli/
