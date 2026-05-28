@@ -85,7 +85,7 @@ def run_command(step: dict[str, Any], dry_run: bool, timeout_seconds: int) -> St
 
     try:
         proc = subprocess.Popen(
-            ["/bin/zsh", "-lc", command],
+            cmd,
             cwd=step.get("cwd"),
             text=True,
             stdout=subprocess.PIPE,

@@ -25,8 +25,8 @@ Finish an evidence-backed benchmark report comparing authorized video face-swap 
 
 ## Browser test results (2026-05-27)
 - Magic Hour: BLOCKED — account has 0 credits; human needs to claim daily 100 free credits or buy credit pack ($10 Starter/4000 credits).
-- GoEnhance AI: BLOCKED — account not logged in; human needs login + 30 free tokens; API requires key+token purchase.
-- DeepSwap: BLOCKED — app page requires login/signup before upload; no output.
+- GoEnhance AI: BLOCKED — clicking upload area opens login dialog (Google or Email + 18+ confirm); Generate button requires 2 tokens per video; human needs to login and claim 30 free tokens.
+- DeepSwap: BLOCKED — clicking upload area redirects to /signin; login/signup required; claims 90%+ similarity, 4K HD, multi-face 6.
 - Akool: TESTED (manual) — weighted=3.64, best so far but watermark + identity<4.
 - RunPod FaceFusion CUDA: GUIDE READY — human needs to execute steps in `rerun_first_gpu_facefusion_guide.md`.
 

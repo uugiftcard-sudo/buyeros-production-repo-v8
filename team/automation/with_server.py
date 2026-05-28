@@ -64,10 +64,23 @@ def main() -> int:
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
+    # Readiness failures are much easier to debug if we surface
+    # the server's stdout/stderr (often includes a stack trace).
+    server_output: list[str] = []
+    assert server.stdout is not None
     try:
         deadline = time.monotonic() + args.timeout
         ready = False
         while time.monotonic() < deadline:
+            # Drain any available server output for later diagnostics.
+            try:
+                if server.stdout is not None:
+                    line = server.stdout.readline()
+                    if line:
+                        server_output.append(line)
+            except Exception:
+                pass
+
             if server.poll() is not None:
                 break
             try:
@@ -83,6 +96,10 @@ def main() -> int:
             print(f"server did not become ready: {args.ready_url}")
             if server.poll() is not None:
                 print(f"server exited with code {server.returncode}")
+            if server_output:
+                print("--- server output (tail) ---")
+                tail = "".join(server_output[-200:])
+                print(redact(tail).rstrip())
             return 1
 
         child_proc = subprocess.run(

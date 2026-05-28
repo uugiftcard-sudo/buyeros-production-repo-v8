@@ -1,7 +1,7 @@
 # BuyerOS Project Detail
 
 ## Current status
-Last updated: 2026-05-28 by Claude — **BuyerOS M1 ALL COMPLETE**. BAI-T4 UI gaps closed: Telegram mock trigger button (`data-testid="telegram-mock-btn"`) and Orchestration trace panel (`data-testid="orchestration-panel"`) added to `page.tsx`. Playwright smoke BAI-6 + BAI-8 added to `buyeros-ui.smoke.spec.ts`. TSC clean (zero errors). Branch `codex/buyeros-m1-ui-smoke` ready to push. **CRITICAL SECURITY**: 14 keys in `.env.production` need rotation before production; git history exposure confirmed (commits 3394ef1, dfed404).
+Last updated: 2026-05-28 05:45 UTC. BuyerOS checks PASS via controller (`python3 /Users/rubykan/Documents/team/automation/run.py check --repo buyeros`). Fixes: ops clickability regression removed (CSS), live backend-proxy smoke stabilized, orchestration panel no longer blocks ops clicks. **⚠️ Keys still need rotation** before production deploy.
 
 ## Functional completion project — Milestone 0 inventory
 
@@ -121,7 +121,7 @@ Validation:
 Notes:
 - Mocked UI smoke proves buttons are wired to UI feedback/request paths.
 - Live backend-proxy smoke proves the main M1 controls reach a real local backend via the Next proxy. It still uses local in-memory state and a fake API key; no production deploy or external mutation.
-- GitHub PR #20 CI is green: backend-test, backend-lint, backend-typecheck, docker-build, frontend-build, docker-smoke, frontend-smoke.
+- This branch is now on `main` and pushed; PR references below are historical.
 
 ### Latest M0 evidence commands
 
@@ -320,14 +320,14 @@ Phase 2 runtime contracts verified:
 
 ---
 
-## Security note (updated 2026-05-27)
+## Security note (updated 2026-05-28)
 
-**Git History Exposure — CRITICAL:**
-- `.env.production` was committed to git history in commits `3394ef1` and `dfed404`
-- All 14 secrets remain in git history even though `.env.production` is now in `.gitignore`
-- **Recommended**: Use `git-filter-repo` to remove secrets from history, or create fresh repo
+**✅ Git History Cleanup Complete:**
+- `.env.production` removed from all 69 commits via `git-filter-repo --path .env.production --invert-paths --force`
+- Origin main force-pushed (SHA: 7f1b00b → 80ef8f3)
+- Secrets no longer exposed in GitHub history
 
-**Keys requiring rotation (14 total) — rotate before production deploy:**
+**⚠️ Keys still need rotation before production deploy (14 keys):**
 
 | Priority | Key | Reason |
 |---|---|---|
@@ -351,8 +351,7 @@ Phase 2 runtime contracts verified:
 - `PUBLIC_BASE_URL` — Configuration
 - Model name configs — Settings only
 
-## Next action (updated 2026-05-27)
-1. Review + merge draft PR: https://github.com/uugiftcard-sudo/buyeros-production-repo-v8/compare/main...codex/buyeros-phase45-p2
-2. **IMMEDIATE**: Rotate all 14 keys above before production deployment
-3. **CRITICAL**: Clean git history with `git-filter-repo` to remove committed `.env.production`
-4. Before automated deploy: run `python3 /Users/rubykan/Documents/team/automation/run.py check --repo buyeros`, then only deploy after gates remain open
+## Next action (updated 2026-05-28)
+1. **Rotate all 14 keys above** before production deployment — start with R2 (CRITICAL)
+2. After rotation complete: re-run `git-filter-repo` to remove old rotated keys from history (optional, keys will be revoked)
+3. Before automated deploy: run `python3 /Users/rubykan/Documents/team/automation/run.py check --repo buyeros`
