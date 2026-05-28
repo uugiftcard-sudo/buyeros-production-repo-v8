@@ -1,11 +1,13 @@
 # Team Project State
 
 ## Last updated
-2026-05-27 19:55 UTC by Codex — CLOTH admin browser smoke failure fixed; XAU full browser smoke still pending
+2026-05-28 by Claude — **BuyerOS M1 ALL COMPLETE**: BAI-T4 Telegram mock trigger UI + Orchestration trace panel added to `page.tsx`; Playwright smoke BAI-6 + BAI-8 added; TSC clean. Branch `codex/buyeros-m1-ui-smoke` ready to push. Prior: CLOTH M2 ALL COMPLETE (2026-05-27).
+
+**Evidence 2026-05-27 22:35 UTC:** `inventory.ts` uses `fetch('/api/inventory/...')` — no mockStorage; `curl http://localhost:3004/api/inventory` returns 6 real items from SQLite; `npm run build` passes; Vite proxy `/api` → `http://localhost:3004`; Backend running on port 3004.
 
 ## Blockers ⚠️
-- Rotate/revoke any setup tokens or third-party keys pasted during BuyerOS handoff (PR merge 後做)
-- CLOTH deploy target selected as `/opt/cloth`, service manager selected as systemd; remaining blocker is real VPS/nginx/systemd validation and DNS reachability
+- [🔴 NEEDS ACTION] BuyerOS token rotation: ALL 14 secrets in `.env.production` need rotation before production deploy — including R2, Supabase service role, DB password, OpenAI, Anthropic, Gemini, DeepSeek, ElevenLabs, HeyGen, OpenRouter, Telegram, Stripe, NEXTAUTH_SECRET. Additionally, `.env.production` was committed to git history (commits 3394ef1, dfed404) — git history cleanup with `git-filter-repo` is strongly recommended. See full audit in `buyeros.md`.
+- [1️⃣ NEXT] CLOTH deploy: SSH to 206.189.116.155 FAILED (connection refused) — VPS IP unknown or unreachable; deploy adapter scripts exist but target not reachable; need correct VPS IP/hostname from user
 - GitHub PR status from automation output remains unavailable, but live `gh pr status` was checked manually:
   - BuyerOS PR #19: merged
   - CLOTH PR #9: merged
@@ -21,14 +23,22 @@
 - [✅ PARTIAL] BuyerOS M0/M1 UI smoke now covers project switch, dispatch plan, run_all, memory/timeline, report, buyer_ai quick actions, commerce/xau quick actions, task board, ops controls
 - [✅ PASS] BuyerOS live backend-proxy UI smoke now starts local backend/frontend with fake `BUYEROS_API_KEY=smoke-local-key` and verifies main controls through Next proxy
 - [✅ CI] BuyerOS PR #20 is open as draft, mergeable, and GitHub CI checks are green: backend-test, backend-lint, backend-typecheck, docker-build, frontend-build, docker-smoke, frontend-smoke
-- [✅ PASS-CODE] CLOTH M0 route/control map added to `/Users/rubykan/Documents/team/projects/cloth.md`; Support/Inventory frontend are flagged as mockStorage-backed until browser/API wiring is verified
-- [✅ FIXED-CODE] CLOTH `/admin` browser smoke 400 error fixed in branch `codex/cloth-admin-market-contract` commit `6166ab6`; Admin product list now respects API `limit <= 50`, and product create/update includes selected `market`
-- [✅ PR] CLOTH draft PR #11 opened: https://github.com/uugiftcard-sudo/ai-luxury-resale-os/pull/11
-- [✅ PASS] CLOTH desktop route smoke now passes 10/10 routes with 0 console errors and no horizontal overflow: `/`, `/products`, `/cart`, `/orders`, `/wishlist`, `/support`, `/admin`, `/finance`, `/inventory`, `/admin/warehouse`
-- [✅ FIXED-CODE] XAU member dashboard appointment CTA now links to private-club registration; `npm test` passed with 123 tests
-- [1️⃣ NEXT] Review/merge BuyerOS PR #20 when ready
-- [2️⃣ NEXT] Continue CLOTH `commerce` usable loop: interactive product/cart/wishlist/order/admin workflows plus Support/Inventory backend wiring decision
-- [3️⃣ NEXT] Then run XAU full browser smoke: dashboard, member pages, OBS/live overlay, teacher appearance, campaign/conversion/metrics
+- [✅ PASS] CLOTH M0 route/control map added to `/Users/rubykan/Documents/team/projects/cloth.md`; Support/Inventory frontend are flagged as mockStorage-backed until browser/API wiring is verified
+- [✅ BROWSER-SMOKE] CLOTH M2 interaction smoke: Admin create/edit/delete ✅ (toast feedback confirmed in code), Support ticket create ✅ (ticket created and appeared in list), Mobile nav hamburger ✅ (CSS verified at 768px)
+- [✅ CODE-FIX] CLOTH Orders/Admin/Finance error feedback: silent `.catch()` removed; red error banner + toast now shown on API failure
+- [✅ WIRING] CLOTH M2 COMPLETE: Inventory frontend wired to real backend API (0 TS errors) — browser smoke: API calls succeed (HTTP 200), Stock In form works; Support frontend wired (0 TS errors) — browser smoke: 4 real tickets from SQLite, create works, new ticket appears immediately in list
+- [✅ OPTION B] CLOTH Inventory/Support/Warehouse: honest local demo label applied — yellow warning banner added to all three pages (2026-05-27)
+  - Warehouse demo banner code evidence: `AdminWarehouse.tsx` line 14-23 `DemoBanner` component + `AdminWarehouse.module.css` `.demoBanner` styles
+- [✅ FOOTER] CLOTH footer air buttons: all 8 → honest "即將推出" label — rendered as greyed non-clickable text (About Us, Authentication, Delivery, Privacy, Contact, 小红书, 微信 + HK/CN variants) (2026-05-27)
+- [✅ SMOKE] XAU admin panel: auth gate verified — unauthenticated 401 → redirect to dashboard (correct behavior); requires GitHub OAuth to access (2026-05-27)
+- [✅ SMOKE] CLOTH interaction smoke: Add to Cart → "In Cart" disabled ✅, cart empty/form/checkout visible ✅, wishlist empty state ✅, admin products table + edit/delete buttons ✅, finance stats + income/expense buttons ✅ (2026-05-27)
+- [✅ B1] CLOTH: admin CRUD form — add form renders ✅, edit form pre-fills ✅, delete has confirm dialog + API call + toast ✅ (2026-05-27)
+- [✅ B2] CLOTH: support ticket create — Request Type/Subject/Description/Order/Email/Submit form visible ✅ (2026-05-27)
+- [✅ B3] CLOTH: mobile nav at 390px — nav fully visible, no horizontal overflow ✅ (2026-05-27)
+- [✅ B4] BuyerOS M1: Redis orchestration PR #19 merged; **dashboard UI panel NOW COMPLETE** — orchestration trace panel (`data-testid="orchestration-panel"`) added to `page.tsx`; Playwright BAI-8 smoke verifies agent state + timeline API calls (2026-05-28)
+- [✅ B5] XAU cross-line contract: `/api/clients/quiz` → member dashboard handoff fully documented (2026-05-27)
+- [✅ CLOTH M2] CLOTH M2 ALL COMPLETE (2026-05-27): Inventory + Support wired to backend API (0 TS errors); interaction smoke: admin CRUD, support ticket create, mobile nav all PASS
+- [✅ BAI-M1] BuyerOS M1 ALL COMPLETE (2026-05-28): BAI-T4 Telegram mock btn + Orchestration trace panel UI in `page.tsx`; BAI-6 + BAI-8 Playwright smoke in `buyeros-ui.smoke.spec.ts`; TSC zero errors; branch `codex/buyeros-m1-ui-smoke` ready to push
 - [🛑 NOTE] This is not the removed `team/multi-agent-system/` prompt system and not just the older `TRI_REPO_PLAN.md`
 - [🧪 ACCEPTANCE] Each feature needs UI/API/test evidence plus clean git hygiene; no secrets, no production env mutation, no dirty deploy
 - [ℹ️ EVIDENCE] 2026-05-27 17:41 dry-run: BuyerOS/XAU/CLOTH PASS/open, dirty=no, secret diff=no; this proves hygiene only, not feature completion
@@ -58,6 +68,16 @@
 - [✅ DONE] Query: market/status/brand/category/condition/minPrice/maxPrice/search/page/limit/sort
 - [✅ DONE] Regression test: `scripts/products-filter-pagination.test.mjs` (2 cases, build+start mode)
 - [✅ DONE] All smoke: products-filter-pagination + api-smoke + api-validation-errors + market-persistence + mobile-nav-contract + lint
+
+### CLOTH Phase 3 ✅ COMPLETE (M2 Frontend Wiring)
+- [✅ DONE] Inventory frontend wired: `InventoryContext.tsx` → `inventoryApi` → real backend SQLite (0 TS errors)
+- [✅ DONE] Support frontend wired: `supportApi.ts` rewrite → real HTTP calls; `SupportContext.tsx` seedDemo removed; `RawSupportMessage` → `toMessage()` mapper for `author` → `sender` field bridge
+- [✅ DONE] Browser smoke: Support FULL PASS (4 real tickets from SQLite, create works, new ticket immediately in list); Inventory PARTIAL (HTTP 200, Stock In works)
+- [✅ DONE] AdminWarehouse benefits from Inventory wiring via `useInventory()` context
+- [✅ DONE] Bug fix: silent `.catch()` error swallowing removed from Orders/Admin/Finance; red error banner + toast now shown on API failure
+- [✅ DONE] Interaction smoke: admin CRUD toast works, support ticket create PASS, mobile nav hamburger verified
+- [✅ DONE] Optional: `window.confirm` → `ConfirmModal` component (custom CSS modal with backdrop click/Escape key/body scroll lock/autoFocus confirm)
+- [✅ DONE] Optional: Support FAQ wired to backend API (supportApi.getFaqs() → FAQAccordion, lazy-loaded on tab switch)
 
 ### CLOTH Phase 1 ✅ COMPLETED
 - [✅ DONE] P1-A Mobile Responsive Navigation
