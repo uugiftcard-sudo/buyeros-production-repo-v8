@@ -1549,12 +1549,14 @@ export default function DashboardPage() {
           )}
         </section>
 
-        <section className="panel ops-panel" id="orchestration" data-testid="orchestration-panel">
-          <div className="panel-title">
-            <span className="panel-icon icon-sop" />
-            <div>
-              <p className="section-kicker">Orchestration</p>
-              <h2>Agent 狀態 &amp; Trace</h2>
+        <section className="panel ops-panel" id="orchestration" data-testid="orchestration-panel" style={{ pointerEvents: "none" }}>
+          <div style={{ pointerEvents: "auto" }}>
+            <div className="panel-title">
+              <span className="panel-icon icon-sop" />
+              <div>
+                <p className="section-kicker">Orchestration</p>
+                <h2>Agent 狀態 &amp; Trace</h2>
+              </div>
             </div>
           </div>
           <div className="sop-list">
