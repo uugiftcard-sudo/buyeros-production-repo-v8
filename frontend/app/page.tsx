@@ -344,6 +344,8 @@ export default function DashboardPage() {
   const [uiTheme, setUiTheme] = useState<UiTheme>("ops");
   const [mounted, setMounted] = useState(false);
   const [pendingActions, setPendingActions] = useState<Record<string, number>>({});
+  const [orchAgentId, setOrchAgentId] = useState("hermes");
+  const [orchTrace, setOrchTrace] = useState<{ agentState: unknown; timeline: unknown[] } | null>(null);
   const [actionEvents, setActionEvents] = useState<ActionEvent[]>([
     { id: "init", label: "系統已載入", status: "等待操作", createdAt: "2026-01-01T00:00:00.000Z" }
   ]);
@@ -459,6 +461,21 @@ export default function DashboardPage() {
       markPendingAction(label, -1);
       setLoading(false);
     }
+  }
+
+  async function loadOrchestrationTrace(agentId: string) {
+    const agentData = await callApi(`/api/v1/orchestration/agent/${encodeURIComponent(agentId)}`, {}, "Orchestration Agent State", { muteResult: true });
+    // Generate a trace_id from agent state if available
+    const traceId = (agentData && typeof agentData === "object" && "trace_id" in agentData)
+      ? (agentData as { trace_id?: string }).trace_id
+      : agentId;
+    const timelineData = await callApi(`/api/v1/orchestration/trace/${encodeURIComponent(traceId ?? agentId)}/timeline`, {}, "Orchestration Timeline", { muteResult: true });
+    const timelineItems = (timelineData && typeof timelineData === "object" && "events" in timelineData)
+      ? ((timelineData as { events?: unknown[] }).events ?? [])
+      : Array.isArray(timelineData) ? timelineData : [];
+    setOrchTrace({ agentState: agentData, timeline: timelineItems });
+    setResult({ label: `Orchestration: ${agentId}`, data: { agentState: agentData, timeline: timelineItems } });
+    recordAction("Orchestration Trace", `已載入 agent ${agentId}`);
   }
 
   async function loadTasks({ muteResult = false } = {}) {
@@ -1315,6 +1332,20 @@ export default function DashboardPage() {
                   <button type="button" className="secondary slim" disabled={actionBusy("重試記錄")} onClick={() => runWorkspaceAction("retry")}>
                     {actionBusy("重試記錄") ? "記錄中..." : "重試記錄"}
                   </button>
+                  <button
+                    type="button"
+                    className="secondary slim"
+                    data-testid="telegram-mock-btn"
+                    disabled={actionBusy("Telegram Mock")}
+                    onClick={() =>
+                      callApi("/telegram/webhook", {
+                        method: "POST",
+                        body: JSON.stringify({ message: { chat: { id: 0, type: "private" }, from: { id: 0, first_name: "MockUser", is_bot: false }, text: "/status", message_id: 1, date: Math.floor(Date.now() / 1000) } })
+                      }, "Telegram Mock")
+                    }
+                  >
+                    {actionBusy("Telegram Mock") ? "發送中..." : "Telegram Mock (/status)"}
+                  </button>
 	                </>
 	              ) : null}
 	              {project === "commerce" ? (
@@ -1516,6 +1547,66 @@ export default function DashboardPage() {
           ) : (
             <p className="hint">備份、部署、Rollback 會放在這裡，不跟專案功能混在一起。</p>
           )}
+        </section>
+
+        <section className="panel ops-panel" id="orchestration" data-testid="orchestration-panel">
+          <div className="panel-title">
+            <span className="panel-icon icon-sop" />
+            <div>
+              <p className="section-kicker">Orchestration</p>
+              <h2>Agent 狀態 &amp; Trace</h2>
+            </div>
+          </div>
+          <div className="sop-list">
+            <label htmlFor="orch-agent-id" style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+              <span style={{ whiteSpace: "nowrap", fontSize: "0.85rem" }}>Agent ID</span>
+              <input
+                id="orch-agent-id"
+                data-testid="orch-agent-id"
+                type="text"
+                value={orchAgentId}
+                onChange={(e) => setOrchAgentId(e.target.value)}
+                placeholder="hermes"
+                style={{ flex: 1, padding: "0.25rem 0.5rem", borderRadius: 4, border: "1px solid var(--border, #444)", background: "transparent", color: "inherit" }}
+              />
+            </label>
+            <a
+              className="ops-link-button"
+              role="button"
+              data-testid="orch-load-btn"
+              href={`${normalizedProxyUrl}/api/v1/orchestration/agent/${encodeURIComponent(orchAgentId)}`}
+              target="ops-result-frame"
+              onClick={(e) => { e.preventDefault(); void loadOrchestrationTrace(orchAgentId); }}
+            >
+              載入 Agent Trace
+            </a>
+          </div>
+          <div className="ops-result-card" aria-live="polite" data-testid="orch-result">
+            {orchTrace ? (
+              <>
+                <div className="row">
+                  <span>Agent 狀態</span>
+                  <strong>{orchAgentId}</strong>
+                </div>
+                <pre style={{ maxHeight: 200, overflow: "auto" }}>{JSON.stringify(orchTrace.agentState, null, 2)}</pre>
+                <div className="row" style={{ marginTop: "0.75rem" }}>
+                  <span>Timeline 事件</span>
+                  <strong>{orchTrace.timeline.length} 筆</strong>
+                </div>
+                {orchTrace.timeline.length > 0 ? (
+                  <pre style={{ maxHeight: 200, overflow: "auto" }}>{JSON.stringify(orchTrace.timeline, null, 2)}</pre>
+                ) : (
+                  <p className="muted" style={{ marginTop: "0.4rem" }}>
+                    {(orchTrace.agentState && typeof orchTrace.agentState === "object" && "detail" in orchTrace.agentState)
+                      ? "Redis not configured — local fallback active"
+                      : "尚無 timeline 事件"}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="muted">輸入 Agent ID 後點「載入 Agent Trace」查看 Redis orchestration 狀態與 trace timeline。</p>
+            )}
+          </div>
         </section>
       </section>
 

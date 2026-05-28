@@ -24,3 +24,4 @@ frontend/playwright-report/
 infra/ops_runs/
 infra/.smoke_*_pid
 infra/*smoke*.log
+.old_keys_backup.txt
