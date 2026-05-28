@@ -680,6 +680,10 @@ p {
   padding: 16px;
 }
 
+.panel * {
+  pointer-events: auto;
+}
+
 .panel-large {
   grid-column: auto;
 }
