@@ -87,8 +87,8 @@ class HsbcHkCsvParser:
                 d = _parse_date_ddmmyyyy(str(row.get(col_tx_date, "")))
             desc = str(row.get(col_desc, "") or "").strip() or "(no description)"
 
-            debit_minor = _to_minor(str(row.get(col_debit, ""))) if col_debit else None
-            credit_minor = _to_minor(str(row.get(col_credit, ""))) if col_credit else None
+            debit_minor = _to_minor(str(row.get(col_debit, "")), currency=currency) if col_debit else None
+            credit_minor = _to_minor(str(row.get(col_credit, "")), currency=currency) if col_credit else None
             bal_minor = _to_minor(str(row.get(col_balance, "")), currency=currency) if col_balance else None
 
             amount_minor: Optional[int] = None

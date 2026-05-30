@@ -188,21 +188,35 @@ class BankImportService:
         period_start = min(dates)
         period_end = max(dates)
 
+        deposit_total = sum(t.get("amount", 0) for t in transactions if t.get("amount", 0) > 0)
+        withdraw_total = sum(abs(t.get("amount", 0)) for t in transactions if t.get("amount", 0) < 0)
+
         statement_payload: Dict[str, Any] = {
             "statement_id": statement_id,
             "team_id": team_id,
             "buyer_id": buyer_id,
+            "date": period_end,
             "bank_code": bank_code,
             "account_id": account_id,
             "currency": currency,
             "period_start": period_start,
             "period_end": period_end,
+            "total_deposits_hkd": deposit_total,
+            "deposit_count": sum(1 for t in transactions if t.get("amount", 0) > 0),
+            "total_withdrawals_hkd": withdraw_total,
+            "withdrawal_count": sum(1 for t in transactions if t.get("amount", 0) < 0),
+            "opening_balance_hkd": None,
+            "closing_balance_hkd": None,
+            "raw_entry_count": len(transactions),
+            "raw_text": raw_text[:10000] if raw_text else None,
             "imported_at": now,
             "import_source": source,
             "reference": reference,
             "file_hash": digest,
             "status": "imported",
-            "raw_text": raw_text,
+            "source": source,
+            "uploaded_by": None,
+            "created_at": now,
         }
 
         self.supabase.table("bank_statements").insert(statement_payload).execute()
@@ -212,17 +226,19 @@ class BankImportService:
             tx_id = f"tx-{uuid.uuid4().hex[:12]}"
             tx_rows.append(
                 {
-                    "transaction_id": tx_id,
+                    "transaction_ref": f"tx-{uuid.uuid4().hex[:12]}",
                     "statement_id": statement_id,
                     "team_id": team_id,
                     "buyer_id": buyer_id,
                     "date": t.get("date"),
                     "description": (t.get("description") or "")[:500],
-                    "amount": t.get("amount"),
-                    "currency": t.get("currency") or currency,
-                    "balance": t.get("balance"),
-                    "reference": t.get("reference"),
+                    "transaction_type": None,
+                    "amount_hkd": t.get("amount"),
+                    "balance_after_hkd": t.get("balance"),
+                    "category": None,
                     "is_reconciled": False,
+                    "reconciled_by": None,
+                    "reconciled_at": None,
                     "created_at": now,
                 }
             )
