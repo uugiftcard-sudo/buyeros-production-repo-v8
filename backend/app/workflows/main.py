@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
@@ -84,6 +84,10 @@ from ..schemas.state import (
     TaskRunAllRequest,
     TaskRunRequest,
     TaskStatusRequest,
+    ReceiptScanRequest,
+    ReconCompareRequest,
+    RefundCardVerifyRequest,
+    BankImportCsvRequest,
 )
 from ..runtime.session_store import RedisSessionStore
 from ..security import require_api_key
@@ -97,6 +101,12 @@ from ..services.task_board_service import TaskBoardService
 from ..services.task_dispatcher_service import TaskDispatcherService
 from ..services.xau_integration import XAUIntegration
 from ..services.cloth_integration import CLOTHIntegration
+from ..services.receipt_vision_service import ReceiptVisionService
+from ..services.recon_store import ReconStore
+from ..services.bank_import_service import BankImportService
+from ..services.telegram_commands import parse_telegram_command
+from ..services.admin_dashboard import render_admin_page, render_kv_card, render_table_card
+from ..services.expense_service import ExpenseService, VALID_CATEGORIES, VALID_STATUSES
 from ..workflows.buyeros_graph import BuyerOSGraphWorkflow
 
 logger = logging.getLogger(__name__)
@@ -426,6 +436,9 @@ def create_app() -> FastAPI:
     project_registry = ProjectRegistryService(memory_store)
     timeline_service = MemoryTimelineService(memory_store)
     ops_status_service = OpsStatusService()
+    receipt_vision = ReceiptVisionService()
+    recon_store = ReconStore()
+    bank_import = BankImportService()
 
     # Setup tool registry and register tools
     tool_registry = ToolRegistry()
@@ -524,8 +537,14 @@ def create_app() -> FastAPI:
     app.state.timeline_service = timeline_service
     app.state.dispatcher_service = dispatcher_service
     app.state.ops_status_service = ops_status_service
+    app.state.receipt_vision = receipt_vision
+    app.state.recon_store = recon_store
+    app.state.bank_import = bank_import
     app.state.orders_service = orders_service
     app.state.buyers_service = buyers_service
+
+    expense_service = ExpenseService()
+    app.state.expense_service = expense_service
 
     @app.on_event("startup")
     async def _startup_orchestration() -> None:
@@ -557,7 +576,58 @@ def create_app() -> FastAPI:
         if not chat_id or not text:
             return JSONResponse(content={"ok": True})
         user_id = str(chat_id)
-        response_text = workflow.handle_message(user_id=user_id, message=text, channel="telegram", session_id=user_id)
+
+        # Prefer explicit recon commands over intent routing.
+        cmd = parse_telegram_command(text)
+        if cmd:
+            name, args = cmd
+            try:
+                if name == "scan":
+                    if not args.get("image_url") or not args.get("buyer_id"):
+                        response_text = "用法：/scan <image_url> buyer=<id> team=<id?> decl=<id?> date=<YYYY-MM-DD?>"
+                    else:
+                        result = await recon_receipt_scan(ReceiptScanRequest(**args))
+                        if result.get("ok"):
+                            response_text = (
+                                f"已掃描\nscan_id={result.get('scan_id')}\nitems={result.get('items_count')}\n"
+                                f"total_hkd={result.get('total_amount_hkd')}\nmodel={result.get('model')}"
+                            )
+                        else:
+                            response_text = f"掃描失敗：{result.get('error') or 'unknown_error'}"
+
+                elif name == "compare":
+                    if not args.get("declaration_id") or not args.get("scan_id") or not args.get("buyer_id"):
+                        response_text = "用法：/compare decl=<id> scan=<id> buyer=<id> team=<id?> threshold=<0.72?> date=<YYYY-MM-DD?>"
+                    else:
+                        # Parse threshold if present
+                        if args.get("threshold") is not None:
+                            try:
+                                args["threshold"] = float(args["threshold"])  # type: ignore
+                            except Exception:
+                                args["threshold"] = 0.72
+                        result = await recon_compare(ReconCompareRequest(**args))
+                        response_text = (
+                            f"對照完成\ncmp_id={result.get('comparison_id')}\n"
+                            f"risk={result.get('risk_level')}\nflags={','.join(result.get('risk_flags') or [])}\n"
+                            f"diff_hkd={result.get('diff_hkd')}\nmatched={((result.get('stats') or {}).get('matched_count'))}"
+                        )
+
+                elif name == "refundcard":
+                    if not args.get("return_id") or not args.get("refund_card_last4"):
+                        response_text = "用法：/refundcard return=<id> last4=<1234> buyer=<id?> team=<id?>"
+                    else:
+                        result = await refund_card_verify(RefundCardVerifyRequest(**args))
+                        response_text = (
+                            f"卡號核對\nver_id={result.get('verification_id')}\nmatch={result.get('card_match')}\n"
+                            f"risk={result.get('risk_level')}\nflags={','.join(result.get('risk_flags') or [])}"
+                        )
+
+                else:
+                    response_text = "未知指令。"
+            except Exception as exc:
+                response_text = f"指令執行錯誤：{exc}"
+        else:
+            response_text = workflow.handle_message(user_id=user_id, message=text, channel="telegram", session_id=user_id)
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         if bot_token:
             send_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -695,9 +765,589 @@ def create_app() -> FastAPI:
         )
         return {"ok": True, **summary}
 
-    @app.get("/context/session/{session_id}", dependencies=[Depends(require_api_key)])
-    async def context_session(session_id: str) -> Dict[str, Any]:
-        """Return shared context for a specific session."""
+    @app.post("/recon/receipt/scan", dependencies=[Depends(require_api_key)], tags=["Recon"])
+    async def recon_receipt_scan(payload: ReceiptScanRequest) -> Dict[str, Any]:
+        """Extract receipt items via OpenRouter Vision and persist to Supabase."""
+        if not receipt_vision.configured():
+            raise HTTPException(status_code=400, detail="OPENROUTER_API_KEY not configured")
+        if not recon_store.configured():
+            raise HTTPException(status_code=400, detail="SUPABASE_URL/SUPABASE_KEY not configured")
+
+        vision = receipt_vision.extract_receipt(
+            image_url=payload.image_url,
+            scan_id=payload.scan_id,
+            receipt_date=payload.date,
+        )
+        if not vision.ok:
+            audit_logger.log(
+                action="recon.receipt_scan.failed",
+                actor="api",
+                details={"buyer_id": payload.buyer_id, "error": vision.error, "scan_id": vision.scan_id},
+            )
+            return {"ok": False, "scan_id": vision.scan_id, "error": vision.error, "provider": vision.provider, "model": vision.model}
+
+        scan_date = payload.date or (vision.date or datetime.now(timezone.utc).date().isoformat())
+        # Insert scan row
+        recon_store.insert_receipt_scan(
+            scan_id=vision.scan_id,
+            buyer_id=payload.buyer_id,
+            team_id=payload.team_id,
+            declaration_id=payload.declaration_id,
+            scan_date=scan_date,
+            image_url=payload.image_url,
+            raw_text=None,
+            total_amount_hkd=vision.total_amount_hkd,
+            ai_provider=vision.provider,
+            ai_confidence=None,
+            ai_model=vision.model,
+            raw=vision.raw,
+        )
+        # Insert items
+        items_payload = [
+            {
+                "item_name": it.item_name,
+                "quantity": it.quantity,
+                "unit_price_hkd": it.unit_price_hkd,
+                "subtotal_hkd": it.subtotal_hkd,
+                "ai_confidence": it.ai_confidence,
+            }
+            for it in vision.items
+        ]
+        recon_store.insert_receipt_items(scan_id=vision.scan_id, items=items_payload)
+
+        audit_logger.log(
+            action="recon.receipt_scan.completed",
+            actor="api",
+            details={
+                "buyer_id": payload.buyer_id,
+                "team_id": payload.team_id,
+                "declaration_id": payload.declaration_id,
+                "scan_id": vision.scan_id,
+                "items": len(items_payload),
+                "total_amount_hkd": vision.total_amount_hkd,
+            },
+        )
+
+        return {
+            "ok": True,
+            "scan_id": vision.scan_id,
+            "date": scan_date,
+            "merchant": vision.merchant,
+            "currency": vision.currency,
+            "total_amount_hkd": vision.total_amount_hkd,
+            "items_count": len(items_payload),
+            "model": vision.model,
+        }
+
+    @app.post("/recon/compare", dependencies=[Depends(require_api_key)], tags=["Recon"])
+    async def recon_compare(payload: ReconCompareRequest) -> Dict[str, Any]:
+        """Compare a declaration and a receipt scan into item_comparisons (MVP fuzzy match)."""
+        if not recon_store.configured():
+            raise HTTPException(status_code=400, detail="SUPABASE_URL/SUPABASE_KEY not configured")
+
+        declared_items = recon_store.fetch_declaration_items(declaration_id=payload.declaration_id)
+        scanned_items = recon_store.fetch_receipt_items(scan_id=payload.scan_id)
+        if not declared_items:
+            raise HTTPException(status_code=404, detail="declaration_items not found")
+        if not scanned_items:
+            raise HTTPException(status_code=404, detail="receipt_items not found")
+
+        from ..services.recon_matching import match_items
+
+        match = match_items(
+            declared=declared_items,
+            scanned=scanned_items,
+            threshold=payload.threshold,
+        )
+
+        declared_total = sum(int(it.get("subtotal_hkd") or 0) for it in declared_items)
+        scanned_total = sum(int(it.get("subtotal_hkd") or 0) for it in scanned_items)
+        diff = scanned_total - declared_total
+
+        has_missing = match["stats"]["missing_declared_count"] > 0
+        has_undeclared = match["stats"]["undeclared_scanned_count"] > 0
+        has_mismatch = match["stats"]["mismatched_count"] > 0
+        all_matched = (not has_missing) and (not has_undeclared) and (not has_mismatch)
+
+        risk_flags = []
+        if has_missing:
+            risk_flags.append("missing_declared_items")
+        if has_undeclared:
+            risk_flags.append("undeclared_scanned_items")
+        if has_mismatch:
+            risk_flags.append("price_or_quantity_mismatch")
+        if abs(diff) >= 5000:  # HKD 50
+            risk_flags.append("total_diff_over_hkd_50")
+
+        risk_level = "low"
+        if has_undeclared or has_missing:
+            risk_level = "medium"
+        if has_undeclared and abs(diff) >= 20000:
+            risk_level = "high"
+
+        comparison_id = f"cmp-{uuid.uuid4().hex[:12]}"
+        compare_date = payload.date or datetime.now(timezone.utc).date().isoformat()
+
+        comparison_payload = {
+            "comparison_id": comparison_id,
+            "declaration_id": payload.declaration_id,
+            "scan_id": payload.scan_id,
+            "buyer_id": payload.buyer_id,
+            "team_id": payload.team_id,
+            "date": compare_date,
+
+            "has_missing_items": has_missing,
+            "has_undeclared_items": has_undeclared,
+            "has_extra_items": False,
+            "has_price_mismatch": has_mismatch,
+            "has_quantity_mismatch": has_mismatch,
+            "has_unmatched_declared": has_missing,
+            "all_matched": all_matched,
+
+            "declared_total_hkd": declared_total,
+            "scanned_total_hkd": scanned_total,
+            "price_difference_hkd": diff,
+
+            "missing_items": match["missing_declared"],
+            "undeclared_items": match["undeclared_scanned"],
+            "mismatched_items": match["mismatched"],
+
+            "risk_level": risk_level,
+            "risk_flags": risk_flags,
+
+            "status": "pending",
+        }
+
+        recon_store.insert_item_comparison(payload=comparison_payload)
+
+        audit_logger.log(
+            action="recon.compare.completed",
+            actor="api",
+            details={
+                "comparison_id": comparison_id,
+                "buyer_id": payload.buyer_id,
+                "team_id": payload.team_id,
+                "declaration_id": payload.declaration_id,
+                "scan_id": payload.scan_id,
+                "risk_level": risk_level,
+                "flags": risk_flags,
+            },
+        )
+
+        return {
+            "ok": True,
+            "comparison_id": comparison_id,
+            "risk_level": risk_level,
+            "risk_flags": risk_flags,
+            "declared_total_hkd": declared_total,
+            "scanned_total_hkd": scanned_total,
+            "diff_hkd": diff,
+            "stats": match["stats"],
+        }
+
+    @app.post("/recon/refund-card/verify", dependencies=[Depends(require_api_key)], tags=["Recon"])
+    async def refund_card_verify(payload: RefundCardVerifyRequest) -> Dict[str, Any]:
+        """Verify refund card last4 against buyer registered cards and persist verification."""
+        if not recon_store.configured():
+            raise HTTPException(status_code=400, detail="SUPABASE_URL/SUPABASE_KEY not configured")
+
+        ret = recon_store.fetch_return(return_id=payload.return_id)
+        if not ret:
+            raise HTTPException(status_code=404, detail="return not found")
+
+        buyer_id = payload.buyer_id or str(ret.get("buyer_id") or "")
+        if not buyer_id:
+            raise HTTPException(status_code=400, detail="buyer_id missing")
+
+        team_id = payload.team_id or (ret.get("team_id") if isinstance(ret.get("team_id"), str) else None)
+        refund_last4 = str(payload.refund_card_last4).strip()
+
+        cards = recon_store.fetch_payment_cards_for_buyer(buyer_id=buyer_id)
+        active_cards = [c for c in cards if c.get("is_active") is not False]
+        known_last4 = {str(c.get("card_last4") or "").strip() for c in active_cards if c.get("card_last4")}
+
+        card_match = refund_last4 in known_last4 if refund_last4 else False
+        any_verified = any(bool(c.get("is_verified")) for c in active_cards)
+
+        risk_flags = []
+        if not cards:
+            risk_flags.append("no_cards_on_file")
+        if not card_match:
+            risk_flags.append("refund_card_last4_mismatch")
+        if cards and not any_verified:
+            risk_flags.append("cards_unverified")
+
+        risk_level = "low"
+        if not card_match:
+            risk_level = "medium" if cards else "high"
+
+        verification_id = f"ver-{uuid.uuid4().hex[:12]}"
+        ver_payload = {
+            "verification_id": verification_id,
+            "buyer_id": buyer_id,
+            "team_id": team_id,
+            "return_id": payload.return_id,
+            "refund_card_last4": refund_last4,
+            "refund_amount_hkd": ret.get("refund_amount_hkd"),
+            "card_match": card_match,
+            "card_verified": any_verified,
+            "verification_status": "completed",
+            "risk_level": risk_level,
+            "risk_flags": risk_flags,
+        }
+        recon_store.insert_refund_card_verification(payload=ver_payload)
+
+        audit_logger.log(
+            action="recon.refund_card_verify.completed",
+            actor="api",
+            details={
+                "verification_id": verification_id,
+                "return_id": payload.return_id,
+                "buyer_id": buyer_id,
+                "team_id": team_id,
+                "card_match": card_match,
+                "risk_level": risk_level,
+                "risk_flags": risk_flags,
+            },
+        )
+
+        return {
+            "ok": True,
+            "verification_id": verification_id,
+            "return_id": payload.return_id,
+            "buyer_id": buyer_id,
+            "team_id": team_id,
+            "card_match": card_match,
+            "known_last4": sorted([x for x in known_last4 if x]),
+            "risk_level": risk_level,
+            "risk_flags": risk_flags,
+        }
+
+    @app.post("/recon/bank/import-csv", dependencies=[Depends(require_api_key)], tags=["Recon"])
+    async def recon_bank_import_csv(
+        request: Request,
+        bank_code: str = Form(...),
+        account_id: str = Form(...),
+        currency: str = Form("HKD"),
+        team_id: Optional[str] = Form(None),
+        buyer_id: Optional[str] = Form(None),
+        statement_id: Optional[str] = Form(None),
+        reference: str = Form("bank-import-csv"),
+        source: str = Form("api"),
+        file: UploadFile = File(...),
+    ) -> Dict[str, Any]:
+        """Import a bank statement CSV (multi-bank via bank_code)."""
+        if not bank_import.configured():
+            raise HTTPException(status_code=400, detail="SUPABASE_URL/SUPABASE_KEY not configured")
+
+        raw = await file.read()
+        try:
+            content = raw.decode("utf-8")
+        except Exception:
+            content = raw.decode("utf-8", errors="ignore")
+
+        result = bank_import.import_csv(
+            bank_code=bank_code,
+            account_id=account_id,
+            currency=currency,
+            content=content,
+            team_id=team_id,
+            buyer_id=buyer_id,
+            statement_id=statement_id,
+            source=source,
+            reference=reference,
+        )
+
+        audit_logger.log(
+            action="recon.bank_import_csv",
+            actor="api",
+            details={
+                "bank_code": bank_code,
+                "account_id": account_id,
+                "currency": currency,
+                "statement_id": result.get("statement_id"),
+                "ok": result.get("ok"),
+                "transactions": result.get("transactions"),
+            },
+        )
+
+        return result
+
+    @app.post("/recon/bank/import-manual", dependencies=[Depends(require_api_key)], tags=["Recon"])
+    async def recon_bank_import_manual(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Import bank transactions from manual JSON payload.
+
+        Expected payload:
+          {
+            "bank_code": "za_hk",
+            "account_id": "za-main",
+            "currency": "HKD|GBP|USDT",
+            "team_id": "..."?,
+            "buyer_id": "..."?,
+            "statement_id": "..."?,
+            "reference": "..."?,
+            "source": "api"?,
+            "raw_text": "..."?,
+            "transactions": [
+              {"date": "YYYY-MM-DD", "description": "...", "amount_major": 12.34, "balance_major": 56.78?},
+              ...
+            ]
+          }
+        """
+        if not bank_import.configured():
+            raise HTTPException(status_code=400, detail="SUPABASE_URL/SUPABASE_KEY not configured")
+
+        from ..services.bank_manual_import import major_to_minor
+
+        bank_code = str(payload.get("bank_code") or "").strip()
+        account_id = str(payload.get("account_id") or "").strip()
+        currency = str(payload.get("currency") or "HKD").strip()
+        if not bank_code or not account_id:
+            raise HTTPException(status_code=400, detail="bank_code/account_id required")
+
+        txs_in = payload.get("transactions") or []
+        if not isinstance(txs_in, list) or not txs_in:
+            raise HTTPException(status_code=400, detail="transactions required")
+
+        txs = []
+        for t in txs_in:
+            if not isinstance(t, dict):
+                continue
+            date = t.get("date")
+            desc = t.get("description")
+            amt_major = t.get("amount_major")
+            bal_major = t.get("balance_major")
+            if date is None or amt_major is None:
+                continue
+            txs.append(
+                {
+                    "date": str(date),
+                    "description": str(desc or "(no description)"),
+                    "amount": major_to_minor(float(amt_major), currency=currency),
+                    "currency": currency.upper(),
+                    "balance": major_to_minor(float(bal_major), currency=currency) if bal_major is not None else None,
+                    "reference": t.get("reference"),
+                }
+            )
+
+        result = bank_import.import_manual(
+            bank_code=bank_code,
+            account_id=account_id,
+            currency=currency,
+            transactions=txs,
+            team_id=payload.get("team_id"),
+            buyer_id=payload.get("buyer_id"),
+            statement_id=payload.get("statement_id"),
+            source=str(payload.get("source") or "api"),
+            reference=str(payload.get("reference") or "bank-import-manual"),
+            raw_text=payload.get("raw_text"),
+        )
+
+        audit_logger.log(
+            action="recon.bank_import_manual",
+            actor="api",
+            details={
+                "bank_code": bank_code,
+                "account_id": account_id,
+                "currency": currency,
+                "statement_id": result.get("statement_id"),
+                "ok": result.get("ok"),
+                "transactions": result.get("transactions"),
+            },
+        )
+
+        return result
+
+    @app.get("/admin", tags=["Admin"])
+    async def admin_dashboard(request: Request, token: Optional[str] = None) -> Response:
+        """Minimal admin dashboard (server-rendered).
+
+        Auth options:
+        - Standard API key header (same as other endpoints)
+        - Query token (?token=...) when ADMIN_DASHBOARD_TOKEN is configured
+        """
+        expected_query_token = os.getenv("ADMIN_DASHBOARD_TOKEN")
+
+        if expected_query_token:
+            if token != expected_query_token:
+                raise HTTPException(status_code=401, detail="Invalid or missing admin token")
+        else:
+            await require_api_key(request)
+
+        def _admin_url(path: str) -> str:
+            return f"{path}?token={token}" if expected_query_token else path
+
+        blocks = []
+
+        blocks.append(
+            "<div class=\"grid\">"
+            + render_kv_card(
+                "Services",
+                {
+                    "supabase": "ok" if recon_store.configured() else "missing SUPABASE_URL/SUPABASE_KEY",
+                    "openrouter": "ok" if receipt_vision.configured() else "missing OPENROUTER_API_KEY",
+                    "bank_import": "ok" if bank_import.configured() else "missing SUPABASE_URL/SUPABASE_KEY",
+                },
+            )
+            + render_kv_card(
+                "Bank parsers",
+                {
+                    "registered": ", ".join(bank_import.parsers.list_codes()),
+                    "note": "use /recon/bank/import-csv with bank_code",
+                },
+            )
+            + "</div>"
+        )
+
+        if recon_store.configured():
+            try:
+                supa = recon_store.supabase
+                statements = (
+                    supa.table("bank_statements")
+                    .select("statement_id,bank_code,account_id,currency,period_start,period_end,imported_at,status")
+                    .order("imported_at", desc=True)
+                    .limit(20)
+                    .execute()
+                ).data or []
+
+                rows = []
+                for s in statements:
+                    sid = s.get("statement_id")
+                    sid_link = f"<a href=\"{_admin_url('/admin/statements/' + str(sid))}\">{sid}</a>" if sid else ""
+                    rows.append(
+                        [
+                            sid_link,
+                            s.get("bank_code"),
+                            s.get("account_id"),
+                            s.get("currency"),
+                            f"{s.get('period_start')} → {s.get('period_end')}",
+                            s.get("status"),
+                        ]
+                    )
+                blocks.append(
+                    render_table_card(
+                        "Recent bank statements",
+                        headers=["statement_id", "bank", "account", "ccy", "period", "status"],
+                        rows=rows,
+                    )
+                )
+
+                comps = (
+                    supa.table("item_comparisons")
+                    .select("comparison_id,date,buyer_id,team_id,declaration_id,scan_id,risk_level,status")
+                    .order("date", desc=True)
+                    .limit(20)
+                    .execute()
+                ).data or []
+
+                rows2 = []
+                for c in comps:
+                    cid = c.get("comparison_id")
+                    cid_link = f"<a href=\"{_admin_url('/admin/comparisons/' + str(cid))}\">{cid}</a>" if cid else ""
+                    rows2.append(
+                        [
+                            cid_link,
+                            c.get("date"),
+                            c.get("risk_level"),
+                            c.get("status"),
+                            c.get("declaration_id"),
+                            c.get("scan_id"),
+                        ]
+                    )
+                blocks.append(
+                    render_table_card(
+                        "Recent recon comparisons",
+                        headers=["comparison_id", "date", "risk", "status", "declaration_id", "scan_id"],
+                        rows=rows2,
+                    )
+                )
+            except Exception as exc:
+                blocks.append(render_kv_card("Admin error", {"error": str(exc)}))
+
+        html = render_admin_page(title="BuyerOS Admin", blocks=blocks)
+        return Response(content=html, media_type="text/html")
+
+    @app.get("/admin/statements/{statement_id}", tags=["Admin"])
+    async def admin_statement_detail(statement_id: str, request: Request, token: Optional[str] = None) -> Response:
+        expected_query_token = os.getenv("ADMIN_DASHBOARD_TOKEN")
+        if expected_query_token:
+            if token != expected_query_token:
+                raise HTTPException(status_code=401, detail="Invalid or missing admin token")
+        else:
+            await require_api_key(request)
+
+        if not recon_store.configured():
+            return Response(content=render_admin_page(title="BuyerOS Admin", blocks=[render_kv_card("Error", {"error": "supabase_not_configured"})]), media_type="text/html")
+
+        supa = recon_store.supabase
+        stmt = (
+            supa.table("bank_statements")
+            .select("statement_id,bank_code,account_id,currency,period_start,period_end,imported_at,status,file_hash")
+            .eq("statement_id", statement_id)
+            .limit(1)
+            .execute()
+        ).data or []
+
+        txs = (
+            supa.table("bank_transactions")
+            .select("transaction_id,date,description,amount,currency,balance,is_reconciled")
+            .eq("statement_id", statement_id)
+            .order("date", desc=False)
+            .limit(200)
+            .execute()
+        ).data or []
+
+        blocks = []
+        blocks.append("<div style=\"margin-bottom:10px\"><a href=\"/admin?token=" + _escape(token) + "\">← back</a></div>" if expected_query_token else "<div style=\"margin-bottom:10px\"><a href=\"/admin\">← back</a></div>")
+        blocks.append(render_kv_card("Statement", stmt[0] if stmt else {"statement_id": statement_id, "found": False}))
+        rows = []
+        for t in txs:
+            rows.append([t.get("date"), t.get("description"), t.get("amount"), t.get("currency"), t.get("balance"), t.get("is_reconciled")])
+        blocks.append(render_table_card("Transactions (first 200)", headers=["date", "description", "amount", "ccy", "balance", "reconciled"], rows=rows))
+        html = render_admin_page(title=f"Statement {statement_id}", blocks=blocks)
+        return Response(content=html, media_type="text/html")
+
+    @app.get("/admin/comparisons/{comparison_id}", tags=["Admin"])
+    async def admin_comparison_detail(comparison_id: str, request: Request, token: Optional[str] = None) -> Response:
+        expected_query_token = os.getenv("ADMIN_DASHBOARD_TOKEN")
+        if expected_query_token:
+            if token != expected_query_token:
+                raise HTTPException(status_code=401, detail="Invalid or missing admin token")
+        else:
+            await require_api_key(request)
+
+        if not recon_store.configured():
+            return Response(content=render_admin_page(title="BuyerOS Admin", blocks=[render_kv_card("Error", {"error": "supabase_not_configured"})]), media_type="text/html")
+
+        supa = recon_store.supabase
+        comp = (
+            supa.table("item_comparisons")
+            .select("comparison_id,date,buyer_id,team_id,declaration_id,scan_id,risk_level,status,stats")
+            .eq("comparison_id", comparison_id)
+            .limit(1)
+            .execute()
+        ).data or []
+
+        mismatches = (
+            supa.table("item_mismatches")
+            .select("mismatch_id,comparison_id,sku,declared_qty,scanned_qty,declared_price,scanned_price,reason")
+            .eq("comparison_id", comparison_id)
+            .limit(200)
+            .execute()
+        ).data or []
+
+        blocks = []
+        blocks.append("<div style=\"margin-bottom:10px\"><a href=\"/admin?token=" + _escape(token) + "\">← back</a></div>" if expected_query_token else "<div style=\"margin-bottom:10px\"><a href=\"/admin\">← back</a></div>")
+        blocks.append(render_kv_card("Comparison", comp[0] if comp else {"comparison_id": comparison_id, "found": False}))
+
+        rows = []
+        for m in mismatches:
+            rows.append([m.get("sku"), m.get("declared_qty"), m.get("scanned_qty"), m.get("declared_price"), m.get("scanned_price"), m.get("reason")])
+        blocks.append(render_table_card("Mismatches (first 200)", headers=["sku", "declared_qty", "scanned_qty", "declared_price", "scanned_price", "reason"], rows=rows))
+
+        html = render_admin_page(title=f"Comparison {comparison_id}", blocks=blocks)
+        return Response(content=html, media_type="text/html")
+
         items = context_hub.get_session(session_id)
         if not items:
             # Backward-compatible fallback for historical rows where callers
@@ -1248,6 +1898,95 @@ def create_app() -> FastAPI:
         )
         audit_logger.log(action="tasks.run_all", actor="api", details={"task_id": task_id, "ok": bool(result.get("ok")), "status": result.get("status")})
         return result
+
+    # ──────────────────────────────────────────────────────────────────
+    # Expense Claims — 買手報帳系統
+    # ──────────────────────────────────────────────────────────────────
+
+    @app.post("/expenses", dependencies=[Depends(require_api_key)], tags=["Expenses"])
+    async def submit_expense(request: Request) -> Dict[str, Any]:
+        """Submit a new expense claim (status=pending)."""
+        body = await request.json()
+        svc: ExpenseService = request.app.state.expense_service
+        try:
+            claim = svc.submit(
+                buyer_name=body.get("buyer_name", ""),
+                amount=float(body.get("amount", 0)),
+                description=body.get("description", ""),
+                currency=body.get("currency", "HKD"),
+                category=body.get("category", "other"),
+                receipt_url=body.get("receipt_url"),
+            )
+        except (ValueError, KeyError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        audit_logger.log(action="expenses.submit", actor="api",
+                         details={"id": claim["id"], "buyer": claim["buyer_name"],
+                                  "amount": claim["amount"]})
+        return {"ok": True, "claim": claim}
+
+    @app.get("/expenses", dependencies=[Depends(require_api_key)], tags=["Expenses"])
+    async def list_expenses(
+        request: Request,
+        status: Optional[str] = None,
+        buyer_name: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
+        """List expense claims with optional status / buyer filter."""
+        svc: ExpenseService = request.app.state.expense_service
+        try:
+            claims = svc.list_claims(status=status, buyer_name=buyer_name,
+                                     limit=limit, offset=offset)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {"ok": True, "claims": claims, "count": len(claims)}
+
+    @app.get("/expenses/export/csv", dependencies=[Depends(require_api_key)], tags=["Expenses"])
+    async def export_expenses_csv(
+        request: Request,
+        status: Optional[str] = None,
+        buyer_name: Optional[str] = None,
+    ) -> Response:
+        """Export expense claims as CSV download."""
+        svc: ExpenseService = request.app.state.expense_service
+        try:
+            csv_content = svc.export_csv(status=status, buyer_name=buyer_name)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=expenses.csv"},
+        )
+
+    @app.get("/expenses/{claim_id}", dependencies=[Depends(require_api_key)], tags=["Expenses"])
+    async def get_expense(request: Request, claim_id: str) -> Dict[str, Any]:
+        """Fetch a single expense claim by ID."""
+        svc: ExpenseService = request.app.state.expense_service
+        claim = svc.get_claim(claim_id)
+        if not claim:
+            raise HTTPException(status_code=404, detail="claim not found")
+        return {"ok": True, "claim": claim}
+
+    @app.patch("/expenses/{claim_id}/status", dependencies=[Depends(require_api_key)], tags=["Expenses"])
+    async def update_expense_status(request: Request, claim_id: str) -> Dict[str, Any]:
+        """Approve or reject an expense claim."""
+        body = await request.json()
+        new_status = body.get("status", "")
+        if new_status not in {"approved", "rejected"}:
+            raise HTTPException(status_code=422, detail="status must be 'approved' or 'rejected'")
+        svc: ExpenseService = request.app.state.expense_service
+        claim = svc.update_status(
+            claim_id=claim_id,
+            new_status=new_status,
+            reviewer=body.get("reviewer"),
+            reviewer_note=body.get("reviewer_note"),
+        )
+        if not claim:
+            raise HTTPException(status_code=404, detail="claim not found")
+        audit_logger.log(action=f"expenses.{new_status}", actor="api",
+                         details={"id": claim_id, "reviewer": body.get("reviewer")})
+        return {"ok": True, "claim": claim}
 
     @app.get("/system/capabilities", dependencies=[Depends(require_api_key)], tags=["Meta"])
     async def system_capabilities() -> Dict[str, Any]:

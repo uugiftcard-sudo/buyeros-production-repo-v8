@@ -112,6 +112,49 @@ class CloseCycleRequest(BaseModel):
     date: Optional[str] = None
 
 
+class ReceiptScanRequest(BaseModel):
+    image_url: str = Field(min_length=8)
+    buyer_id: str = Field(min_length=2)
+    team_id: Optional[str] = None
+    declaration_id: Optional[str] = None
+    scan_id: Optional[str] = None
+    date: Optional[str] = None
+    reference: str = "recon-receipt-scan"
+    source: str = "api"
+    language: str = "zh"
+
+
+class ReconCompareRequest(BaseModel):
+    declaration_id: str = Field(min_length=2)
+    scan_id: str = Field(min_length=2)
+    buyer_id: str = Field(min_length=2)
+    team_id: Optional[str] = None
+    date: Optional[str] = None
+    threshold: float = Field(default=0.72, ge=0.5, le=0.95)
+    reference: str = "recon-compare"
+    source: str = "api"
+
+
+class RefundCardVerifyRequest(BaseModel):
+    return_id: str = Field(min_length=2)
+    refund_card_last4: str = Field(min_length=4, max_length=4)
+    buyer_id: Optional[str] = None
+    team_id: Optional[str] = None
+    reference: str = "refund-card-verify"
+    source: str = "api"
+
+
+class BankImportCsvRequest(BaseModel):
+    bank_code: str = Field(min_length=2)
+    account_id: str = Field(min_length=2)
+    currency: str = Field(default="HKD")
+    team_id: Optional[str] = None
+    buyer_id: Optional[str] = None
+    statement_id: Optional[str] = None
+    reference: str = "bank-import-csv"
+    source: str = "api"
+
+
 class ReportCreateRequest(BaseModel):
     period: str = "daily"
     date: Optional[str] = None
