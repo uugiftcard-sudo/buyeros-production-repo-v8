@@ -158,21 +158,60 @@ def ensure_worksheet(sh, worksheet_name: str):
     return ws
 
 
-def append_events(ws, events: list[BalanceEvent], existing_message_ids: set[int], existing_fingerprints: set[str]):
-    new_events = [
-        e
-        for e in events
-        if (e.message_id not in existing_message_ids) and (e.fingerprint not in existing_fingerprints)
-    ]
-    if not new_events:
-        return 0
+def fetch_last4_to_row(ws, limit_rows: int = 20000) -> dict[str, int]:
+    # Reads column A (Card Last 4) and returns a dict mapping last4 -> row_index (1-indexed).
+    try:
+        values = ws.col_values(1)  # 1-indexed
+    except Exception:
+        return {}
 
-    rows = [
-        [e.last4, f"{e.balance_gbp:.2f}", e.query_date, e.timestamp, str(e.message_id), e.fingerprint]
-        for e in new_events
-    ]
-    ws.append_rows(rows, value_input_option="USER_ENTERED")
-    return len(rows)
+    # Drop header
+    values = values[1:]
+    if limit_rows:
+        values = values[:limit_rows]
+
+    out: dict[str, int] = {}
+    for i, v in enumerate(values):
+        v = (v or "").strip()
+        if not v:
+            continue
+        # row_index is i+2 because: values[0] is row 2 (after dropping header at row 1)
+        out[v] = i + 2
+    return out
+
+
+def write_events(
+    ws,
+    events: list[BalanceEvent],
+    existing_message_ids: set[int],
+    existing_fingerprints: set[str],
+    last4_to_row: dict[str, int],
+):
+    new_count = 0
+    updated_count = 0
+
+    for e in events:
+        # Skip if fingerprint already processed
+        if e.fingerprint in existing_fingerprints:
+            continue
+
+        row_values = [e.last4, f"{e.balance_gbp:.2f}", e.query_date, e.timestamp, str(e.message_id), e.fingerprint]
+
+        if e.last4 in last4_to_row:
+            # Update existing row
+            row_num = last4_to_row[e.last4]
+            ws.update(
+                f"A{row_num}:F{row_num}",
+                [row_values],
+                value_input_option="USER_ENTERED",
+            )
+            updated_count += 1
+        else:
+            # Append new row
+            ws.append_rows([row_values], value_input_option="USER_ENTERED")
+            new_count += 1
+
+    return new_count, updated_count
 
 
 def fetch_existing_message_ids(ws, limit_rows: int = 20000) -> set[int]:
@@ -247,12 +286,13 @@ def main():
 
     existing_ids = fetch_existing_message_ids(ws)
     existing_fps = fetch_existing_fingerprints(ws)
-    written = append_events(ws, events, existing_ids, existing_fps)
+    last4_to_row = fetch_last4_to_row(ws)
+    new_count, updated_count = write_events(ws, events, existing_ids, existing_fps, last4_to_row)
 
-    if written == 0:
+    if new_count == 0 and updated_count == 0:
         print(f"No new One4all messages to write (worksheet '{config.WORKSHEET_NAME}').")
     else:
-        print(f"Wrote {written} new rows to worksheet '{config.WORKSHEET_NAME}'.")
+        print(f"Wrote {new_count} / Updated {updated_count} new rows to worksheet '{config.WORKSHEET_NAME}'.")
 
 
 if __name__ == "__main__":
