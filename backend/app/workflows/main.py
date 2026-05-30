@@ -1204,8 +1204,8 @@ def create_app() -> FastAPI:
                 supa = recon_store.supabase
                 statements = (
                     supa.table("bank_statements")
-                    .select("statement_id,bank_code,account_id,currency,period_start,period_end,imported_at,status")
-                    .order("imported_at", desc=True)
+                    .select("statement_id,team_id,currency,period_start,period_end,total_deposits_hkd,total_withdrawals_hkd,opening_balance_hkd,closing_balance_hkd,source,uploaded_by,created_at")
+                    .order("created_at", desc=True)
                     .limit(20)
                     .execute()
                 ).data or []
@@ -1217,17 +1217,18 @@ def create_app() -> FastAPI:
                     rows.append(
                         [
                             sid_link,
-                            s.get("bank_code"),
-                            s.get("account_id"),
+                            s.get("team_id"),
                             s.get("currency"),
                             f"{s.get('period_start')} → {s.get('period_end')}",
-                            s.get("status"),
+                            s.get("total_deposits_hkd"),
+                            s.get("total_withdrawals_hkd"),
+                            s.get("source"),
                         ]
                     )
                 blocks.append(
                     render_table_card(
                         "Recent bank statements",
-                        headers=["statement_id", "bank", "account", "ccy", "period", "status"],
+                        headers=["statement_id", "team_id", "ccy", "period", "deposits_hkd", "withdrawals_hkd", "source"],
                         rows=rows,
                     )
                 )
@@ -1282,7 +1283,7 @@ def create_app() -> FastAPI:
         supa = recon_store.supabase
         stmt = (
             supa.table("bank_statements")
-            .select("statement_id,bank_code,account_id,currency,period_start,period_end,imported_at,status,file_hash")
+            .select("statement_id,team_id,date,period_start,period_end,total_deposits_hkd,deposit_count,total_withdrawals_hkd,withdrawal_count,opening_balance_hkd,closing_balance_hkd,raw_entry_count,currency,source,uploaded_by,created_at")
             .eq("statement_id", statement_id)
             .limit(1)
             .execute()
@@ -1290,7 +1291,7 @@ def create_app() -> FastAPI:
 
         txs = (
             supa.table("bank_transactions")
-            .select("transaction_id,date,description,amount,currency,balance,is_reconciled")
+            .select("transaction_ref,date,description,transaction_type,amount_hkd,balance_after_hkd,category,is_reconciled,reconciled_by,reconciled_at")
             .eq("statement_id", statement_id)
             .order("date", desc=False)
             .limit(200)
@@ -1302,8 +1303,8 @@ def create_app() -> FastAPI:
         blocks.append(render_kv_card("Statement", stmt[0] if stmt else {"statement_id": statement_id, "found": False}))
         rows = []
         for t in txs:
-            rows.append([t.get("date"), t.get("description"), t.get("amount"), t.get("currency"), t.get("balance"), t.get("is_reconciled")])
-        blocks.append(render_table_card("Transactions (first 200)", headers=["date", "description", "amount", "ccy", "balance", "reconciled"], rows=rows))
+            rows.append([t.get("date"), t.get("description"), t.get("transaction_type"), t.get("amount_hkd"), t.get("balance_after_hkd"), t.get("is_reconciled")])
+        blocks.append(render_table_card("Transactions (first 200)", headers=["date", "description", "type", "amount_hkd", "balance_hkd", "reconciled"], rows=rows))
         html = render_admin_page(title=f"Statement {statement_id}", blocks=blocks)
         return Response(content=html, media_type="text/html")
 
