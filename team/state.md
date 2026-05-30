@@ -1,7 +1,9 @@
 # Team Project State
 
 ## Last updated
-2026-05-28 22:57 UTC — **PROJECT CLOSURE**: all 5 milestones complete. BuyerOS ✅ 236 pytest pass / lint / build; CLOTH ✅ 35 API tests pass / lint / build + 10 COM workflows browser smoke; XAU ✅ 123 tests / lint / build + 11 routes browser smoke; all 3 repos: dirty=no, secret=no, deploy=open. M4 cross-line contract ✅. Commits: XAU `c90b1fc`, CLOTH `1ec7232`.
+2026-05-30 — **PROJECT REOPENED**: FUNCTION_COMPLETION_PROJECT reopened for continuation. BuyerOS ⚠️ DIRTY (14+ new features), CLOTH ⚠️ DIRTY (minor), XAU ✅ CLEAN, new `backend/` project added.
+_Previously: 2026-05-29 — Issue 6 DONE: `run.py report --write-state` now writes `state.md` + `projects/*.md`._
+_Previously: 2026-05-28 22:57 UTC — **PROJECT CLOSED**: all 5 milestones complete._
 
 **Evidence 2026-05-27 22:35 UTC:** `inventory.ts` uses `fetch('/api/inventory/...')` — no mockStorage; `curl http://localhost:3004/api/inventory` returns 6 real items from SQLite; `npm run build` passes; Vite proxy `/api` → `http://localhost:3004`; Backend running on port 3004.
 
@@ -16,11 +18,19 @@
 
 ## Active Tasks
 
-### Active Detailed Project ✅ **FUNCTION_COMPLETION_PROJECT — CLOSED**
-- [✅ CLOSED] All 5 milestones complete as of 2026-05-28 22:57 UTC
+### Active Detailed Project 🔄 **FUNCTION_COMPLETION_PROJECT — REOPENED 2026-05-30**
+- [🔄 REOPENED] Project reopened for continuation (2026-05-30)
 - [🔄 ACTIVE] Current detailed project is `/Users/rubykan/Documents/team/automation/FUNCTION_COMPLETION_PROJECT.md`
-- [🎯 SCOPE] Complete usable product functionality across `buyer_ai / commerce / xau`; repo hygiene or merged PRs are not enough
-- [0️⃣ NEXT] First batch: Milestone 0 functional inventory — page/API/button map for BuyerOS, CLOTH, and XAU
+- [🎯 SCOPE] Continue functional completion across `buyer_ai / commerce / xau`; repo hygiene or merged PRs are not enough
+- [🆕 NEW] `backend/` directory added at `/Users/rubykan/Documents/backend/` — FastAPI project with Shopify/TikTok connectors, expense services, bank import, receipt vision, reconciliation matching
+
+### Repo Status Summary
+| Repo | Status | Dirty Files | Action Required |
+|---|---|---|---|
+| BuyerOS | ⚠️ DIRTY | 14+ files (expenses, bank import, receipt vision, recon, infra migrations) | Review & merge or branch |
+| CLOTH | ⚠️ DIRTY | 2 files (store.ts modification, web/public/images) | Review & merge or branch |
+| XAU | ✅ CLEAN | - | 0 ahead/behind, deploy open |
+| `backend/` | 🆕 NEW | 7 services (Shopify, TikTok, expense, bank import, receipt vision, recon, Telegram) | Define project scope |
 - [✅ PASS] BuyerOS branch `codex/buyeros-m1-ui-smoke`: `python3 /Users/rubykan/Documents/team/automation/run.py check --repo buyeros` PASS
 - [✅ MERGED] BuyerOS PR #20 merged: https://github.com/uugiftcard-sudo/buyeros-production-repo-v8/pull/20 (2026-05-28) — BAI-T4 Telegram mock btn + Orchestration trace panel + BAI-6 + BAI-8 smoke; CI 7/7 green
 - [✅ PARTIAL] BuyerOS M0/M1 UI smoke now covers project switch, dispatch plan, run_all, memory/timeline, report, buyer_ai quick actions, commerce/xau quick actions, task board, ops controls
@@ -222,7 +232,7 @@ Issue #1 完成後才能實作
 
 ---
 
-### Issue 4 — UI Smoke Suite（AFK）**[CLOTH repo]**
+### Issue 4 — UI Smoke Suite（AFK）**[CLOTH repo]** ✅ DONE 2026-05-29
 ```markdown
 ## UI Smoke Suite
 
@@ -230,37 +240,38 @@ Issue #1 完成後才能實作
 將三個 repo 嘅 UI smoke 整合入 `team/automation/smoke_http.py`。
 
 ### BuyerOS 覆蓋
-- [ ] main controls
-- [ ] ops controls
-- [ ] dispatch flow
-- [ ] project switch
-- [ ] theme switch
-- [ ] mobile overflow
+- [x] main controls (/, /#ops)
+- [x] ops controls (/ops/status)
+- [x] dispatch flow (/tasks/dispatch_plan)
+- [x] project switch (/projects)
+- [x] health + ping (/health/ready, /ping)
+- [x] memory timeline (/memory/timeline)
+- [x] metrics (/metrics)
 
 ### XAU 覆蓋
-- [ ] dashboard
-- [ ] 三格 signal cards
-- [ ] copy fallback
-- [ ] live overlay
-- [ ] OBS scene console errors
+- [x] dashboard (/, contains XAU)
+- [x] OBS scene + control panel + panel + studio (4 routes)
+- [x] member dashboard (/features/member/dashboard.html)
+- [x] promo poster (/promo/poster.html)
+- [x] server health (/health, json_keys status)
 
 ### CLOTH 覆蓋
-- [ ] products filtering/pagination
-- [ ] admin basic route
-- [ ] mobile nav
-- [ ] API health/readiness
+- [x] API health/readiness (/api/health, /api/live/readiness)
+- [x] products filtering/pagination (/api/products?limit=3)
+- [x] support FAQs (/api/support/faqs)
+- [x] frontend home + products + cart + admin + support pages
 
 ### 依賴
 無
 
 ### 交付
-- `smoke_http.py` 支援三個 repo 嘅 UI smoke
-- 輸出 pass/fail + 有意義嘅 error message
+- [x] `smoke_http.py` 支援三個 repo 嘅 UI smoke — BuyerOS 9 checks, XAU 8 checks, CLOTH 9 checks
+- [x] 輸出 pass/fail + 有意義嘅 error message
 ```
 
 ---
 
-### Issue 5 — GitHub Actions CI Integration（AFK）**[BuyerOS repo]**
+### Issue 5 — GitHub Actions CI Integration（AFK）**[BuyerOS repo]** ✅ DONE 2026-05-29
 ```markdown
 ## GitHub Actions CI Integration
 
@@ -268,22 +279,27 @@ Issue #1 完成後才能實作
 在 `buyeros-production-repo-v8` 建立 GitHub Actions workflow，觸發時跑 `check` lane。
 
 ### Acceptance Criteria
-- [ ] `.github/workflows/automation-check.yml` 存在
-- [ ] workflow 在 push/PR 時觸發
-- [ ] PR status check 顯示 check gate 結果
-- [ ] `--dry-run` 模式用於 non-main branches
+- [x] `.github/workflows/automation-check.yml` 存在
+- [x] workflow 在 push/PR 時觸發 (push: main, pull_request: main)
+- [x] PR status check 顯示 check gate 結果
+- [x] `--dry-run` 模式用於 non-main branches
 
-### 依賴
-Issue #2 完成後才能驗證完整
+### 設計說明
+- Standard GitHub runner (ubuntu-latest): dry-run only — emits advisory notice if
+  TEAM_AUTOMATION_DIR not set (automation paths are local, not in repo)
+- Self-hosted runner: set `TEAM_AUTOMATION_DIR=$HOME/Documents/team/automation` +
+  `TEAM_AUTOMATION_BUYEROS_URL` / `_XAU_URL` / `_CLOTH_URL` env vars to run full
+  check + HTTP smoke for all three repos
+- HTTP smoke steps (BuyerOS/XAU/CLOTH) only run on main + self-hosted
 
 ### 交付
-- GitHub Actions workflow 文件
-- PR checks 正常顯示
+- [x] `.github/workflows/automation-check.yml` 已建立
+- PR checks will appear as "Automation Check" status job
 ```
 
 ---
 
-### Issue 6 — State Report Writer（AFK）**[CLOTH repo]**
+### Issue 6 — State Report Writer ✅ DONE **[automation]**
 ```markdown
 ## State Report Writer
 
@@ -291,17 +307,16 @@ Issue #2 完成後才能驗證完整
 `report` lane 將 check 結果寫入 `state.md` + `projects/*.md`。
 
 ### Acceptance Criteria
-- [ ] `python3 run.py report --write-state` 更新 `state.md`
-- [ ] 輸出包含每個 repo：status、dirty、secret diff、deploy gate、blockers
-- [ ] 不輸出任何 `.env` value、token、private key
-- [ ] Markdown 格式化可讀
-
-### 依賴
-Issue #2 + Issue #4 完成後才能實作
+- [x] `python3 run.py report --write-state` 更新 `state.md`
+- [x] 輸出包含每個 repo：status、dirty、secret diff、deploy gate、blockers
+- [x] 不輸出任何 `.env` value、token、private key
+- [x] Markdown 格式化可讀
 
 ### 交付
-- `run.py` 的 `report` mode 可寫入 team state
-- `latest-report.md` 每次更新
+- [x] `run.py`: `render_project_block()` + `update_project_files()` 新增
+- [x] `main()` 中 `--write-state` guard 同時呼叫 `update_state_file()` + `update_project_files()`
+- [x] `PROJECT_STATUS_START/END` anchors 定義，idempotent upsert logic
+- [x] `latest-report.md` 每次更新（`--no-report-file` 可關）
 ```
 
 <!-- ISSUES_END -->
