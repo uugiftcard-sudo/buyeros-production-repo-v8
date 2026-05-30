@@ -1320,25 +1320,50 @@ def create_app() -> FastAPI:
             return Response(content=render_admin_page(title="BuyerOS Admin", blocks=[render_kv_card("Error", {"error": "supabase_not_configured"})]), media_type="text/html")
 
         supa = recon_store.supabase
-        comp = (
+        comp_rows = (
             supa.table("item_comparisons")
-            .select("comparison_id,date,buyer_id,team_id,declaration_id,scan_id,risk_level,status,stats")
+            .select("comparison_id,date,buyer_id,team_id,declaration_id,scan_id,risk_level,status,missing_items,undeclared_items,mismatched_items")
             .eq("comparison_id", comparison_id)
             .limit(1)
             .execute()
         ).data or []
 
-        mismatches = (
-            supa.table("item_mismatches")
-            .select("mismatch_id,comparison_id,sku,declared_qty,scanned_qty,declared_price,scanned_price,reason")
-            .eq("comparison_id", comparison_id)
-            .limit(200)
-            .execute()
-        ).data or []
+        comp_row = comp_rows[0] if comp_rows else None
+
+        # Prefer normalized table if present; otherwise fall back to JSONB on item_comparisons.
+        mismatches: list[dict[str, Any]] = []
+        try:
+            mismatches = (
+                supa.table("item_mismatches")
+                .select("mismatch_id,comparison_id,sku,declared_qty,scanned_qty,declared_price,scanned_price,reason")
+                .eq("comparison_id", comparison_id)
+                .limit(200)
+                .execute()
+            ).data or []
+        except Exception:
+            pass
+
+        if not mismatches and comp_row:
+            raw = comp_row.get("mismatched_items")
+            if isinstance(raw, list):
+                for idx, m in enumerate(raw[:200]):
+                    if isinstance(m, dict):
+                        mismatches.append(
+                            {
+                                "mismatch_id": m.get("mismatch_id") or f"json-{idx}",
+                                "comparison_id": comparison_id,
+                                "sku": m.get("sku") or m.get("item") or m.get("item_name"),
+                                "declared_qty": m.get("declared_qty") or m.get("declared_quantity"),
+                                "scanned_qty": m.get("scanned_qty") or m.get("scanned_quantity"),
+                                "declared_price": m.get("declared_price") or m.get("declared_price_hkd") or m.get("declared_unit_price"),
+                                "scanned_price": m.get("scanned_price") or m.get("scanned_price_hkd") or m.get("scanned_unit_price"),
+                                "reason": m.get("reason") or m.get("type"),
+                            }
+                        )
 
         blocks = []
         blocks.append("<div style=\"margin-bottom:10px\"><a href=\"/admin?token=" + _escape(token) + "\">← back</a></div>" if expected_query_token else "<div style=\"margin-bottom:10px\"><a href=\"/admin\">← back</a></div>")
-        blocks.append(render_kv_card("Comparison", comp[0] if comp else {"comparison_id": comparison_id, "found": False}))
+        blocks.append(render_kv_card("Comparison", comp_row if comp_row else {"comparison_id": comparison_id, "found": False}))
 
         rows = []
         for m in mismatches:
