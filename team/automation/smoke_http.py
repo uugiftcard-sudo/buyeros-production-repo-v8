@@ -29,10 +29,22 @@ SCENARIOS = {
     "buyeros": [
         Check("/", "dashboard shell"),
         Check("/#ops", "ops anchor"),
+        Check("/ping", "ping"),
+        Check("/health/ready", "health ready"),
+        Check("/projects", "projects list"),
+        Check("/tasks/dispatch_plan", "dispatch plan"),
+        Check("/memory/timeline", "memory timeline"),
+        Check("/ops/status", "ops status"),
+        Check("/metrics", "metrics"),
     ],
     "xau": [
         Check("/", "dashboard", contains=("XAU",)),
         Check("/stream/obs-scene.html", "OBS scene"),
+        Check("/stream/obs-control-panel.html", "OBS control panel"),
+        Check("/stream/obs-panel.html", "OBS panel"),
+        Check("/stream/obs-studio.html", "OBS studio"),
+        Check("/features/member/dashboard.html", "member dashboard"),
+        Check("/promo/poster.html", "promo poster"),
         Check("/health", "server health", json_keys=("status",)),
     ],
     "cloth": [
@@ -40,6 +52,11 @@ SCENARIOS = {
         Check("/api/live/readiness", "live readiness"),
         Check("/api/products?limit=3", "products pagination"),
         Check("/api/support/faqs", "support faqs"),
+        Check("/", "frontend home"),
+        Check("/products", "products page"),
+        Check("/cart", "cart page"),
+        Check("/admin", "admin route"),
+        Check("/support", "support page"),
     ],
 }
 

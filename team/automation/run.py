@@ -20,6 +20,8 @@ ROOT = Path(__file__).parent
 CONFIG_PATH = ROOT / "config.json"
 STATE_START = "<!-- AUTOMATION_STATUS_START -->"
 STATE_END = "<!-- AUTOMATION_STATUS_END -->"
+PROJECT_STATUS_START = "<!-- PROJECT_AUTOMATION_STATUS_START -->"
+PROJECT_STATUS_END = "<!-- PROJECT_AUTOMATION_STATUS_END -->"
 MAX_OUTPUT_CHARS = 6000
 REDACTION_PATTERNS = [
     re.compile(r"sk-[A-Za-z0-9_\-]{8,}"),
@@ -363,6 +365,58 @@ def update_state_file(state_file: Path, report: str) -> None:
     state_file.write_text(updated, encoding="utf-8")
 
 
+def render_project_block(result: RepoResult) -> str:
+    """Render a single-repo status block for injection into projects/*.md."""
+    now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    status_icon = "✅" if result.ok else "❌"
+    deploy_icon = "🟢 open" if result.deploy_allowed else "🔴 blocked"
+    lines = [
+        f"## Automation Status — {result.label}",
+        "",
+        f"- **Generated:** {now}",
+        f"- **Check:** {status_icon} {'PASS' if result.ok else 'FAIL'}",
+        f"- **Dirty tree:** {'⚠️ yes' if result.dirty else 'no'}",
+        f"- **Secret diff:** {'⚠️ yes' if result.secret_hits else 'no'}",
+        f"- **Deploy gate:** {deploy_icon}",
+    ]
+    if result.blockers:
+        lines.append(f"- **Blockers:** {'; '.join(result.blockers)}")
+    if result.secret_hits:
+        lines.append(f"- **Secret hits:** {', '.join(result.secret_hits)}")
+    lines.append("")
+    for step in result.steps:
+        suffix = " (skipped)" if step.skipped else ""
+        icon = "✅" if step.ok else "❌"
+        lines.append(f"  - {icon}{suffix} `{step.name}`")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def update_project_files(config: dict[str, Any], results: list[RepoResult]) -> None:
+    """Inject per-repo automation status into each projects/*.md file."""
+    projects_dir = Path(config["state_file"]).parent / "projects"
+    repo_project_map = {
+        "buyeros": projects_dir / "buyeros.md",
+        "xau": projects_dir / "xau.md",
+        "cloth": projects_dir / "cloth.md",
+    }
+    result_by_key = {r.key: r for r in results}
+    for repo_key, project_file in repo_project_map.items():
+        if repo_key not in result_by_key:
+            continue
+        if not project_file.exists():
+            continue
+        block_content = render_project_block(result_by_key[repo_key])
+        block = f"{PROJECT_STATUS_START}\n{block_content}{PROJECT_STATUS_END}"
+        current = project_file.read_text(encoding="utf-8")
+        if PROJECT_STATUS_START in current and PROJECT_STATUS_END in current:
+            start = current.index(PROJECT_STATUS_START)
+            end = current.index(PROJECT_STATUS_END) + len(PROJECT_STATUS_END)
+            updated = current[:start].rstrip() + "\n\n" + block + "\n" + current[end:].lstrip()
+        else:
+            updated = current.rstrip() + "\n\n" + block + "\n"
+        project_file.write_text(updated, encoding="utf-8")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Three-repo automation controller")
     parser.add_argument("mode", choices=["check", "deploy", "report"])
@@ -383,6 +437,7 @@ def main() -> int:
         Path(config["report_file"]).write_text(report, encoding="utf-8")
     if args.write_state and not args.dry_run:
         update_state_file(Path(config["state_file"]), report)
+        update_project_files(config, results)
 
     if args.dry_run and not args.strict_exit:
         return 0
