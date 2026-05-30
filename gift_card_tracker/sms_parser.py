@@ -1,3 +1,4 @@
+import hashlib
 import os
 import re
 import sqlite3
@@ -24,6 +25,11 @@ class BalanceEvent:
     query_date: str
     timestamp: str
     message_id: int
+
+    @property
+    def fingerprint(self) -> str:
+        payload = f"{self.last4}|{self.balance_gbp:.2f}|{self.timestamp}".encode("utf-8")
+        return hashlib.sha1(payload).hexdigest()
 
 
 def get_messages_db_path() -> str:
@@ -129,7 +135,7 @@ def open_sheet(credentials_path: str, sheet_id: str):
 
 
 def ensure_worksheet(sh, worksheet_name: str):
-    header = ["Card Last 4", "Balance GBP", "Query Date", "Timestamp", "Message ID"]
+    header = ["Card Last 4", "Balance GBP", "Query Date", "Timestamp", "Message ID", "Fingerprint"]
 
     try:
         ws = sh.worksheet(worksheet_name)
@@ -146,19 +152,23 @@ def ensure_worksheet(sh, worksheet_name: str):
 
     if first_row != header:
         if not first_row:
-            ws.update("A1:E1", [header])
+            ws.update("A1:F1", [header])
         # If it already has a different header, we leave it alone.
 
     return ws
 
 
-def append_events(ws, events: list[BalanceEvent], existing_message_ids: set[int]):
-    new_events = [e for e in events if e.message_id not in existing_message_ids]
+def append_events(ws, events: list[BalanceEvent], existing_message_ids: set[int], existing_fingerprints: set[str]):
+    new_events = [
+        e
+        for e in events
+        if (e.message_id not in existing_message_ids) and (e.fingerprint not in existing_fingerprints)
+    ]
     if not new_events:
         return 0
 
     rows = [
-        [e.last4, f"{e.balance_gbp:.2f}", e.query_date, e.timestamp, str(e.message_id)]
+        [e.last4, f"{e.balance_gbp:.2f}", e.query_date, e.timestamp, str(e.message_id), e.fingerprint]
         for e in new_events
     ]
     ws.append_rows(rows, value_input_option="USER_ENTERED")
@@ -190,6 +200,26 @@ def fetch_existing_message_ids(ws, limit_rows: int = 20000) -> set[int]:
     return out
 
 
+def fetch_existing_fingerprints(ws, limit_rows: int = 20000) -> set[str]:
+    # Reads column F (Fingerprint) and returns a set of strings.
+    try:
+        values = ws.col_values(6)  # 1-indexed
+    except Exception:
+        return set()
+
+    # Drop header
+    values = values[1:]
+    if limit_rows:
+        values = values[:limit_rows]
+
+    out: set[str] = set()
+    for v in values:
+        v = (v or "").strip()
+        if v:
+            out.add(v)
+    return out
+
+
 def main():
     db_path = get_messages_db_path()
     if not os.path.exists(db_path):
@@ -216,7 +246,8 @@ def main():
     ws = ensure_worksheet(sh, config.WORKSHEET_NAME)
 
     existing_ids = fetch_existing_message_ids(ws)
-    written = append_events(ws, events, existing_ids)
+    existing_fps = fetch_existing_fingerprints(ws)
+    written = append_events(ws, events, existing_ids, existing_fps)
 
     if written == 0:
         print(f"No new One4all messages to write (worksheet '{config.WORKSHEET_NAME}').")
