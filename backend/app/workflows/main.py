@@ -163,6 +163,20 @@ def _is_test_env() -> bool:
     return os.getenv("BUYEROS_ENV") == "test"
 
 
+def _escape(s: Any) -> str:
+    """HTML-escape a value for safe inclusion in admin pages."""
+    if s is None:
+        return ""
+    return (
+        str(s)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#39;")
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Structured JSON logger  (replaces bare logger.error / logger.warning calls)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -621,6 +635,84 @@ def create_app() -> FastAPI:
                             f"卡號核對\nver_id={result.get('verification_id')}\nmatch={result.get('card_match')}\n"
                             f"risk={result.get('risk_level')}\nflags={','.join(result.get('risk_flags') or [])}"
                         )
+
+                elif name == "start":
+                    response_text = (
+                        "BuyerOS 對帳系統\n\n"
+                        "可用指令：\n"
+                        "/start - 本訊息\n"
+                        "/status - 系統狀態\n"
+                        "/recon [date] - 執行對帳\n"
+                        "/bank_import <bank_code> <account_id> - 觸發銀行入帳\n"
+                        "/scan <url> buyer=<id> team=<id?> - 掃描收據\n"
+                        "/compare decl=<id> scan=<id> buyer=<id> - 比對差異\n"
+                        "/refundcard return=<id> last4=<1234> - 退貨卡號驗證\n"
+                        "/help - 指令列表"
+                    )
+
+                elif name == "status":
+                    from datetime import date as _date, timedelta
+                    today = _date.today().isoformat()
+                    yesterday = (_date.today() - timedelta(days=1)).isoformat()
+                    status_lines = [f"BuyerOS 狀態\n日期：{today}"]
+                    if recon_store.configured():
+                        try:
+                            decls = recon_store.fetch_declarations_by_date(date=today)
+                            deposits = recon_store.fetch_bank_deposits(date=today)
+                            records = recon_store.fetch_recon_daily_records(date=yesterday)
+                            status_lines.append(f"今日申報：{len(decls)} 筆")
+                            status_lines.append(f"今日銀行入帳：{len(deposits)} 筆")
+                            status_lines.append(f"昨日對帳記錄：{len(records)} 筆")
+                        except Exception:
+                            status_lines.append("狀態查詢失敗")
+                    else:
+                        status_lines.append("Supabase 未配置")
+                    response_text = "\n".join(status_lines)
+
+                elif name == "recon":
+                    recon_date = args.get("date") or ""
+                    if recon_date:
+                        try:
+                            from datetime import datetime
+                            datetime.strptime(recon_date, "%Y-%m-%d")
+                        except ValueError:
+                            response_text = "日期格式錯誤，請使用 YYYY-MM-DD"
+                        else:
+                            if not recon_store.configured():
+                                response_text = "Supabase 未配置，無法執行對帳"
+                            else:
+                                result = recon_store.run_daily_reconciliation(date=recon_date)
+                                response_text = (
+                                    f"對帳完成\n日期={result.get('date')}\n"
+                                    f"處理團隊={result.get('teams_processed')}\n"
+                                    f"申報={result.get('total_declarations')} 筆\n"
+                                    f"銀行入帳={result.get('total_bank_credits')} 筆\n"
+                                    f"已配對={result.get('matched_count')}\n"
+                                    f"未配對銀行={len(result.get('unmatched_bank_credits') or [])}"
+                                )
+                    else:
+                        response_text = "用法：/recon [YYYY-MM-DD]\n預設：昨日"
+
+                elif name == "bank_import":
+                    bank_code = args.get("bank_code", "")
+                    account_id = args.get("account_id", "")
+                    if not bank_code or not account_id:
+                        response_text = "用法：/bank_import <bank_code> <account_id>\n請稍後上傳 CSV 檔案至 /recon/bank/import-csv"
+                    else:
+                        response_text = f"銀行入帳已觸發\nbank={bank_code}\naccount={account_id}\n請上傳 CSV 至 /recon/bank/import-csv"
+
+                elif name == "help":
+                    response_text = (
+                        "BuyerOS 指令列表\n\n"
+                        "/start - 歡迎訊息\n"
+                        "/status - 系統狀態\n"
+                        "/recon [date] - 執行對帳\n"
+                        "/bank_import <bank_code> <account_id> - 觸發銀行入帳\n"
+                        "/scan <url> buyer=<id> team=<id?> decl=<id?> - 掃描收據\n"
+                        "/compare decl=<id> scan=<id> buyer=<id> team=<id?> threshold=<0.72> - 比對差異\n"
+                        "/refundcard return=<id> last4=<1234> buyer=<id?> team=<id?> - 退貨卡號驗證\n"
+                        "/help - 本列表"
+                    )
 
                 else:
                     response_text = "未知指令。"
@@ -1374,20 +1466,218 @@ def create_app() -> FastAPI:
         html = render_admin_page(title=f"Comparison {comparison_id}", blocks=blocks)
         return Response(content=html, media_type="text/html")
 
-        items = context_hub.get_session(session_id)
-        if not items:
-            # Backward-compatible fallback for historical rows where callers
-            # keyed memory on session_id but failed to persist content.session_id.
-            fallback_items = context_hub.memory_store.search_memory(
-                namespace_prefix=("buyeros", "ai_context"),
-                memory_key=session_id,
-                limit=50,
-            )
-            if fallback_items:
-                items = fallback_items
-        audit_logger.log(action="context.session", actor="api", details={"session_id": session_id, "count": len(items)})
-        return {"ok": True, "items": items, "last_state": session_store.get_state(session_id)}
+    # ── Phase 2c: Refund Card Verification ────────────────────────────────────
 
+    @app.get("/admin/refund-card/verify/{verification_id}", tags=["Admin"])
+    async def admin_refund_card_verify(verification_id: str, request: Request, token: Optional[str] = None) -> Response:
+        """Show refund card verification result (admin page)."""
+        expected_query_token = os.getenv("ADMIN_DASHBOARD_TOKEN")
+        if expected_query_token:
+            if token != expected_query_token:
+                raise HTTPException(status_code=401, detail="Invalid or missing admin token")
+        else:
+            await require_api_key(request)
+
+        if not recon_store.configured():
+            return Response(
+                content=render_admin_page(title="BuyerOS Admin", blocks=[render_kv_card("Error", {"error": "supabase_not_configured"})]),
+                media_type="text/html",
+            )
+
+        supa = recon_store.supabase
+        ver_rows = (
+            supa.table("refund_card_verifications")
+            .select(
+                "verification_id,buyer_id,team_id,return_id,"
+                "original_transaction_id,original_card_last4,"
+                "refund_card_last4,refund_amount_hkd,"
+                "card_match,card_verified,verification_status,"
+                "risk_level,risk_flags,"
+                "verified_by,verified_at,notes,created_at"
+            )
+            .eq("verification_id", verification_id)
+            .limit(1)
+            .execute()
+        ).data or []
+
+        ver = ver_rows[0] if ver_rows else None
+        blocks = []
+        blocks.append(
+            "<div style=\"margin-bottom:10px\"><a href=\"/admin?token=" + _escape(token) + "\">← back</a></div>"
+            if expected_query_token
+            else "<div style=\"margin-bottom:10px\"><a href=\"/admin\">← back</a></div>"
+        )
+        if ver:
+            risk_flags_raw = ver.get("risk_flags", [])
+            risk_flags_str = ", ".join(risk_flags_raw) if isinstance(risk_flags_raw, list) else str(risk_flags_raw or "")
+            rows_display = {
+                "verification_id": ver.get("verification_id"),
+                "buyer_id": ver.get("buyer_id"),
+                "team_id": ver.get("team_id"),
+                "return_id": ver.get("return_id"),
+                "refund_card_last4": ver.get("refund_card_last4"),
+                "refund_amount_hkd": ver.get("refund_amount_hkd"),
+                "card_match": ver.get("card_match"),
+                "card_verified": ver.get("card_verified"),
+                "verification_status": ver.get("verification_status"),
+                "risk_level": ver.get("risk_level"),
+                "risk_flags": risk_flags_str,
+                "verified_by": ver.get("verified_by"),
+                "verified_at": ver.get("verified_at"),
+                "notes": ver.get("notes"),
+                "created_at": ver.get("created_at"),
+            }
+            blocks.append(render_kv_card("Verification Result", rows_display))
+        else:
+            blocks.append(render_kv_card("Verification", {"verification_id": verification_id, "found": False}))
+
+        html = render_admin_page(title=f"Refund Card Verify {verification_id}", blocks=blocks)
+        return Response(content=html, media_type="text/html")
+
+    # ── Phase 2d: Daily Reconciliation ─────────────────────────────────────────
+
+    @app.post("/recon/daily-reconcile", dependencies=[Depends(require_api_key)], tags=["Recon"])
+    async def recon_daily_reconcile(request: Request) -> Dict[str, Any]:
+        """Reconcile declarations vs bank credits for all teams on a given date.
+
+        Accepts optional JSON body: { "date": "YYYY-MM-DD" }.
+        Defaults to yesterday (local date).
+        """
+        body = await request.json() if request.body else {}
+        target_date_raw = body.get("date")
+
+        if target_date_raw:
+            target_date = str(target_date_raw)
+        else:
+            from datetime import date as _date, timedelta
+            target_date = (_date.today() - timedelta(days=1)).isoformat()
+
+        if not recon_store.configured():
+            raise HTTPException(status_code=400, detail="SUPABASE_URL/SUPABASE_KEY not configured")
+
+        result = recon_store.run_daily_reconciliation(date=target_date)
+
+        audit_logger.log(
+            action="recon.daily_reconcile",
+            actor="api",
+            details={
+                "date": target_date,
+                "teams_processed": result.get("teams_processed"),
+                "total_declarations": result.get("total_declarations"),
+                "total_bank_credits": result.get("total_bank_credits"),
+                "matched_count": result.get("matched_count"),
+            },
+        )
+
+        return result
+
+    @app.get("/admin/recon-daily", tags=["Admin"])
+    async def admin_recon_daily(request: Request, token: Optional[str] = None) -> Response:
+        """Show recent recon_daily records (admin page)."""
+        expected_query_token = os.getenv("ADMIN_DASHBOARD_TOKEN")
+        if expected_query_token:
+            if token != expected_query_token:
+                raise HTTPException(status_code=401, detail="Invalid or missing admin token")
+        else:
+            await require_api_key(request)
+
+        if not recon_store.configured():
+            return Response(
+                content=render_admin_page(title="BuyerOS Admin", blocks=[render_kv_card("Error", {"error": "supabase_not_configured"})]),
+                media_type="text/html",
+            )
+
+        supa = recon_store.supabase
+        records = (
+            supa.table("recon_daily")
+            .select(
+                "recon_id,team_id,date,period_type,"
+                "total_declared_hkd,total_scanned_hkd,total_income_diff_hkd,"
+                "total_returns_hkd,return_count,"
+                "total_expenses_hkd,expense_count,"
+                "total_missing_items,total_price_mismatches,total_risk_alerts,critical_alerts,"
+                "total_commission_hkd,"
+                "status,approved_by,approved_at,created_at"
+            )
+            .order("created_at", desc=True)
+            .limit(50)
+            .execute()
+        ).data or []
+
+        def _fmt_hkd(v: Any) -> str:
+            if v is None:
+                return ""
+            try:
+                return f"{int(v) / 100:,.2f}"
+            except Exception:
+                return str(v)
+
+        def _status_pill(v: Any) -> str:
+            vv = str(v or "").lower()
+            if vv in ("approved", "complete", "completed"):
+                return f'<span class="pill good">{_escape(v)}</span>'
+            if vv in ("draft", "pending"):
+                return f'<span class="pill warn">{_escape(v)}</span>'
+            return f'<span class="pill neutral">{_escape(v)}</span>'
+
+        def _risk_pill(v: Any) -> str:
+            vv = str(v or "").lower()
+            if vv == "high":
+                return f'<span class="pill bad">{_escape(v)}</span>'
+            if vv == "medium":
+                return f'<span class="pill warn">{_escape(v)}</span>'
+            return f'<span class="pill good">{_escape(v)}</span>'
+
+        blocks = []
+        blocks.append(
+            "<div style=\"margin-bottom:10px\"><a href=\"/admin?token=" + _escape(token) + "\">← back</a></div>"
+            if expected_query_token
+            else "<div style=\"margin-bottom:10px\"><a href=\"/admin\">← back</a></div>"
+        )
+
+        rows = []
+        for r in records:
+            rows.append([
+                _escape(r.get("recon_id")),
+                _escape(r.get("date")),
+                _escape(r.get("team_id")),
+                _fmt_hkd(r.get("total_declared_hkd")),
+                _fmt_hkd(r.get("total_scanned_hkd")),
+                _fmt_hkd(r.get("total_income_diff_hkd")),
+                _fmt_hkd(r.get("total_returns_hkd")),
+                _fmt_hkd(r.get("total_expenses_hkd")),
+                _status_pill(r.get("status")),
+                _escape(r.get("created_at")),
+            ])
+
+        blocks.append(render_table_card(
+            "Daily Reconciliation Records (recent 50)",
+            headers=["recon_id", "date", "team_id", "declared_hkd", "scanned_hkd", "diff_hkd", "returns_hkd", "expenses_hkd", "status", "created_at"],
+            rows=rows,
+            num_cols=[3, 4, 5, 6, 7],
+        ))
+
+        # Summary stats
+        if records:
+            total_declared = sum(r.get("total_declared_hkd") or 0 for r in records)
+            total_scanned = sum(r.get("total_scanned_hkd") or 0 for r in records)
+            total_returns = sum(r.get("total_returns_hkd") or 0 for r in records)
+            total_expenses = sum(r.get("total_expenses_hkd") or 0 for r in records)
+            blocks.insert(
+                1,
+                render_kv_card("Summary", {
+                    "records": len(records),
+                    "total_declared_hkd": _fmt_hkd(total_declared),
+                    "total_scanned_hkd": _fmt_hkd(total_scanned),
+                    "total_returns_hkd": _fmt_hkd(total_returns),
+                    "total_expenses_hkd": _fmt_hkd(total_expenses),
+                }),
+            )
+
+        html = render_admin_page(title="Daily Reconciliation", blocks=blocks)
+        return Response(content=html, media_type="text/html")
+
+    # Re-add /agents/run endpoint that was accidentally removed
     @app.post("/agents/run", dependencies=[Depends(require_api_key)], tags=["Agents"])
     async def agents_run(payload: AgentRunRequest) -> Dict[str, Any]:
         """Run a task through the BuyerOS graph/provider layer."""
