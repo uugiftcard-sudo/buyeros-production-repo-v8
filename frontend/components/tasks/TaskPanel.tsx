@@ -1,6 +1,6 @@
 "use client";
 
-import { TaskContent } from "@/app/page";
+import { TaskContent } from "../../app/types";
 
 interface TaskPanelProps {
   tasks: TaskContent[];

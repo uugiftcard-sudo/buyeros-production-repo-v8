@@ -1,6 +1,6 @@
 "use client";
 
-import { AgentCard as AgentCardType } from "@/app/page";
+import { AgentCard as AgentCardType } from "../../app/types";
 
 interface AgentCardProps {
   agent: AgentCardType;
