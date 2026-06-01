@@ -107,6 +107,7 @@ from ..services.bank_import_service import BankImportService
 from ..services.telegram_commands import parse_telegram_command
 from ..services.admin_dashboard import render_admin_page, render_kv_card, render_table_card
 from ..services.expense_service import ExpenseService, VALID_CATEGORIES, VALID_STATUSES
+from ..services.finance_service import FinanceService
 from ..workflows.buyeros_graph import BuyerOSGraphWorkflow
 
 logger = logging.getLogger(__name__)
@@ -560,6 +561,9 @@ def create_app() -> FastAPI:
     expense_service = ExpenseService()
     app.state.expense_service = expense_service
 
+    finance_service = FinanceService(memory_store=memory_store)
+    app.state.finance_service = finance_service
+
     @app.on_event("startup")
     async def _startup_orchestration() -> None:
         await orchestration_store.connect()
@@ -856,6 +860,14 @@ def create_app() -> FastAPI:
             details={"query": payload.query, "source_provider": payload.source_provider, "session_id": payload.session_id, "count": summary.get("count")},
         )
         return {"ok": True, **summary}
+
+    @app.get("/context/session/{session_id}", dependencies=[Depends(require_api_key)], tags=["Context"])
+    async def context_session(session_id: str, limit: int = 50) -> Dict[str, Any]:
+        """Return shared context entries for a session plus any saved runtime state."""
+        safe_limit = min(max(limit, 1), 100)
+        items = context_hub.get_session(session_id, limit=safe_limit)
+        last_state = session_store.get_state(session_id)
+        return {"ok": True, "session_id": session_id, "items": items, "last_state": last_state}
 
     @app.post("/recon/receipt/scan", dependencies=[Depends(require_api_key)], tags=["Recon"])
     async def recon_receipt_scan(payload: ReceiptScanRequest) -> Dict[str, Any]:
@@ -2214,6 +2226,73 @@ def create_app() -> FastAPI:
         )
         audit_logger.log(action="tasks.run_all", actor="api", details={"task_id": task_id, "ok": bool(result.get("ok")), "status": result.get("status")})
         return result
+
+    # ──────────────────────────────────────────────────────────────────
+    # Orders — 訂單查詢 (buyer_ai 視角)
+    # ──────────────────────────────────────────────────────────────────
+
+    @app.get("/orders", dependencies=[Depends(require_api_key)], tags=["Orders"])
+    async def list_orders(
+        request: Request,
+        customer_id: Optional[str] = None,
+        limit: int = 20,
+    ) -> Dict[str, Any]:
+        """List orders, optionally filtered by customer_id."""
+        svc = request.app.state.orders_service
+        items = svc.list_orders(customer_id=customer_id, limit=max(1, min(limit, 200)))
+        return {"ok": True, "configured": svc.configured(), "orders": items, "count": len(items)}
+
+    @app.get("/orders/{order_id}", dependencies=[Depends(require_api_key)], tags=["Orders"])
+    async def get_order(request: Request, order_id: str) -> Dict[str, Any]:
+        """Fetch a single order by ID."""
+        svc = request.app.state.orders_service
+        order = svc.get_order(order_id)
+        return {"ok": True, "configured": svc.configured(), "order": order}
+
+    # ──────────────────────────────────────────────────────────────────
+    # Buyers — 買手資料
+    # ──────────────────────────────────────────────────────────────────
+
+    @app.get("/buyers", dependencies=[Depends(require_api_key)], tags=["Buyers"])
+    async def list_buyers(request: Request, limit: int = 20) -> Dict[str, Any]:
+        """List buyer/customer profiles from configured e-commerce provider."""
+        svc = request.app.state.buyers_service
+        customers = svc.list_customers(limit=max(1, min(limit, 200)))
+        return {
+            "ok": True,
+            "configured": svc.configured(),
+            "customers": customers,
+            "count": len(customers),
+        }
+
+    @app.get("/buyers/{customer_id}", dependencies=[Depends(require_api_key)], tags=["Buyers"])
+    async def get_buyer(request: Request, customer_id: str) -> Dict[str, Any]:
+        """Fetch a single buyer/customer profile by ID."""
+        svc = request.app.state.buyers_service
+        customer = svc.get_customer(customer_id)
+        return {"ok": True, "configured": svc.configured(), "customer": customer}
+
+    # ──────────────────────────────────────────────────────────────────
+    # Finance — 財務摘要
+    # ──────────────────────────────────────────────────────────────────
+
+    @app.get("/finance/profit", dependencies=[Depends(require_api_key)], tags=["Finance"])
+    async def finance_profit(request: Request) -> Dict[str, Any]:
+        """Return profit summary (Google Sheets → Finance API → local estimate)."""
+        svc = request.app.state.finance_service if hasattr(request.app.state, "finance_service") else None
+        if svc is None:
+            raise HTTPException(status_code=503, detail="finance service not initialised")
+        result = svc.get_profit_summary()
+        return {"ok": True, **result}
+
+    @app.get("/finance/payout", dependencies=[Depends(require_api_key)], tags=["Finance"])
+    async def finance_payout(request: Request) -> Dict[str, Any]:
+        """Return payout schedule for buyers."""
+        svc = request.app.state.finance_service if hasattr(request.app.state, "finance_service") else None
+        if svc is None:
+            raise HTTPException(status_code=503, detail="finance service not initialised")
+        result = svc.get_payout_schedule()
+        return {"ok": True, **result}
 
     # ──────────────────────────────────────────────────────────────────
     # Expense Claims — 買手報帳系統

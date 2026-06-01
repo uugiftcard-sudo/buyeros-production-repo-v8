@@ -1,68 +1,31 @@
-# ── Binary media ──────────────────────────────────────────────────────────────
-*.zip
-*.mp4
-*.mov
-*.avi
-*.mkv
-*.jpeg
-*.jpg
-*.png
-*.gif
-*.webp
-*.bmp
-*.tiff
-
-# ── macOS system ───────────────────────────────────────────────────────────────
-.DS_Store
-.localized
-
-# ── Secrets & credentials ──────────────────────────────────────────────────────
-.env
-*.rtf
-*.pem
-*.key
-*.p12
-*.pfx
-Secrets_Env/
-
-# ── AI export raw dumps (contain private data) ────────────────────────────────
-Raw-Exports/Other-AI/Telegram/
-Raw-Exports/Claude/
-Raw-Exports/ChatGPT/
-Raw-Exports/Gemini/
-Raw-Exports/Perplexity/
-
-# ── Project subdirectories to ignore ──────────────────────────────────────────
-Videos/
-Images/
-
-# ── Dependency & cache directories ────────────────────────────────────────────
-node_modules/
 __pycache__/
+.pytest_cache/
+.env
+.env.local
+.env.production
+.env.production.local
+.env.staging.local
+.staging_root_password.local
 *.pyc
 *.pyo
 *.pyd
-.Python
-*.egg-info/
-.eggs/
-dist/
-build/
-*.whl
-
-# ── IDE & editor noise ────────────────────────────────────────────────────────
-.vscode/
-*.codex/
-.idea/
 *.swp
 *.swo
-*~
 .DS_Store
+build/
+dist/
+*.egg-info/
+node_modules/
+.next/
+*.tsbuildinfo
+frontend/test-results/
+frontend/playwright-report/
+/.vscode/
+infra/ops_runs/
+infra/.smoke_*_pid
+infra/*smoke*.log
+.old_keys_backup.txt
 
-# ── Nested git repositories (accidental gitlinks) ─────────────────────────────
-*/.git
-*/*/.git
-*/*/*/.git
-
-# ── Playwright / browser automation artifacts ─────────────────────────────────
-.playwright-cli/
-**/.playwright-cli/
+# Local SQLite databases (expense claims, etc.)
+backend/data/
+supabase/.temp/
