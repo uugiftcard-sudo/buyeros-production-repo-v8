@@ -1,6 +1,7 @@
 __pycache__/
 .pytest_cache/
 .env
+.env.*.local
 .env.local
 .env.production
 .env.production.local
@@ -20,7 +21,11 @@ node_modules/
 *.tsbuildinfo
 frontend/test-results/
 frontend/playwright-report/
+frontend/.next/
+frontend/tsconfig.tsbuildinfo
 /.vscode/
+.codegraph/
+.cursor/rules/
 infra/ops_runs/
 infra/.smoke_*_pid
 infra/*smoke*.log
