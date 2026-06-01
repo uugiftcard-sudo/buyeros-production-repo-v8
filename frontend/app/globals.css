@@ -1357,8 +1357,10 @@ p {
   color: oklch(0.12 0.02 255);
   padding: 0 14px;
   font-weight: 800;
+  font: inherit;
   text-align: center;
   text-decoration: none;
+  cursor: pointer;
   transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 

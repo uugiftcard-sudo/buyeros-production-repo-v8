@@ -360,3 +360,104 @@ test("BAI-8: Orchestration trace panel loads agent state and timeline", async ({
   const orchResult = page.getByTestId("orch-result");
   await expect(orchResult).toContainText("hermes");
 });
+
+test("Expenses page submits, filters, reviews, and exports through mocked API", async ({ page }) => {
+  test.setTimeout(60_000);
+
+  const calls: string[] = [];
+  type ExpenseSmokeClaim = {
+    id: string;
+    buyer_name: string;
+    amount: number;
+    currency: string;
+    category: string;
+    description: string;
+    receipt_url: string | null;
+    status: "pending" | "approved" | "rejected";
+    submitted_at: string;
+    reviewed_at: string | null;
+    reviewer: string | null;
+    reviewer_note: string | null;
+  };
+
+  let claim: ExpenseSmokeClaim = {
+    id: "claim-smoke-1",
+    buyer_name: "陳大文",
+    amount: 128.5,
+    currency: "HKD",
+    category: "travel",
+    description: "廣州採購交通費",
+    receipt_url: "https://example.com/receipt.jpg",
+    status: "pending",
+    submitted_at: "2026-06-01T00:00:00+00:00",
+    reviewed_at: null,
+    reviewer: null,
+    reviewer_note: null,
+  };
+
+  await page.route("**/api/buyeros/**", async (route) => {
+    const url = new URL(route.request().url());
+    const path = url.pathname.replace(/^\/api\/buyeros/, "");
+    calls.push(`${route.request().method()} ${path}`);
+
+    if (path.startsWith("/expenses/export/csv")) {
+      return route.fulfill({
+        status: 200,
+        contentType: "text/csv",
+        body: "id,buyer_name,status\nclaim-smoke-1,陳大文,approved\n",
+      });
+    }
+
+    const json = (body: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+
+    if (route.request().method() === "POST" && path === "/expenses") {
+      const body = route.request().postDataJSON() as { buyer_name: string; amount: number; category: string; description: string };
+      claim = { ...claim, ...body, status: "pending" };
+      return json({ ok: true, claim });
+    }
+
+    if (route.request().method() === "PATCH" && path === "/expenses/claim-smoke-1/status") {
+      const body = route.request().postDataJSON() as { status: "approved" | "rejected"; reviewer?: string; reviewer_note?: string };
+      claim = {
+        ...claim,
+        status: body.status,
+        reviewer: body.reviewer ?? null,
+        reviewer_note: body.reviewer_note ?? null,
+        reviewed_at: "2026-06-01T00:05:00+00:00",
+      };
+      return json({ ok: true, claim });
+    }
+
+    if (path.startsWith("/expenses")) {
+      return json({ ok: true, claims: [claim], count: 1 });
+    }
+
+    return json({ ok: true });
+  });
+
+  await page.goto("/expenses");
+  await expect(page.getByRole("heading", { name: "買手報帳系統" })).toBeVisible();
+
+  await page.getByRole("button", { name: "+ 提交報帳" }).click();
+  await page.getByPlaceholder("e.g. 陳大文").fill("陳大文");
+  await page.getByPlaceholder("0.00").fill("128.50");
+  await page.getByPlaceholder("費用說明，例如：廣州採購差旅費").fill("廣州採購交通費");
+  await page.getByRole("button", { name: "提交報帳" }).click();
+  await expect(page.getByText("報帳單已提交，待審批。")).toBeVisible();
+  await expect.poll(() => calls.includes("POST /expenses")).toBe(true);
+
+  await page.getByPlaceholder("搜尋買手姓名").fill("大文");
+  await page.getByRole("button", { name: "刷新" }).click();
+  await expect.poll(() => calls.some((call) => call.includes("GET /expenses"))).toBe(true);
+  await expect(page.getByText("陳大文").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "審批" }).click();
+  await page.getByPlaceholder("你的姓名").fill("Ruby");
+  await page.getByPlaceholder("例如：金額偏高，需補充收據").fill("OK");
+  await page.getByRole("button", { name: "✓ 批准" }).click();
+  await expect(page.getByText("報帳單已批准。")).toBeVisible();
+  await expect.poll(() => calls.includes("PATCH /expenses/claim-smoke-1/status")).toBe(true);
+
+  await page.getByRole("button", { name: "↓ 匯出 CSV" }).click();
+  await expect.poll(() => calls.some((call) => call.includes("GET /expenses/export/csv"))).toBe(true);
+});
