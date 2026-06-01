@@ -34,7 +34,6 @@ infra/*smoke*.log
 # Local SQLite databases (expense claims, etc.)
 backend/data/
 supabase/.temp/
-xau-ai-cli/
 
 # Embedded repos — independent git repos
 XAU/

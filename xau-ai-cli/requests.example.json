@@ -1,0 +1,34 @@
+[
+  {
+    "biasType": "up",
+    "topic": "今日黄金直播重点：不追高，等回踩",
+    "cta": "留言“黄金”我把关键位置发你",
+    "frame": "M15",
+    "momentum": 62,
+    "position": 55,
+    "risk": 58,
+    "support": "关键支撑位附近（不报具体点位）",
+    "resistance": "关键压力位附近（不报具体点位）",
+    "accountStyle": "educational"
+  },
+  {
+    "biasType": "down",
+    "topic": "跌破后的二次确认怎么讲",
+    "cta": "想要我拆逻辑就打 1",
+    "frame": "M5",
+    "momentum": 48,
+    "position": 45,
+    "risk": 72,
+    "accountStyle": "educational"
+  },
+  {
+    "biasType": "wait",
+    "topic": "数据前的观望话术：纪律大于方向",
+    "cta": "新来的朋友先别急，留言“风控”我送你一张仓位表",
+    "frame": "H1",
+    "momentum": 35,
+    "position": 50,
+    "risk": 80,
+    "accountStyle": "educational"
+  }
+]
