@@ -20,6 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from app.routers import shopify_router
 from app.routers import tiktok_router
 from app.routers import api_router
+from app.routers import metrics_router
 from app.rate_limit import limiter, rate_limit_exceeded_handler
 
 # ---------------------------------------------------------------------------
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(shopify_router)
     app.include_router(tiktok_router)
     app.include_router(api_router)
+    app.include_router(metrics_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
