@@ -243,10 +243,57 @@ def repo_selection(config: dict[str, Any], selected: str) -> list[str]:
     return [selected]
 
 
+def validate_repo_path(repo: dict[str, Any]) -> list[str]:
+    repo_path = Path(repo["path"])
+    blockers: list[str] = []
+    if not repo_path.exists():
+        return [f"repo path missing: {repo_path}"]
+    if not repo_path.is_dir():
+        return [f"repo path is not a directory: {repo_path}"]
+
+    git_root = subprocess.run(
+        ["git", "-C", str(repo_path), "rev-parse", "--show-toplevel"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if git_root.returncode != 0:
+        blockers.append("repo path is not inside a git checkout")
+    elif Path(git_root.stdout.strip()).resolve() != repo_path.resolve():
+        blockers.append(f"repo path resolves to parent git root: {git_root.stdout.strip()}")
+
+    for required_file in repo.get("required_files", []):
+        if not (repo_path / required_file).exists():
+            blockers.append(f"missing required file: {required_file}")
+    return blockers
+
+
 def run_repo(config: dict[str, Any], repo_key: str, mode: str, dry_run: bool) -> RepoResult:
     repo = config["repos"][repo_key]
     path = repo["path"]
     label = repo["label"]
+    path_blockers = validate_repo_path(repo)
+    if path_blockers:
+        return RepoResult(
+            key=repo_key,
+            label=label,
+            mode=mode,
+            ok=False,
+            deploy_allowed=False,
+            dirty=False,
+            secret_hits=[],
+            blockers=path_blockers,
+            steps=[
+                StepResult(
+                    name="repo path validation",
+                    ok=False,
+                    command=f"validate {path}",
+                    output="; ".join(path_blockers),
+                )
+            ],
+        )
+
     status = git_status(path)
     dirty = bool(status)
     secret_hits = secret_scan(path, config["secret_patterns"])

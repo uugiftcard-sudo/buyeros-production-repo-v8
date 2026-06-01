@@ -21,6 +21,11 @@
     "buyeros": {
       "label": "BuyerOS",
       "path": "/Users/rubykan/Downloads/buyeros-production-repo-v8",
+      "required_files": [
+        "backend/app/workflows/main.py",
+        "frontend/package.json",
+        "infra/preflight_deploy.sh"
+      ],
       "deploy_policy": "production",
       "check_commands": [
         {
@@ -77,6 +82,11 @@
     "xau": {
       "label": "XAU",
       "path": "/Users/rubykan/Documents/XAU",
+      "required_files": [
+        "app.js",
+        "server/package.json",
+        "tests/analysis-output.test.js"
+      ],
       "deploy_policy": "local-docker",
       "check_commands": [
         {
@@ -118,6 +128,11 @@
     "cloth": {
       "label": "CLOTH",
       "path": "/Users/rubykan/Documents/CLOTH",
+      "required_files": [
+        "package.json",
+        "api/package.json",
+        "web/package.json"
+      ],
       "deploy_policy": "staging-systemd",
       "check_commands": [
         {
