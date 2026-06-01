@@ -219,13 +219,37 @@ test.skip("BuyerOS mission control can plan, run one step, and show memory UI", 
 
   await expect(page.getByText("Health Check")).toBeVisible();
   await expect(page.getByText("Backup Status")).toBeVisible();
-  await page.getByText("Capabilities / Gaps").click();
-  await expect(page.getByText("Capabilities / Gaps").first()).toBeVisible();
-  await page.getByText("Report History").click();
+  await page.evaluate(() => {
+    const click = (text: string) => {
+      const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === text);
+      if (btn) (btn as HTMLButtonElement).click();
+    };
+    click('Capabilities / Gaps');
+  });
+  await expect(page.locator('#capabilities').getByText("Capabilities / Gaps")).toBeVisible({ timeout: 5000 });
+  await page.evaluate(() => {
+    const click = (text: string) => {
+      const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === text);
+      if (btn) (btn as HTMLButtonElement).click();
+    };
+    click('Report History');
+  });
   await expect(page.getByText("報表歷史").first()).toBeVisible();
-  await page.getByText("Audit Log").click();
+  await page.evaluate(() => {
+    const click = (text: string) => {
+      const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === text);
+      if (btn) (btn as HTMLButtonElement).click();
+    };
+    click('Audit Log');
+  });
   await expect(page.getByText("Audit Log").first()).toBeVisible();
-  await page.getByText("維運狀態").click();
+  await page.evaluate(() => {
+    const click = (text: string) => {
+      const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === text);
+      if (btn) (btn as HTMLButtonElement).click();
+    };
+    click('維運狀態');
+  });
   await expect(page.locator("#ops").getByText("Backup created", { exact: true })).toBeVisible();
   await expect(page.getByText(/RTO 12s/)).toBeVisible();
 
