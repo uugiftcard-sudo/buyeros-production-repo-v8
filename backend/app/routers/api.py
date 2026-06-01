@@ -6,14 +6,16 @@ Routes: /api/expenses, /api/tasks, /api/automation, /api/memory
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from typing import Any, Dict, List, Optional
+
+from app.rate_limit import limiter, DEFAULT_LIMIT, WRITE_LIMIT
 
 router = APIRouter(prefix="/api", tags=["buyeros"])
 
 
 # ---------------------------------------------------------------------------
-# Health & Status
+# Health & Status (no rate limit)
 # ---------------------------------------------------------------------------
 
 @router.get("/health")
@@ -23,7 +25,8 @@ async def health_check() -> Dict[str, str]:
 
 
 @router.get("/status")
-async def get_status() -> Dict[str, Any]:
+@limiter.limit(DEFAULT_LIMIT)
+async def get_status(request: Request) -> Dict[str, Any]:
     """Get system status including AI router status."""
     from app.ai_router import AIModelRouter
     router_ai = AIModelRouter()
@@ -38,7 +41,9 @@ async def get_status() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 @router.get("/expenses")
+@limiter.limit(DEFAULT_LIMIT)
 async def list_expenses(
+    request: Request,
     status_filter: Optional[str] = None,
     buyer_name: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
@@ -49,7 +54,8 @@ async def list_expenses(
 
 
 @router.post("/expenses")
-async def create_expense(data: Dict[str, Any]) -> Dict[str, Any]:
+@limiter.limit(WRITE_LIMIT)
+async def create_expense(request: Request, data: Dict[str, Any]) -> Dict[str, Any]:
     """Create a new expense claim."""
     from app.services.expense_service import ExpenseService
     service = ExpenseService()
@@ -62,7 +68,8 @@ async def create_expense(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.get("/expenses/{expense_id}")
-async def get_expense(expense_id: str) -> Dict[str, Any]:
+@limiter.limit(DEFAULT_LIMIT)
+async def get_expense(request: Request, expense_id: str) -> Dict[str, Any]:
     """Get expense by ID."""
     from app.services.expense_service import ExpenseService
     service = ExpenseService()
@@ -73,7 +80,9 @@ async def get_expense(expense_id: str) -> Dict[str, Any]:
 
 
 @router.patch("/expenses/{expense_id}")
+@limiter.limit(WRITE_LIMIT)
 async def update_expense(
+    request: Request,
     expense_id: str,
     data: Dict[str, Any],
 ) -> Dict[str, Any]:
@@ -101,7 +110,8 @@ async def update_expense(
 # ---------------------------------------------------------------------------
 
 @router.post("/tasks/dispatch")
-async def dispatch_task(data: Dict[str, Any]) -> Dict[str, Any]:
+@limiter.limit(WRITE_LIMIT)
+async def dispatch_task(request: Request, data: Dict[str, Any]) -> Dict[str, Any]:
     """Dispatch a new task."""
     from app.services.task_dispatcher_service import TaskDispatcherService
     service = TaskDispatcherService()
@@ -109,7 +119,8 @@ async def dispatch_task(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.get("/tasks/{task_id}")
-async def get_task(task_id: str) -> Dict[str, Any]:
+@limiter.limit(DEFAULT_LIMIT)
+async def get_task(request: Request, task_id: str) -> Dict[str, Any]:
     """Get task by ID."""
     from app.services.task_dispatcher_service import TaskDispatcherService
     service = TaskDispatcherService()
@@ -120,7 +131,9 @@ async def get_task(task_id: str) -> Dict[str, Any]:
 
 
 @router.get("/tasks")
+@limiter.limit(DEFAULT_LIMIT)
 async def list_tasks(
+    request: Request,
     status_filter: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """List tasks with optional status filter."""
@@ -132,7 +145,8 @@ async def list_tasks(
 
 
 @router.patch("/tasks/{task_id}/cancel")
-async def cancel_task(task_id: str) -> Dict[str, Any]:
+@limiter.limit(WRITE_LIMIT)
+async def cancel_task(request: Request, task_id: str) -> Dict[str, Any]:
     """Cancel a task."""
     from app.services.task_dispatcher_service import TaskDispatcherService
     service = TaskDispatcherService()
@@ -144,7 +158,8 @@ async def cancel_task(task_id: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 @router.post("/bank/import")
-async def import_bank_transactions(data: Dict[str, Any]) -> Dict[str, Any]:
+@limiter.limit(WRITE_LIMIT)
+async def import_bank_transactions(request: Request, data: Dict[str, Any]) -> Dict[str, Any]:
     """Import bank transactions."""
     from app.services.bank_import_service import BankImportService
     service = BankImportService()
@@ -152,7 +167,8 @@ async def import_bank_transactions(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.get("/bank/reconciliations")
-async def list_reconciliations() -> List[Dict[str, Any]]:
+@limiter.limit(DEFAULT_LIMIT)
+async def list_reconciliations(request: Request) -> List[Dict[str, Any]]:
     """List reconciliations."""
     from app.services.recon_store import ReconStore
     store = ReconStore()
@@ -160,7 +176,8 @@ async def list_reconciliations() -> List[Dict[str, Any]]:
 
 
 @router.get("/bank/reconciliations/{recon_id}")
-async def get_reconciliation(recon_id: str) -> Dict[str, Any]:
+@limiter.limit(DEFAULT_LIMIT)
+async def get_reconciliation(request: Request, recon_id: str) -> Dict[str, Any]:
     """Get reconciliation by ID."""
     from app.services.recon_store import ReconStore
     store = ReconStore()
@@ -175,7 +192,8 @@ async def get_reconciliation(recon_id: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 @router.post("/ai/route")
-async def route_ai_request(data: Dict[str, Any]) -> Dict[str, Any]:
+@limiter.limit(WRITE_LIMIT)
+async def route_ai_request(request: Request, data: Dict[str, Any]) -> Dict[str, Any]:
     """Route AI request to appropriate model."""
     from app.ai_router import AIModelRouter
     router_ai = AIModelRouter()
@@ -190,7 +208,8 @@ async def route_ai_request(data: Dict[str, Any]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 @router.get("/memory/{key}")
-async def get_memory(key: str) -> Dict[str, Any]:
+@limiter.limit(DEFAULT_LIMIT)
+async def get_memory(request: Request, key: str) -> Dict[str, Any]:
     """Get memory by key."""
     from app.memory_store import MemoryStore
     store = MemoryStore()
@@ -198,7 +217,8 @@ async def get_memory(key: str) -> Dict[str, Any]:
 
 
 @router.post("/memory/{key}")
-async def set_memory(key: str, data: Dict[str, Any]) -> Dict[str, str]:
+@limiter.limit(WRITE_LIMIT)
+async def set_memory(request: Request, key: str, data: Dict[str, Any]) -> Dict[str, str]:
     """Set memory value."""
     from app.memory_store import MemoryStore
     store = MemoryStore()
@@ -207,7 +227,8 @@ async def set_memory(key: str, data: Dict[str, Any]) -> Dict[str, str]:
 
 
 @router.delete("/memory/{key}")
-async def delete_memory(key: str) -> Dict[str, str]:
+@limiter.limit(WRITE_LIMIT)
+async def delete_memory(request: Request, key: str) -> Dict[str, str]:
     """Delete memory."""
     from app.memory_store import MemoryStore
     store = MemoryStore()

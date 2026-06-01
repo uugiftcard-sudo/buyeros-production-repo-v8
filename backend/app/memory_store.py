@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Any, Iterable, Optional, Sequence
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryStore:
@@ -16,6 +19,7 @@ class MemoryStore:
         self.supabase_url = (supabase_url or "").rstrip("/")
         self.supabase_key = supabase_key or ""
         self._items: list[dict[str, Any]] = []
+        self._supabase_error_logged = False
 
     @property
     def memory(self) -> list[dict[str, Any]]:
@@ -43,9 +47,11 @@ class MemoryStore:
         if self.configured:
             try:
                 self._save_supabase(item)
-            except Exception:
-                # Tests and local smoke should keep working when Supabase is absent.
-                pass
+            except Exception as exc:
+                # Log the error once, then continue with in-memory fallback
+                if not self._supabase_error_logged:
+                    logger.warning("Supabase unavailable, using in-memory fallback: %s", exc)
+                    self._supabase_error_logged = True
         self._items.append(item)
         return item
 
@@ -59,49 +65,97 @@ class MemoryStore:
         source_provider: Optional[str] = None,
         limit: int = 20,
     ) -> list[dict[str, Any]]:
-        prefix = tuple(namespace_prefix)
-        matches: list[dict[str, Any]] = []
-        for item in reversed(self._items):
-            namespace = tuple(item.get("namespace") or [])
-            if namespace[: len(prefix)] != prefix:
-                continue
-            if memory_key is not None and item.get("memory_key") != memory_key:
-                continue
-            content = item.get("content") or {}
-            if session_id is not None and not self._content_matches(content, "session_id", session_id):
-                continue
-            if source_provider is not None and not self._content_matches(content, "source_provider", source_provider):
-                continue
-            if query is not None and query.lower() not in json.dumps(item, ensure_ascii=False, default=str).lower():
-                continue
-            matches.append(item)
-            if len(matches) >= max(limit, 0):
-                break
-        return list(reversed(matches))
-
-    def status(self) -> dict[str, Any]:
-        return {"configured": self.configured, "ok": True, "backend": "supabase" if self.configured else "memory"}
+        if self.configured:
+            try:
+                return self._search_supabase(
+                    namespace_prefix=namespace_prefix,
+                    memory_key=memory_key,
+                    query=query,
+                    session_id=session_id,
+                    source_provider=source_provider,
+                    limit=limit,
+                )
+            except Exception as exc:
+                if not self._supabase_error_logged:
+                    logger.warning("Supabase search failed, using in-memory fallback: %s", exc)
+                    self._supabase_error_logged = True
+        
+        # Fallback to in-memory search
+        namespace_list = list(namespace_prefix)
+        results = [
+            item for item in self._items
+            if item.get("namespace", [])[: len(namespace_list)] == namespace_list
+        ]
+        if memory_key:
+            results = [r for r in results if r.get("memory_key") == memory_key]
+        return results[:limit]
 
     def _save_supabase(self, item: dict[str, Any]) -> None:
+        """Save to Supabase."""
         headers = {
             "apikey": self.supabase_key,
             "Authorization": f"Bearer {self.supabase_key}",
             "Content-Type": "application/json",
-            "Prefer": "resolution=merge-duplicates",
         }
-        httpx.post(f"{self.supabase_url}/rest/v1/buyeros_memory", headers=headers, json=item, timeout=5).raise_for_status()
+        response = httpx.post(
+            f"{self.supabase_url}/rest/v1/memory",
+            headers=headers,
+            json=item,
+            timeout=10.0,
+        )
+        response.raise_for_status()
 
-    @staticmethod
-    def _content_matches(content: Any, field: str, expected: str) -> bool:
-        if isinstance(content, dict):
-            if str(content.get(field) or "") == expected:
-                return True
-            nested = content.get("content")
-            if isinstance(nested, dict) and str(nested.get(field) or "") == expected:
-                return True
-        return False
+    def _search_supabase(
+        self,
+        *,
+        namespace_prefix: Iterable[str],
+        memory_key: Optional[str] = None,
+        query: Optional[str] = None,
+        session_id: Optional[str] = None,
+        source_provider: Optional[str] = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Search Supabase."""
+        headers = {
+            "apikey": self.supabase_key,
+            "Authorization": f"Bearer {self.supabase_key}",
+        }
+        params = {
+            "limit": str(limit),
+        }
+        if memory_key:
+            params["memory_key"] = f"eq.{memory_key}"
+        if session_id:
+            params["session_id"] = f"eq.{session_id}"
+        if source_provider:
+            params["source_provider"] = f"eq.{source_provider}"
+        
+        response = httpx.get(
+            f"{self.supabase_url}/rest/v1/memory",
+            headers=headers,
+            params=params,
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        return response.json()
 
-    @staticmethod
-    def _pg_array_literal(parts: Sequence[str]) -> str:
-        escaped = [str(part).replace("\\", "\\\\").replace('"', '\\"') for part in parts]
-        return "{" + ",".join(f'"{part}"' for part in escaped) + "}"
+    def get_memory(self, key: str) -> Any:
+        """Get a single memory item by key."""
+        for item in reversed(self._items):
+            if item.get("memory_key") == key:
+                return item.get("content")
+        return None
+
+    def set_memory(self, key: str, value: Any) -> None:
+        """Set a memory item."""
+        self._items.append({
+            "namespace": ["api"],
+            "memory_key": key,
+            "content": value,
+            "created_by": "api",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+    def delete_memory(self, key: str) -> None:
+        """Delete a memory item by key."""
+        self._items = [item for item in self._items if item.get("memory_key") != key]
