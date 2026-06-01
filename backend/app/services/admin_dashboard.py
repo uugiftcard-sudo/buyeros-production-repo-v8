@@ -236,7 +236,7 @@ def render_table_card(
                     cls = cls.strip()
                 escaped = _escape(c)
                 tds.append(f'<td class="{cls.strip()}">{escaped}</td>')
-            trs.append("<tr>" + "".join(tds) + "</tr>")
+            trs.append(f"<tr>{"".join(tds)}</tr>")
     tbody = "\n".join(trs)
     return f"""<section class="card">
 <div class="card-header"><h2>{_escape(title)}</h2></div>
