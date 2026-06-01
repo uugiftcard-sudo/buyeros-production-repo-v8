@@ -1,17 +1,7 @@
-from __future__ import annotations
+"""Pytest configuration for BuyerOS tests.
 
-import pytest
-from fastapi.testclient import TestClient
-
-from app.main import create_app
-
-
-@pytest.fixture
-def client() -> TestClient:
-    app = create_app()
-    return TestClient(app)
-
-
-@pytest.fixture
-def api_headers() -> dict[str, str]:
-    return {"X-API-Key": "test-key"}
+Sets BUYEROS_ENV=test so that the rate limiter middleware skips enforcement
+during test runs (tests handle their own auth/key scenarios).
+"""
+import os
+os.environ.setdefault("BUYEROS_ENV", "test")
