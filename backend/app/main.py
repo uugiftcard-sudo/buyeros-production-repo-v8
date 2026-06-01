@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import shopify_router
 from app.routers import tiktok_router
+from app.routers import api_router
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     # Routes
     app.include_router(shopify_router)
     app.include_router(tiktok_router)
+    app.include_router(api_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
