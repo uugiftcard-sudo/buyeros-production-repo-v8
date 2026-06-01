@@ -1,7 +1,18 @@
 # BuyerOS Project Detail
 
 ## Current status
-Last updated: 2026-05-28 05:45 UTC. BuyerOS checks PASS via controller (`python3 /Users/rubykan/Documents/team/automation/run.py check --repo buyeros`). Fixes: ops clickability regression removed (CSS), live backend-proxy smoke stabilized, orchestration panel no longer blocks ops clicks. **⚠️ Keys still need rotation** before production deploy.
+Last updated: 2026-06-01. **買手報帳系統 ADDED**: `expense_service.py` (SQLite) + 5 API endpoints (`/expenses` CRUD + CSV export) + `frontend/app/expenses/page.tsx` (submit/list/approve/reject/export UI). Smoke check `/expenses` added to `smoke_http.py`.
+_Previously (2026-05-28): BuyerOS checks PASS. Orchestration panel, ops controls, keys need rotation before production deploy._
+
+### 買手報帳系統 ✅ DONE (2026-06-01)
+- [✅ DONE] `backend/app/services/expense_service.py` — SQLite-backed, submit/list/get/update_status/export_csv
+- [✅ DONE] `backend/app/workflows/main.py` — 5 endpoints: `POST /expenses`, `GET /expenses`, `GET /expenses/{id}`, `PATCH /expenses/{id}/status`, `GET /expenses/export/csv`
+- [✅ DONE] `frontend/app/expenses/page.tsx` — 提交表單、列表、狀態篩選、審批 modal、CSV 匯出
+- [✅ DONE] `smoke_http.py` buyeros — `/expenses` smoke check added (json_keys: ok, claims)
+- DB path: `backend/data/expenses.db` (gitignored via existing `data/` pattern)
+- Categories: travel, accommodation, meals, shipping, samples, marketing, office, other
+- Currencies: HKD, CNY, USD, EUR, GBP
+- Status flow: pending → approved / rejected
 
 ## Functional completion project — Milestone 0 inventory
 

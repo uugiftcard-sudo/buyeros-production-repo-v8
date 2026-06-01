@@ -1,7 +1,10 @@
 # Team Project State
 
 ## Last updated
-2026-05-30 — **PROJECT REOPENED**: FUNCTION_COMPLETION_PROJECT reopened for continuation. BuyerOS ⚠️ DIRTY (14+ new features), CLOTH ⚠️ DIRTY (minor), XAU ✅ CLEAN, new `backend/` project added.
+2026-06-01 — **238 pytest PASS**: 全套測試綠燈。修復 pre-existing `python-multipart` 未裝問題（已在 requirements.txt）。Dashboard UI 4 個快捷按鈕加入 ops section。TSC 0 errors.
+_Previously: Orders/Buyers/Finance API DONE — `/orders` + `/buyers` + `/finance/profit` + `/finance/payout`，smoke 14 checks._
+_Previously: 買手報帳系統 DONE — `expense_service.py` + `/expenses` (5 endpoints) + `frontend/app/expenses/page.tsx` + smoke._
+_Previously: 2026-05-30 — PROJECT REOPENED._
 _Previously: 2026-05-29 — Issue 6 DONE: `run.py report --write-state` now writes `state.md` + `projects/*.md`._
 _Previously: 2026-05-28 22:57 UTC — **PROJECT CLOSED**: all 5 milestones complete._
 

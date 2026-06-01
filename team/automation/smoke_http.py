@@ -36,6 +36,11 @@ SCENARIOS = {
         Check("/memory/timeline", "memory timeline"),
         Check("/ops/status", "ops status"),
         Check("/metrics", "metrics"),
+        Check("/expenses", "expenses list", json_keys=("ok", "claims")),
+        Check("/buyers", "buyers list", json_keys=("ok", "customers")),
+        Check("/orders", "orders list", json_keys=("ok", "orders")),
+        Check("/finance/profit", "finance profit summary", json_keys=("ok",)),
+        Check("/finance/payout", "finance payout schedule", json_keys=("ok",)),
     ],
     "xau": [
         Check("/", "dashboard", contains=("XAU",)),
