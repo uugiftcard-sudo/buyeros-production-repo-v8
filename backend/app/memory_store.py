@@ -29,6 +29,21 @@ class MemoryStore:
     def configured(self) -> bool:
         return bool(self.supabase_url and self.supabase_key)
 
+    def status(self) -> dict[str, Any]:
+        """Return a readiness/diagnostic status object.
+
+        This is used by `/health/ready` and `/debug/info`. The service should be
+        considered healthy even when Supabase is not configured or is down,
+        because we fall back to an in-memory store.
+        """
+
+        return {
+            "configured": self.configured,
+            "ok": True,
+            "backend": "supabase" if self.configured else "memory",
+            "items": len(self._items),
+        }
+
     def save_memory(
         self,
         namespace: Sequence[str],

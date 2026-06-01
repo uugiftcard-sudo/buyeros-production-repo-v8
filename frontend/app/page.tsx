@@ -6,13 +6,11 @@ import { agents, workflowSteps, referencePatterns, taskLanes, projectAliases, ui
 
 // Helper functions
 function normalizeProjectId(value?: string): CanonicalProject {
-  const result = projectAliases[(value || "").trim()] || "buyer_ai";
-  return result;
+  return projectAliases[(value || "").trim()] || "buyer_ai";
 }
 
 function projectProfile(value?: string) {
-  const result = projectProfiles[normalizeProjectId(value || "") as keyof typeof projectProfiles] || projectProfiles.buyer_ai;
-  return result;
+  return projectProfiles[normalizeProjectId(value || "") as keyof typeof projectProfiles] || projectProfiles.buyer_ai;
 }
 
 function normalizeProjectCard(entry: MemoryEntry<ProjectCard>): MemoryEntry<ProjectCard> {
@@ -53,9 +51,6 @@ function summarizeFallback(content?: TimelineContent): string | null {
 }
 
 export default function DashboardPage() {
-  // #region Debug: Component Mount
-  // #endregion
-
   const [api, setApi] = useState<ApiState>({ proxyUrl: defaultProxyUrl, apiKey: "" });
   const [result, setResult] = useState<ResultState>({ label: "尚未執行", data: null });
   const [loading, setLoading] = useState(false);
@@ -486,7 +481,6 @@ export default function DashboardPage() {
       return content;
     })
     .filter((content): content is TimelineContent => Boolean(content && (content.type === "routing" || content.fallback_chain || content.route === "provider")));
-
 
   return (
     <main className="app-shell" data-theme={uiTheme}>
