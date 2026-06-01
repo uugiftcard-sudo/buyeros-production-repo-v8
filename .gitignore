@@ -25,3 +25,7 @@ infra/ops_runs/
 infra/.smoke_*_pid
 infra/*smoke*.log
 .old_keys_backup.txt
+
+# Local SQLite databases (expense claims, etc.)
+backend/data/
+supabase/.temp/

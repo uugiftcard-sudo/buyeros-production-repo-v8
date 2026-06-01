@@ -1504,6 +1504,44 @@ export default function DashboardPage() {
             >
               維運狀態
             </a>
+            <a
+              className="ops-link-button"
+              role="button"
+              href="/expenses"
+              onClick={(event) => {
+                event.preventDefault();
+                window.location.href = "/expenses";
+              }}
+            >
+              買手報帳
+            </a>
+            <button
+              type="button"
+              className="ops-link-button"
+              onClick={() => {
+                void callApi("/buyers", {}, "買手列表");
+              }}
+            >
+              買手資料
+            </button>
+            <button
+              type="button"
+              className="ops-link-button"
+              onClick={() => {
+                void callApi("/orders", {}, "訂單列表");
+              }}
+            >
+              訂單查詢
+            </button>
+            <button
+              type="button"
+              className="ops-link-button"
+              onClick={() => {
+                void callApi("/finance/profit", {}, "利潤摘要");
+              }}
+            >
+              財務摘要
+            </button>
           </div>
           <div className="ops-result-card" aria-live="polite">
             <div className="row">
@@ -1549,8 +1587,8 @@ export default function DashboardPage() {
           )}
         </section>
 
-        <section className="panel ops-panel" id="orchestration" data-testid="orchestration-panel" style={{ pointerEvents: "none" }}>
-          <div style={{ pointerEvents: "auto" }}>
+        <section className="panel ops-panel" id="orchestration" data-testid="orchestration-panel">
+          <div>
             <div className="panel-title">
               <span className="panel-icon icon-sop" />
               <div>
