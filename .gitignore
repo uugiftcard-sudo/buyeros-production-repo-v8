@@ -39,3 +39,5 @@ supabase/.temp/
 XAU/
 CLOTH/
 
+alembic.ini
+backend/alembic/

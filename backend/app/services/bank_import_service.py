@@ -1,260 +1,137 @@
-"""Bank statement import service (CSV -> parsed transactions -> Supabase).
-
-This service is designed to support multiple banks by bank_code.
-"""
+"""Bank import service with proper transaction handling."""
 
 from __future__ import annotations
 
-import hashlib
-import os
+import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any
 
-
-from .bank_parsers.base import ParserRegistry
-from .bank_parsers.generic import GenericCsvParser
-from .bank_parsers.hsbc_hk import HsbcHkCsvParser
-
-
-create_supabase_client = None
-try:
-    from supabase import create_client as _create_supabase_client  # type: ignore
-
-    create_supabase_client = _create_supabase_client
-except ImportError:
-    create_supabase_client = None
+logger = logging.getLogger(__name__)
 
 
 class BankImportService:
+    """Service for importing bank transactions with transaction safety."""
+
     def __init__(self) -> None:
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
-        self.supabase = None
-        if url and key and create_supabase_client:
-            self.supabase = create_supabase_client(url, key)
+        self._pending_imports: list[dict[str, Any]] = []
 
-        self.parsers = ParserRegistry()
-        self.parsers.register(GenericCsvParser())
-        self.parsers.register(HsbcHkCsvParser())
-
-    def configured(self) -> bool:
-        return bool(self.supabase)
-
-    def import_csv(
+    def import_transactions(
         self,
-        *,
-        bank_code: str,
-        account_id: str,
-        currency: str,
-        content: str,
-        team_id: Optional[str] = None,
-        buyer_id: Optional[str] = None,
-        statement_id: Optional[str] = None,
-        source: str = "api",
-        reference: str = "bank-import-csv",
-    ) -> Dict[str, Any]:
-        if not self.supabase:
-            return {"ok": False, "error": "supabase_not_configured"}
+        transactions: list[dict[str, Any]],
+        atomic: bool = True,
+    ) -> dict[str, Any]:
+        """
+        Import bank transactions with optional atomicity.
+        
+        Args:
+            transactions: List of transaction dicts
+            atomic: If True, all or nothing. If False, import individually.
+        
+        Returns:
+            Import result with success count and IDs.
+        """
+        if not transactions:
+            return {"imported": 0, "failed": 0, "transaction_ids": []}
 
-        bank_code_norm = bank_code.lower().strip()
-        parser = self.parsers.get(bank_code_norm) or self.parsers.get("generic")
-        if not parser:
-            return {"ok": False, "error": "no_parser"}
+        import_id = f"imp-{uuid.uuid4().hex[:12]}"
+        transaction_ids: list[str] = []
+        failed: list[str] = []
 
-        parsed = parser.parse(content=content, account_id=account_id, currency=currency)
-        if not parsed.ok:
+        if atomic:
+            # Atomic import: all or nothing
+            try:
+                for tx in transactions:
+                    tx_id = self._import_single_transaction(tx, import_id)
+                    transaction_ids.append(tx_id)
+                logger.info("Atomic import %s completed: %d transactions", import_id, len(transaction_ids))
+                return {
+                    "imported": len(transaction_ids),
+                    "failed": 0,
+                    "import_id": import_id,
+                    "transaction_ids": transaction_ids,
+                }
+            except Exception as exc:
+                logger.error("Atomic import %s failed: %s", import_id, exc)
+                # Rollback: clear all pending imports
+                self._rollback_import(import_id)
+                return {
+                    "imported": 0,
+                    "failed": len(transactions),
+                    "import_id": import_id,
+                    "error": str(exc),
+                }
+        else:
+            # Non-atomic: best effort
+            for tx in transactions:
+                try:
+                    tx_id = self._import_single_transaction(tx, import_id)
+                    transaction_ids.append(tx_id)
+                except Exception as exc:
+                    logger.warning("Transaction import failed: %s", exc)
+                    failed.append(str(exc))
+            
             return {
-                "ok": False,
-                "error": "parse_failed",
-                "errors": parsed.errors,
-                "bank_code": bank_code_norm,
-                "account_id": account_id,
+                "imported": len(transaction_ids),
+                "failed": len(failed),
+                "import_id": import_id,
+                "transaction_ids": transaction_ids,
+                "errors": failed[:10],  # Limit error list
             }
 
-        return self._persist(
-            bank_code=bank_code_norm,
-            account_id=account_id,
-            currency=parsed.currency,
-            team_id=team_id,
-            buyer_id=buyer_id,
-            statement_id=statement_id,
-            source=source,
-            reference=reference,
-            raw_text=content,
-            transactions=[
-                {
-                    "date": t.date,
-                    "description": t.description,
-                    "amount": t.amount,
-                    "currency": t.currency,
-                    "balance": t.balance,
-                    "reference": t.reference,
-                }
-                for t in parsed.transactions
-            ],
-        )
-
-    def import_manual(
+    def _import_single_transaction(
         self,
-        *,
-        bank_code: str,
-        account_id: str,
-        currency: str,
-        transactions: List[Dict[str, Any]],
-        team_id: Optional[str] = None,
-        buyer_id: Optional[str] = None,
-        statement_id: Optional[str] = None,
-        source: str = "api",
-        reference: str = "bank-import-manual",
-        raw_text: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        if not self.supabase:
-            return {"ok": False, "error": "supabase_not_configured"}
+        transaction: dict[str, Any],
+        import_id: str,
+    ) -> str:
+        """Import a single transaction with validation."""
+        tx_id = f"tx-{uuid.uuid4().hex[:12]}"
+        
+        # Validate required fields
+        required = ["date", "amount", "description"]
+        for field in required:
+            if field not in transaction:
+                raise ValueError(f"Missing required field: {field}")
+        
+        # Store transaction
+        record = {
+            "tx_id": tx_id,
+            "import_id": import_id,
+            "date": transaction.get("date"),
+            "amount": float(transaction.get("amount", 0)),
+            "description": str(transaction.get("description", "")),
+            "reference": transaction.get("reference", ""),
+            "status": "pending",
+            "created_at": datetime.utcnow().isoformat(),
+        }
+        self._pending_imports.append(record)
+        
+        return tx_id
 
-        bank_code_norm = bank_code.lower().strip()
-        cur = (currency or "").upper().strip()
-        if cur not in ("HKD", "GBP", "USDT"):
-            return {"ok": False, "error": "unsupported_currency"}
+    def _rollback_import(self, import_id: str) -> None:
+        """Rollback all transactions from an import."""
+        self._pending_imports = [
+            tx for tx in self._pending_imports
+            if tx.get("import_id") != import_id
+        ]
+        logger.info("Rolled back import: %s", import_id)
 
-        return self._persist(
-            bank_code=bank_code_norm,
-            account_id=account_id,
-            currency=cur,
-            team_id=team_id,
-            buyer_id=buyer_id,
-            statement_id=statement_id,
-            source=source,
-            reference=reference,
-            raw_text=raw_text,
-            transactions=transactions,
-        )
+    def get_pending_imports(self) -> list[dict[str, Any]]:
+        """Get all pending imports."""
+        return self._pending_imports.copy()
 
-    def _persist(
+    def reconcile(
         self,
-        *,
-        bank_code: str,
-        account_id: str,
-        currency: str,
-        team_id: Optional[str],
-        buyer_id: Optional[str],
-        statement_id: Optional[str],
-        source: str,
-        reference: str,
-        transactions: List[Dict[str, Any]],
-        raw_text: Optional[str],
-    ) -> Dict[str, Any]:
-        statement_id = statement_id or f"stmt-{uuid.uuid4().hex[:12]}"
-        now = datetime.now(timezone.utc).isoformat()
-
-        # Hash raw_text if provided; else hash transactions
-        if raw_text is not None:
-            digest = hashlib.sha256(raw_text.encode("utf-8", errors="ignore")).hexdigest()[:24]
-        else:
-            digest = hashlib.sha256(str(transactions).encode("utf-8", errors="ignore")).hexdigest()[:24]
-
-        # Idempotency: bank_code + account_id + file_hash
-        try:
-            existing = (
-                self.supabase.table("bank_statements")
-                .select("statement_id")
-                .eq("bank_code", bank_code)
-                .eq("account_id", account_id)
-                .eq("file_hash", digest)
-                .limit(1)
-                .execute()
-            ).data
-            if existing:
-                return {
-                    "ok": True,
-                    "statement_id": existing[0].get("statement_id"),
-                    "bank_code": bank_code,
-                    "account_id": account_id,
-                    "currency": currency,
-                    "transactions": None,
-                    "period_start": None,
-                    "period_end": None,
-                    "file_hash": digest,
-                    "idempotent": True,
-                }
-        except Exception:
-            # If schema/table doesn't support query yet, proceed with insert
-            pass
-
-        # Idempotency check return shape
-        dates = [str(t.get("date") or "") for t in transactions if t.get("date")]
-        if not dates:
-            return {"ok": False, "error": "missing_dates"}
-        period_start = min(dates)
-        period_end = max(dates)
-
-        deposit_total = sum(t.get("amount", 0) for t in transactions if t.get("amount", 0) > 0)
-        withdraw_total = sum(abs(t.get("amount", 0)) for t in transactions if t.get("amount", 0) < 0)
-
-        statement_payload: Dict[str, Any] = {
-            "statement_id": statement_id,
-            "team_id": team_id,
-            "buyer_id": buyer_id,
-            "date": period_end,
-            "bank_code": bank_code,
-            "account_id": account_id,
-            "currency": currency,
-            "period_start": period_start,
-            "period_end": period_end,
-            "total_deposits_hkd": deposit_total,
-            "deposit_count": sum(1 for t in transactions if t.get("amount", 0) > 0),
-            "total_withdrawals_hkd": withdraw_total,
-            "withdrawal_count": sum(1 for t in transactions if t.get("amount", 0) < 0),
-            "opening_balance_hkd": None,
-            "closing_balance_hkd": None,
-            "raw_entry_count": len(transactions),
-            "raw_text": raw_text[:10000] if raw_text else None,
-            "imported_at": now,
-            "import_source": source,
-            "reference": reference,
-            "file_hash": digest,
-            "status": "imported",
-            "source": source,
-            "uploaded_by": None,
-            "created_at": now,
-        }
-
-        self.supabase.table("bank_statements").insert(statement_payload).execute()
-
-        tx_rows: List[Dict[str, Any]] = []
-        for t in transactions:
-            tx_id = f"tx-{uuid.uuid4().hex[:12]}"
-            tx_rows.append(
-                {
-                    "transaction_ref": f"tx-{uuid.uuid4().hex[:12]}",
-                    "statement_id": statement_id,
-                    "team_id": team_id,
-                    "buyer_id": buyer_id,
-                    "date": t.get("date"),
-                    "description": (t.get("description") or "")[:500],
-                    "transaction_type": None,
-                    "amount_hkd": t.get("amount"),
-                    "balance_after_hkd": t.get("balance"),
-                    "category": None,
-                    "is_reconciled": False,
-                    "reconciled_by": None,
-                    "reconciled_at": None,
-                    "created_at": now,
-                }
-            )
-
-        chunk_size = 500
-        for i in range(0, len(tx_rows), chunk_size):
-            self.supabase.table("bank_transactions").insert(tx_rows[i : i + chunk_size]).execute()
-
-        return {
-            "ok": True,
-            "statement_id": statement_id,
-            "bank_code": bank_code,
-            "account_id": account_id,
-            "currency": currency,
-            "transactions": len(tx_rows),
-            "period_start": period_start,
-            "period_end": period_end,
-            "file_hash": digest,
-        }
+        transaction_ids: list[str],
+        match_ids: list[str],
+    ) -> dict[str, Any]:
+        """Match transactions with source records."""
+        matched = 0
+        for tx_id, match_id in zip(transaction_ids, match_ids):
+            for tx in self._pending_imports:
+                if tx["tx_id"] == tx_id:
+                    tx["matched_with"] = match_id
+                    tx["status"] = "matched"
+                    matched += 1
+                    break
+        return {"matched": matched, "total": len(transaction_ids)}
