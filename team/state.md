@@ -1,7 +1,7 @@
 # Team Project State
 
 ## Last updated
-2026-05-30 — **PROJECT REOPENED**: FUNCTION_COMPLETION_PROJECT reopened for continuation. BuyerOS ⚠️ DIRTY (14+ new features), CLOTH ⚠️ DIRTY (minor), XAU ✅ CLEAN, new `backend/` project added.
+2026-06-01 13:59 UTC — All hygiene fixed: BuyerOS 15 new services committed (f03b570+d51095c+3180fea) + test file (d51095c) pushed; CLOTH lint fix committed (2a51f2a) pushed; XAU git repo initialized + branch checkout to `codex/xau-dashboard-live-ui`; all 3 repos: dirty=no, secret=no, deploy=open. `/Documents/backend/` confirmed as independent FastAPI project with own git repo.
 _Previously: 2026-05-29 — Issue 6 DONE: `run.py report --write-state` now writes `state.md` + `projects/*.md`._
 _Previously: 2026-05-28 22:57 UTC — **PROJECT CLOSED**: all 5 milestones complete._
 
