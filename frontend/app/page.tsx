@@ -4,13 +4,29 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AgentCard, ProjectCard, MemoryEntry, TaskContent, SubtaskContent, ProviderStatus, OpsStatus, TimelineContent, TimelineEntry, UiTheme, ActionEvent, ApiState, ResultState, CanonicalProject, OrchTrace, WorkspaceAction } from "./types";
 import { agents, workflowSteps, referencePatterns, taskLanes, projectAliases, uiThemes, subtaskStatusLabels, providerUseCases, providerFallbackChains, projectProfiles, defaultProxyUrl, apiKeyStorageKey } from "./constants";
 
+// #region Debug Instrumentation
+const LOG_ENDPOINT = "http://127.0.0.1:7287/ingest/234d8d35-1f3a-4b33-a182-4fb0cb4d599f";
+const SESSION_ID = "2ef9a9";
+function dbg(location: string, message: string, data: Record<string, unknown> = {}) {
+  fetch(LOG_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": SESSION_ID },
+    body: JSON.stringify({ sessionId: SESSION_ID, location, message, data, timestamp: Date.now(), runId: "debug-run" })
+  }).catch(() => {});
+}
+// #endregion
+
 // Helper functions
 function normalizeProjectId(value?: string): CanonicalProject {
-  return projectAliases[(value || "").trim()] || "buyer_ai";
+  const result = projectAliases[(value || "").trim()] || "buyer_ai";
+  dbg("page.tsx:normalizeProjectId", `input=${value}, output=${result}`);
+  return result;
 }
 
 function projectProfile(value?: string) {
-  return projectProfiles[normalizeProjectId(value || "")];
+  const result = projectProfiles[normalizeProjectId(value || "") as keyof typeof projectProfiles] || projectProfiles.buyer_ai;
+  dbg("page.tsx:projectProfile", `input=${value}, output=${result?.title}`);
+  return result;
 }
 
 function normalizeProjectCard(entry: MemoryEntry<ProjectCard>): MemoryEntry<ProjectCard> {
@@ -51,6 +67,10 @@ function summarizeFallback(content?: TimelineContent): string | null {
 }
 
 export default function DashboardPage() {
+  // #region Debug: Component Mount
+  dbg("page.tsx:DashboardPage", "Component mounted");
+  // #endregion
+
   const [api, setApi] = useState<ApiState>({ proxyUrl: defaultProxyUrl, apiKey: "" });
   const [result, setResult] = useState<ResultState>({ label: "尚未執行", data: null });
   const [loading, setLoading] = useState(false);
@@ -81,6 +101,7 @@ export default function DashboardPage() {
   const normalizedProxyUrl = useMemo(() => api.proxyUrl.replace(/\/+$/, ""), [api.proxyUrl]);
 
   useEffect(() => {
+    dbg("page.tsx:useEffect", "Mount effect");
     setMounted(true);
     recordAction("系統已載入", "等待操作");
     const savedProxyUrl = window.localStorage.getItem("buyeros.api.proxyUrl");
@@ -96,8 +117,9 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    dbg("page.tsx:useEffect", "API URL effect", { proxyUrl: api.proxyUrl });
     window.localStorage.setItem("buyeros.api.proxyUrl", api.proxyUrl);
-  }, [api]);
+  }, [api.proxyUrl]);
 
   useEffect(() => {
     window.localStorage.setItem(apiKeyStorageKey, api.apiKey);
@@ -108,6 +130,7 @@ export default function DashboardPage() {
   }, [uiTheme]);
 
   function updateApi<K extends keyof ApiState>(key: K, value: ApiState[K]) {
+    dbg("page.tsx:updateApi", `key=${key}, value=${value}`);
     setApi((current) => ({ ...current, [key]: value }));
   }
 
@@ -135,7 +158,7 @@ export default function DashboardPage() {
     return Boolean(pendingActions[label]);
   }
 
-  // #region useCallback wrapped API handlers (H1 fix)
+  // #region useCallback wrapped API handlers
   const callApi = useCallback(async (
     path: string,
     init: RequestInit = {},
@@ -143,6 +166,7 @@ export default function DashboardPage() {
     options: { muteResult?: boolean; muteAction?: boolean } = {}
   ): Promise<unknown> => {
     const { muteResult = false, muteAction = false } = options;
+    dbg("page.tsx:callApi", `path=${path}, label=${label}`, { normalizedProxyUrl });
     if (!muteAction) {
       recordAction(label, "執行中");
     }
@@ -193,6 +217,7 @@ export default function DashboardPage() {
   }, [normalizedProxyUrl, api.apiKey]);
 
   const loadOrchestrationTrace = useCallback(async (agentId: string) => {
+    dbg("page.tsx:loadOrchestrationTrace", `agentId=${agentId}`);
     const agentData = await callApi(`/api/v1/orchestration/agent/${encodeURIComponent(agentId)}`, {}, "Orchestration Agent State", { muteResult: true });
     const traceId = (agentData && typeof agentData === "object" && "trace_id" in agentData)
       ? (agentData as { trace_id?: string }).trace_id
@@ -207,6 +232,7 @@ export default function DashboardPage() {
   }, [callApi]);
 
   const loadTasks = useCallback(async ({ muteResult = false } = {}) => {
+    dbg("page.tsx:loadTasks", "Loading tasks");
     const data = await callApi("/tasks", {}, "任務板", { muteResult });
     if (data && typeof data === "object" && "items" in data && Array.isArray((data as { items?: unknown }).items)) {
       setTasks((data as { items: MemoryEntry<TaskContent>[] }).items);
@@ -215,6 +241,7 @@ export default function DashboardPage() {
   }, [callApi]);
 
   const loadSubtasks = useCallback(async (taskId: string) => {
+    dbg("page.tsx:loadSubtasks", `taskId=${taskId}`);
     setPlannedTaskId(taskId);
     const data = await callApi(`/tasks/${encodeURIComponent(taskId)}/subtasks`, {}, "Subtasks");
     if (data && typeof data === "object" && "items" in data && Array.isArray((data as { items?: unknown }).items)) {
@@ -224,6 +251,7 @@ export default function DashboardPage() {
   }, [callApi]);
 
   const loadProjects = useCallback(async () => {
+    dbg("page.tsx:loadProjects", "Loading projects");
     const data = await callApi("/projects", {}, "專案清單");
     if (data && typeof data === "object" && "items" in data && Array.isArray((data as { items?: unknown }).items)) {
       const latest = new Map<string, MemoryEntry<ProjectCard>>();
@@ -237,6 +265,7 @@ export default function DashboardPage() {
   }, [callApi]);
 
   const loadTeamStatus = useCallback(async () => {
+    dbg("page.tsx:loadTeamStatus", "Loading team status");
     const data = await callApi("/ai-team/status", {}, "AI 團隊狀態");
     if (data && typeof data === "object" && "providers" in data && Array.isArray((data as { providers?: unknown }).providers)) {
       setTeamStatus((data as { providers: ProviderStatus[] }).providers);
@@ -245,6 +274,7 @@ export default function DashboardPage() {
   }, [callApi]);
 
   const loadCapabilities = useCallback(async () => {
+    dbg("page.tsx:loadCapabilities", "Loading capabilities");
     const data = await callApi("/system/capabilities", {}, "能力矩陣");
     if (data && typeof data === "object") {
       setCapabilities(data as Record<string, unknown>);
@@ -253,6 +283,7 @@ export default function DashboardPage() {
   }, [callApi]);
 
   const loadOpsStatus = useCallback(async () => {
+    dbg("page.tsx:loadOpsStatus", "Loading ops status");
     const data = await callApi("/ops/status", {}, "維運狀態");
     if (data && typeof data === "object") {
       setOpsStatus(data as OpsStatus);
@@ -262,6 +293,7 @@ export default function DashboardPage() {
 
   const searchTimeline = useCallback(async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
+    dbg("page.tsx:searchTimeline", `query=${memoryQuery}, session=${sessionId}`);
     const data = await callApi(
       "/memory/timeline",
       { method: "POST", body: JSON.stringify({ query: memoryQuery.trim() || undefined, session_id: sessionId, project_id: project, limit: 50 }) },
@@ -275,6 +307,7 @@ export default function DashboardPage() {
 
   const dispatchTask = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    dbg("page.tsx:dispatchTask", `project=${project}, type=${taskType}`);
     await callApi(
       "/tasks/dispatch",
       {
@@ -288,12 +321,13 @@ export default function DashboardPage() {
           session_id: sessionId
         })
       },
-      loading ? "派工中..." : "派工 (Dispatcher)"
+      "派工 (Dispatcher)"
     );
     await loadTasks({ muteResult: true });
-  }, [callApi, project, taskType, taskTitle, prompt, provider, sessionId, loading, loadTasks]);
+  }, [callApi, project, taskType, taskTitle, prompt, provider, sessionId, loadTasks]);
 
   const createPlan = useCallback(async () => {
+    dbg("page.tsx:createPlan", "Creating plan");
     const data = await callApi(
       "/tasks/dispatch_plan",
       {
@@ -321,6 +355,7 @@ export default function DashboardPage() {
   }, [callApi, project, taskType, taskTitle, prompt, provider, sessionId, loadSubtasks, loadTasks]);
 
   const refreshWorkstream = useCallback(async (taskId = plannedTaskId) => {
+    dbg("page.tsx:refreshWorkstream", `taskId=${taskId}`);
     await loadTasks({ muteResult: true });
     if (taskId) await loadSubtasks(taskId);
     await searchTimeline();
@@ -328,6 +363,7 @@ export default function DashboardPage() {
 
   const runSubtask = useCallback(async (subtaskId: string) => {
     if (!plannedTaskId) return;
+    dbg("page.tsx:runSubtask", `subtaskId=${subtaskId}, taskId=${plannedTaskId}`);
     await callApi(
       `/tasks/${encodeURIComponent(plannedTaskId)}/subtasks/run`,
       { method: "POST", body: JSON.stringify({ subtask_id: subtaskId, preferred_provider: provider, session_id: sessionId }) },
@@ -338,6 +374,7 @@ export default function DashboardPage() {
 
   const runNextSubtask = useCallback(async () => {
     if (!plannedTaskId) return;
+    dbg("page.tsx:runNextSubtask", `taskId=${plannedTaskId}`);
     await callApi(
       `/tasks/${encodeURIComponent(plannedTaskId)}/subtasks/next`,
       { method: "POST", body: JSON.stringify({ preferred_provider: provider, session_id: sessionId }) },
@@ -348,6 +385,7 @@ export default function DashboardPage() {
 
   const runAllSubtasks = useCallback(async () => {
     if (!plannedTaskId || subtasks.length === 0) return;
+    dbg("page.tsx:runAllSubtasks", `taskId=${plannedTaskId}, count=${subtasks.length}`);
     await callApi(
       `/tasks/${encodeURIComponent(plannedTaskId)}/run_all`,
       { method: "POST", body: JSON.stringify({ preferred_provider: provider, session_id: sessionId, max_steps: 200 }) },
@@ -357,6 +395,7 @@ export default function DashboardPage() {
   }, [callApi, plannedTaskId, subtasks.length, provider, sessionId, refreshWorkstream]);
 
   const updateTaskStatus = useCallback(async (taskId: string, status: string) => {
+    dbg("page.tsx:updateTaskStatus", `taskId=${taskId}, status=${status}`);
     await callApi(
       `/tasks/${encodeURIComponent(taskId)}/status`,
       { method: "POST", body: JSON.stringify({ status, note: `由 UI 更新為 ${status}` }) },
@@ -366,6 +405,7 @@ export default function DashboardPage() {
   }, [callApi, loadTasks]);
 
   const runWorkspaceAction = useCallback(async (action: WorkspaceAction) => {
+    dbg("page.tsx:runWorkspaceAction", `action=${action}`);
     if (action === "daily_report") {
       await callApi("/automation/daily-report", { method: "POST", body: JSON.stringify({}) }, "買手日報");
       await searchTimeline();
@@ -430,6 +470,7 @@ export default function DashboardPage() {
   // #endregion
 
   useEffect(() => {
+    dbg("page.tsx:useEffect", "Initial data load", { normalizedProxyUrl });
     loadTasks();
     loadProjects();
     loadTeamStatus();
@@ -481,6 +522,8 @@ export default function DashboardPage() {
       return content;
     })
     .filter((content): content is TimelineContent => Boolean(content && (content.type === "routing" || content.fallback_chain || content.route === "provider")));
+
+  dbg("page.tsx:render", "Rendering", { pendingTasks, completedTasks, timelineLength: timeline.length });
 
   return (
     <main className="app-shell" data-theme={uiTheme}>
@@ -645,8 +688,8 @@ export default function DashboardPage() {
                 <article className="provider-row" key={providerItem.name}>
                   <div>
                     <strong>{providerItem.name}</strong>
-                    <span>{providerUseCases[providerItem.name] || "多 AI 任務處理"}</span>
-                    <span>Fallback：{providerItem.fallback_target || providerFallbackChains[providerItem.name] || "無"}</span>
+                    <span>{providerUseCases[providerItem.name as keyof typeof providerUseCases] || "多 AI 任務處理"}</span>
+                    <span>Fallback：{providerItem.fallback_target || providerFallbackChains[providerItem.name as keyof typeof providerFallbackChains] || "無"}</span>
                     <span>最近執行：{providerItem.last_run ? new Date(providerItem.last_run).toLocaleString("zh-TW") : "尚無執行紀錄"}</span>
                     <span>最近錯誤：{providerItem.last_error || "無"}</span>
                     <span>最近 latency：{providerItem.last_latency_ms != null ? `${providerItem.last_latency_ms} ms` : "尚無紀錄"}</span>
@@ -903,7 +946,7 @@ export default function DashboardPage() {
                       <div className="subtask-top">
                         <strong>{subtask.goal}</strong>
                         <span className={`task-status status-${subtask.status}`}>
-                          {subtaskStatusLabels[subtask.status] || subtask.status}
+                          {subtaskStatusLabels[subtask.status as keyof typeof subtaskStatusLabels] || subtask.status}
                         </span>
                       </div>
                       <p>{subtask.kind} · {projectProfile(subtask.project).title} · {subtask.provider || "尚未指派"}</p>

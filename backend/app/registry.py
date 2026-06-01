@@ -7,12 +7,14 @@ Replaces both registry.py and context/provider_registry.py patterns.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Callable, Dict, Generic, Optional, Type, TypeVar
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar("T")
 
-class Registry[T]:
+
+class Registry(Generic[T]):
     """Generic registry for any type of objects."""
 
     def __init__(self, name: str = "registry") -> None:
@@ -54,6 +56,38 @@ class Registry[T]:
     def clear(self) -> None:
         """Clear all items."""
         self._items.clear()
+
+
+class ToolRegistry:
+    def __init__(self) -> None:
+        self._reg: Registry[Callable[..., Any]] = Registry("tool")
+
+    def register(self, name: str, tool: Callable[..., Any]) -> None:
+        self._reg.register(name, tool)
+
+    def has_tool(self, name: str) -> bool:
+        return self._reg.has(name)
+
+    def call(self, name: str, payload: dict[str, Any]) -> Any:
+        tool = self._reg.get(name)
+        return tool(**payload)
+
+    def names(self) -> list[str]:
+        return self._reg.list_all()
+
+
+class AgentRegistry:
+    def __init__(self) -> None:
+        self._reg: Registry[Any] = Registry("agent")
+
+    def register(self, name: str, agent: Any) -> None:
+        self._reg.register(name, agent)
+
+    def get(self, name: str) -> Any:
+        return self._reg.get(name)
+
+    def names(self) -> list[str]:
+        return self._reg.list_all()
 
 
 # Pre-configured registries
