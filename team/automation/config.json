@@ -156,6 +156,11 @@
           "cmd": ["node", "--test", "scripts/mobile-nav-contract.test.mjs"]
         },
         {
+          "name": "frontend backend contract",
+          "cwd": "/Users/rubykan/Documents/CLOTH",
+          "cmd": ["node", "--test", "scripts/frontend-backend-contract.test.mjs"]
+        },
+        {
           "name": "http api/ui smoke",
           "cwd": "/Users/rubykan/Documents/team/automation",
           "cmd": ["python3", "with_server.py", "--timeout", "180", "--cwd", "/Users/rubykan/Documents/CLOTH", "--command", "cd /Users/rubykan/Documents/CLOTH && PORT=3499 npm run dev --workspace=api", "--ready-url", "http://127.0.0.1:3499/api/health", "--", "python3", "smoke_http.py", "cloth", "--base-url", "http://127.0.0.1:3499"]
