@@ -35,3 +35,8 @@ infra/*smoke*.log
 backend/data/
 supabase/.temp/
 xau-ai-cli/
+
+# Embedded repos — independent git repos
+XAU/
+CLOTH/
+
