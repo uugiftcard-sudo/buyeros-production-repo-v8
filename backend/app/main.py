@@ -12,12 +12,15 @@ import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.routers import shopify_router
 from app.routers import tiktok_router
 from app.routers import api_router
+from app.rate_limit import limiter, rate_limit_exceeded_handler
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -37,7 +40,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     logger.info("Starting BuyerOS Backend API")
-    logger.info("Shopify connector: %s", os.getenv("SHOPIFY_API_KEY", "[not set — mock mode]"))
+    # Log only configured status, not the actual key
+    shopify_key = os.getenv("SHOPIFY_API_KEY", "")
+    logger.info("Shopify connector: %s", "configured" if shopify_key else "mock mode")
     yield
     logger.info("Shutting down BuyerOS Backend API")
 
@@ -53,6 +58,10 @@ def create_app() -> FastAPI:
         version="1.0.0",
         lifespan=lifespan,
     )
+
+    # Rate limiting
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
     # CORS — allow frontend dev server
     app.add_middleware(
